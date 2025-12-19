@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import { getRelativePath, deleteUploadedFile } from '../../utils/upload';
-
-const prisma = new PrismaClient();
+import prisma from '../../utils/database';
 
 export const carResolvers = {
   Query: {

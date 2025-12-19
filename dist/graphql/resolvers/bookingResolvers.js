@@ -1,14 +1,16 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bookingResolvers = void 0;
-const client_1 = require("@prisma/client");
 const pricing_1 = require("../../utils/pricing");
 const validation_1 = require("../../utils/validation");
-const prisma = new client_1.PrismaClient();
+const database_1 = __importDefault(require("../../utils/database"));
 exports.bookingResolvers = {
     Query: {
         bookings: async () => {
-            return await prisma.booking.findMany({
+            return await database_1.default.booking.findMany({
                 include: {
                     user: true,
                     car: true,
@@ -17,7 +19,7 @@ exports.bookingResolvers = {
             });
         },
         booking: async (_, { id }) => {
-            return await prisma.booking.findUnique({
+            return await database_1.default.booking.findUnique({
                 where: { id },
                 include: {
                     user: true,
@@ -27,7 +29,7 @@ exports.bookingResolvers = {
             });
         },
         userBookings: async (_, { userId }) => {
-            return await prisma.booking.findMany({
+            return await database_1.default.booking.findMany({
                 where: { userId },
                 include: {
                     user: true,
@@ -37,7 +39,7 @@ exports.bookingResolvers = {
             });
         },
         carBookings: async (_, { carId }) => {
-            return await prisma.booking.findMany({
+            return await database_1.default.booking.findMany({
                 where: { carId },
                 include: {
                     user: true,
@@ -63,7 +65,7 @@ exports.bookingResolvers = {
                 const start = new Date(startDate);
                 const end = new Date(endDate);
                 // Check if car is available for the given dates
-                const overlappingBookings = await prisma.booking.findMany({
+                const overlappingBookings = await database_1.default.booking.findMany({
                     where: {
                         carId,
                         status: { not: 'cancelled' },
@@ -78,7 +80,7 @@ exports.bookingResolvers = {
                 }
             }
             // Get car details
-            const car = await prisma.car.findUnique({
+            const car = await database_1.default.car.findUnique({
                 where: { id: carId }
             });
             if (!car) {
@@ -99,7 +101,7 @@ exports.bookingResolvers = {
             const taxAmount = (0, pricing_1.calculateTax)(basePrice);
             const totalPrice = (0, pricing_1.calculateTotalPrice)(basePrice, taxAmount);
             // Create booking
-            return await prisma.booking.create({
+            return await database_1.default.booking.create({
                 data: {
                     userId: context.userId,
                     carId,
@@ -122,7 +124,7 @@ exports.bookingResolvers = {
             });
         },
         updateBookingStatus: async (_, { input }) => {
-            return await prisma.booking.update({
+            return await database_1.default.booking.update({
                 where: { id: input.id },
                 data: { status: input.status },
                 include: {
@@ -133,7 +135,7 @@ exports.bookingResolvers = {
             });
         },
         cancelBooking: async (_, { id }) => {
-            const booking = await prisma.booking.findUnique({
+            const booking = await database_1.default.booking.findUnique({
                 where: { id }
             });
             if (!booking) {
@@ -143,7 +145,7 @@ exports.bookingResolvers = {
             if (booking.status !== 'pending' && booking.status !== 'confirmed') {
                 throw new Error('Cannot cancel booking with current status');
             }
-            await prisma.booking.update({
+            await database_1.default.booking.update({
                 where: { id },
                 data: { status: 'cancelled' }
             });
@@ -152,17 +154,17 @@ exports.bookingResolvers = {
     },
     Booking: {
         user: async (parent) => {
-            return await prisma.user.findUnique({
+            return await database_1.default.user.findUnique({
                 where: { id: parent.userId }
             });
         },
         car: async (parent) => {
-            return await prisma.car.findUnique({
+            return await database_1.default.car.findUnique({
                 where: { id: parent.carId }
             });
         },
         payment: async (parent) => {
-            return await prisma.payment.findUnique({
+            return await database_1.default.payment.findUnique({
                 where: { bookingId: parent.id }
             });
         }

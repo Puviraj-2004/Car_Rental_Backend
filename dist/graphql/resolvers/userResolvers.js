@@ -1,28 +1,30 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userResolvers = void 0;
-const client_1 = require("@prisma/client");
 const auth_1 = require("../../utils/auth");
-const prisma = new client_1.PrismaClient();
+const database_1 = __importDefault(require("../../utils/database"));
 exports.userResolvers = {
     Query: {
         me: async (_, __, context) => {
             if (!context.userId) {
                 throw new Error('Authentication required');
             }
-            return await prisma.user.findUnique({
+            return await database_1.default.user.findUnique({
                 where: { id: context.userId },
                 include: { bookings: true }
             });
         },
         user: async (_, { id }) => {
-            return await prisma.user.findUnique({
+            return await database_1.default.user.findUnique({
                 where: { id },
                 include: { bookings: true }
             });
         },
         users: async () => {
-            return await prisma.user.findMany({
+            return await database_1.default.user.findMany({
                 include: { bookings: true }
             });
         }
@@ -30,7 +32,7 @@ exports.userResolvers = {
     Mutation: {
         register: async (_, { input }) => {
             // Check if user already exists
-            const existingUser = await prisma.user.findUnique({
+            const existingUser = await database_1.default.user.findUnique({
                 where: { email: input.email }
             });
             if (existingUser) {
@@ -39,7 +41,7 @@ exports.userResolvers = {
             // Hash password
             const hashedPassword = await (0, auth_1.hashPassword)(input.password);
             // Create user
-            const user = await prisma.user.create({
+            const user = await database_1.default.user.create({
                 data: {
                     ...input,
                     password: hashedPassword,
@@ -58,7 +60,7 @@ exports.userResolvers = {
         login: async (_, { input }) => {
             const { email, password } = input;
             // Find user
-            const user = await prisma.user.findUnique({
+            const user = await database_1.default.user.findUnique({
                 where: { email },
                 include: { bookings: true }
             });
@@ -81,14 +83,14 @@ exports.userResolvers = {
             if (!context.userId) {
                 throw new Error('Authentication required');
             }
-            return await prisma.user.update({
+            return await database_1.default.user.update({
                 where: { id: context.userId },
                 data: input,
                 include: { bookings: true }
             });
         },
         deleteUser: async (_, { id }) => {
-            await prisma.user.delete({
+            await database_1.default.user.delete({
                 where: { id }
             });
             return true;
@@ -96,7 +98,7 @@ exports.userResolvers = {
     },
     User: {
         bookings: async (parent) => {
-            return await prisma.booking.findMany({
+            return await database_1.default.booking.findMany({
                 where: { userId: parent.id }
             });
         }
