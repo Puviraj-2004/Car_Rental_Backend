@@ -1,15 +1,14 @@
-import { defineConfig } from 'prisma/config';
+import { loadEnvConfig } from '@next/env';
+import { resolve } from 'path';
 
-export default defineConfig({
-  schema: './prisma/schema.prisma',
-  generate: {
-    client: {
-      outputDir: '../node_modules/.prisma/client',
+// Load environment variables
+loadEnvConfig(process.cwd());
+
+export default {
+  schema: resolve('./prisma/schema.prisma'),
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || 'file:./dev.db',
     },
   },
-  database: {
-    url: process.env.DATABASE_URL,
-    directUrl: process.env.DATABASE_URL,
-    shadowDatabaseUrl: process.env.DATABASE_URL,
-  },
-});
+};
