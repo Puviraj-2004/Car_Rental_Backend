@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { calculateTax, calculateTotalPrice, calculateRentalCost } from '../../utils/pricing';
 import { validateBookingInput } from '../../utils/validation';
-
-const prisma = new PrismaClient();
+import prisma from '../../utils/database';
 
 export const bookingResolvers = {
   Query: {

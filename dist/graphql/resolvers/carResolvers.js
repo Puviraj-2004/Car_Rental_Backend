@@ -1,9 +1,11 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.carResolvers = void 0;
-const client_1 = require("@prisma/client");
 const upload_1 = require("../../utils/upload");
-const prisma = new client_1.PrismaClient();
+const database_1 = __importDefault(require("../../utils/database"));
 exports.carResolvers = {
     Query: {
         cars: async (_, { filter }) => {
@@ -37,7 +39,7 @@ exports.carResolvers = {
                 if (filter.availability !== undefined)
                     where.availability = filter.availability;
             }
-            return await prisma.car.findMany({
+            return await database_1.default.car.findMany({
                 where,
                 include: {
                     bookings: true,
@@ -46,7 +48,7 @@ exports.carResolvers = {
             });
         },
         car: async (_, { id }) => {
-            return await prisma.car.findUnique({
+            return await database_1.default.car.findUnique({
                 where: { id },
                 include: {
                     bookings: true,
@@ -59,7 +61,7 @@ exports.carResolvers = {
             const start = new Date(startDate);
             const end = new Date(endDate);
             // Find cars that don't have overlapping bookings
-            const bookedCarIds = await prisma.booking.findMany({
+            const bookedCarIds = await database_1.default.booking.findMany({
                 where: {
                     AND: [
                         { status: { not: 'cancelled' } },
@@ -80,7 +82,7 @@ exports.carResolvers = {
                 }
             });
             const bookedIds = bookedCarIds.map((booking) => booking.carId);
-            return await prisma.car.findMany({
+            return await database_1.default.car.findMany({
                 where: {
                     AND: [
                         { availability: true },
@@ -96,7 +98,7 @@ exports.carResolvers = {
     },
     Mutation: {
         createCar: async (_, { input }) => {
-            return await prisma.car.create({
+            return await database_1.default.car.create({
                 data: {
                     ...input,
                     availability: input.availability !== undefined ? input.availability : true
@@ -108,7 +110,7 @@ exports.carResolvers = {
             });
         },
         updateCar: async (_, { id, input }) => {
-            return await prisma.car.update({
+            return await database_1.default.car.update({
                 where: { id },
                 data: input,
                 include: {
@@ -119,13 +121,13 @@ exports.carResolvers = {
         },
         deleteCar: async (_, { id }) => {
             // Delete associated images from filesystem
-            const images = await prisma.carImage.findMany({
+            const images = await database_1.default.carImage.findMany({
                 where: { carId: id }
             });
             for (const image of images) {
                 await (0, upload_1.deleteUploadedFile)(image.imagePath);
             }
-            await prisma.car.delete({
+            await database_1.default.car.delete({
                 where: { id }
             });
             return true;
@@ -133,7 +135,7 @@ exports.carResolvers = {
         uploadCarImages: async (_, { input }) => {
             const { carId, images, altTexts, primaryIndex } = input;
             // Verify car exists
-            const car = await prisma.car.findUnique({
+            const car = await database_1.default.car.findUnique({
                 where: { id: carId }
             });
             if (!car) {
@@ -145,7 +147,7 @@ exports.carResolvers = {
                 const altText = altTexts?.[i] || null;
                 const isPrimary = i === (primaryIndex || 0);
                 // Create database record
-                const carImage = await prisma.carImage.create({
+                const carImage = await database_1.default.carImage.create({
                     data: {
                         carId,
                         imagePath: (0, upload_1.getRelativePath)(image.path),
@@ -158,7 +160,7 @@ exports.carResolvers = {
             return uploadedImages;
         },
         deleteCarImage: async (_, { imageId }) => {
-            const image = await prisma.carImage.findUnique({
+            const image = await database_1.default.carImage.findUnique({
                 where: { id: imageId }
             });
             if (!image) {
@@ -167,14 +169,14 @@ exports.carResolvers = {
             // Delete from filesystem
             await (0, upload_1.deleteUploadedFile)(image.imagePath);
             // Delete from database
-            await prisma.carImage.delete({
+            await database_1.default.carImage.delete({
                 where: { id: imageId }
             });
             return true;
         },
         setPrimaryCarImage: async (_, { carId, imageId }) => {
             // Verify image belongs to car
-            const image = await prisma.carImage.findFirst({
+            const image = await database_1.default.carImage.findFirst({
                 where: {
                     id: imageId,
                     carId
@@ -184,12 +186,12 @@ exports.carResolvers = {
                 throw new Error('Image not found or does not belong to this car');
             }
             // Reset all images for this car to non-primary
-            await prisma.carImage.updateMany({
+            await database_1.default.carImage.updateMany({
                 where: { carId },
                 data: { isPrimary: false }
             });
             // Set the specified image as primary
-            await prisma.carImage.update({
+            await database_1.default.carImage.update({
                 where: { id: imageId },
                 data: { isPrimary: true }
             });
@@ -198,12 +200,12 @@ exports.carResolvers = {
     },
     Car: {
         bookings: async (parent) => {
-            return await prisma.booking.findMany({
+            return await database_1.default.booking.findMany({
                 where: { carId: parent.id }
             });
         },
         images: async (parent) => {
-            return await prisma.carImage.findMany({
+            return await database_1.default.carImage.findMany({
                 where: { carId: parent.id },
                 orderBy: { createdAt: 'asc' }
             });
@@ -211,7 +213,7 @@ exports.carResolvers = {
     },
     CarImage: {
         car: async (parent) => {
-            return await prisma.car.findUnique({
+            return await database_1.default.car.findUnique({
                 where: { id: parent.carId }
             });
         }

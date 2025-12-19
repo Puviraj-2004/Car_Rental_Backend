@@ -31,11 +31,11 @@ export declare const carResolvers: {
             }[];
         } & {
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
@@ -80,11 +80,11 @@ export declare const carResolvers: {
             }[];
         } & {
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
@@ -130,11 +130,11 @@ export declare const carResolvers: {
             }[];
         } & {
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
@@ -181,11 +181,11 @@ export declare const carResolvers: {
             }[];
         } & {
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
@@ -231,11 +231,11 @@ export declare const carResolvers: {
             }[];
         } & {
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
@@ -294,11 +294,11 @@ export declare const carResolvers: {
     CarImage: {
         car: (parent: any) => Promise<{
             year: number;
+            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
-            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
