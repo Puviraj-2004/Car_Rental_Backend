@@ -1,0 +1,1 @@
+{"version":3,"file":"prisma.config.js","sourceRoot":"","sources":["../src/prisma.config.ts"],"names":[],"mappings":";;AAAA,2CAA8C;AAC9C,yBAAuB;AAEvB,kBAAe,IAAA,qBAAY,EAAC;IAC1B,UAAU,EAAE;QACV,GAAG,EAAE,OAAO,CAAC,GAAG,CAAC,YAAa;KAC/B;CACF,CAAC,CAAC"}
