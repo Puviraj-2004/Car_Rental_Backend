@@ -21,11 +21,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -92,11 +92,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -163,11 +163,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -234,11 +234,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -307,11 +307,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -378,11 +378,11 @@ export declare const bookingResolvers: {
             };
             car: {
                 year: number;
-                model: string;
                 id: string;
                 createdAt: Date;
                 updatedAt: Date;
                 brand: string;
+                model: string;
                 plateNumber: string;
                 fuelType: string;
                 transmission: string;
@@ -451,11 +451,11 @@ export declare const bookingResolvers: {
         } | null>;
         car: (parent: any) => Promise<{
             year: number;
-            model: string;
             id: string;
             createdAt: Date;
             updatedAt: Date;
             brand: string;
+            model: string;
             plateNumber: string;
             fuelType: string;
             transmission: string;
