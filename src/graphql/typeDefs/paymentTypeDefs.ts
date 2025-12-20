@@ -1,6 +1,21 @@
 import { gql } from 'graphql-tag';
 
 export const paymentTypeDefs = gql`
+  enum PaymentStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    REFUNDED
+  }
+
+  enum PaymentMethod {
+    CREDIT_CARD
+    DEBIT_CARD
+    PAYPAL
+    STRIPE
+    BANK_TRANSFER
+  }
+
   type Payment {
     id: ID!
     bookingId: ID!
@@ -8,8 +23,8 @@ export const paymentTypeDefs = gql`
     baseAmount: Float!
     taxAmount: Float!
     currency: String!
-    status: String!
-    paymentMethod: String
+    status: PaymentStatus!
+    paymentMethod: PaymentMethod
     transactionId: String
     createdAt: String!
     updatedAt: String!
@@ -22,13 +37,13 @@ export const paymentTypeDefs = gql`
     baseAmount: Float!
     taxAmount: Float!
     currency: String
-    paymentMethod: String
+    paymentMethod: PaymentMethod
     transactionId: String
   }
 
   input UpdatePaymentStatusInput {
     id: ID!
-    status: String!
+    status: PaymentStatus!
     transactionId: String
   }
 

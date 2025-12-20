@@ -31,6 +31,7 @@ async function main() {
       city: 'Paris',
       country: 'France',
       postalCode: '75000',
+      role: 'ADMIN',
       language: 'en',
       gdprConsent: true,
       consentDate: new Date()

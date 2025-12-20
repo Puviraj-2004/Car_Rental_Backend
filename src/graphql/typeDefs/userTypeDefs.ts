@@ -1,6 +1,11 @@
 import { gql } from 'graphql-tag';
 
 export const userTypeDefs = gql`
+  enum UserRole {
+    USER
+    ADMIN
+  }
+
   type User {
     id: ID!
     email: String!
@@ -12,6 +17,7 @@ export const userTypeDefs = gql`
     city: String
     country: String
     postalCode: String
+    role: UserRole!
     language: String!
     gdprConsent: Boolean!
     consentDate: String

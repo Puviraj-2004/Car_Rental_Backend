@@ -53,8 +53,8 @@ export const userResolvers = {
         include: { bookings: true }
       });
 
-      // Generate JWT token
-      const token = generateToken(user.id);
+      // Generate JWT token with role
+      const token = generateToken(user.id, user.role);
 
       return {
         token,
@@ -81,8 +81,8 @@ export const userResolvers = {
         throw new Error('Invalid credentials');
       }
 
-      // Generate JWT token
-      const token = generateToken(user.id);
+      // Generate JWT token with role
+      const token = generateToken(user.id, user.role);
 
       return {
         token,

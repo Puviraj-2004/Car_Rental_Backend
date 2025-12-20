@@ -2,14 +2,27 @@ import { gql } from 'graphql-tag';
 
 export const carTypeDefs = gql`
   scalar Upload
+
+  enum FuelType {
+    PETROL
+    DIESEL
+    ELECTRIC
+    HYBRID
+  }
+
+  enum TransmissionType {
+    MANUAL
+    AUTOMATIC
+  }
+
   type Car {
     id: ID!
     brand: String!
     model: String!
     year: Int!
     plateNumber: String!
-    fuelType: String!
-    transmission: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
     seats: Int!
     doors: Int!
     pricePerHour: Float!
@@ -39,8 +52,8 @@ export const carTypeDefs = gql`
   input CarFilterInput {
     brand: String
     model: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     minPricePerDay: Float
     maxPricePerDay: Float
     minPricePerHour: Float
@@ -61,8 +74,8 @@ export const carTypeDefs = gql`
     model: String!
     year: Int!
     plateNumber: String!
-    fuelType: String!
-    transmission: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
     seats: Int!
     doors: Int!
     pricePerHour: Float!
@@ -79,8 +92,8 @@ export const carTypeDefs = gql`
     model: String
     year: Int
     plateNumber: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     seats: Int
     doors: Int
     pricePerHour: Float

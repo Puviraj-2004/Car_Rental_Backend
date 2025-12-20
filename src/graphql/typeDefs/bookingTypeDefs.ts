@@ -1,6 +1,19 @@
 import { gql } from 'graphql-tag';
 
 export const bookingTypeDefs = gql`
+  enum RentalType {
+    HOUR
+    KM
+    DAY
+  }
+
+  enum BookingStatus {
+    PENDING
+    CONFIRMED
+    CANCELLED
+    COMPLETED
+  }
+
   type Booking {
     id: ID!
     user: User!
@@ -12,18 +25,12 @@ export const bookingTypeDefs = gql`
     taxAmount: Float!
     rentalType: RentalType!
     rentalValue: Float! # Hours for HOUR, KM for KM, Days for DAY
-    status: String!
+    status: BookingStatus!
     pickupLocation: String
     dropoffLocation: String
     createdAt: String!
     updatedAt: String!
     payment: Payment
-  }
-
-  enum RentalType {
-    HOUR
-    KM
-    DAY
   }
 
   input CreateBookingInput {
@@ -38,7 +45,7 @@ export const bookingTypeDefs = gql`
 
   input UpdateBookingStatusInput {
     id: ID!
-    status: String!
+    status: BookingStatus!
   }
 
   type Query {
