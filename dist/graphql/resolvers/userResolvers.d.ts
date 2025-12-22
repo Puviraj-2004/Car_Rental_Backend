@@ -12,13 +12,14 @@ export declare const userResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             }[];
         } & {
+            role: import(".prisma/client").$Enums.Role;
             id: string;
             email: string;
             password: string;
@@ -50,13 +51,14 @@ export declare const userResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             }[];
         } & {
+            role: import(".prisma/client").$Enums.Role;
             id: string;
             email: string;
             password: string;
@@ -86,13 +88,14 @@ export declare const userResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             }[];
         } & {
+            role: import(".prisma/client").$Enums.Role;
             id: string;
             email: string;
             password: string;
@@ -128,13 +131,14 @@ export declare const userResolvers: {
                     totalPrice: number;
                     basePrice: number;
                     taxAmount: number;
-                    rentalType: string;
+                    rentalType: import(".prisma/client").$Enums.RentalType;
                     rentalValue: number;
-                    status: string;
+                    status: import(".prisma/client").$Enums.BookingStatus;
                     pickupLocation: string | null;
                     dropoffLocation: string | null;
                 }[];
             } & {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -169,13 +173,14 @@ export declare const userResolvers: {
                     totalPrice: number;
                     basePrice: number;
                     taxAmount: number;
-                    rentalType: string;
+                    rentalType: import(".prisma/client").$Enums.RentalType;
                     rentalValue: number;
-                    status: string;
+                    status: import(".prisma/client").$Enums.BookingStatus;
                     pickupLocation: string | null;
                     dropoffLocation: string | null;
                 }[];
             } & {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -208,13 +213,14 @@ export declare const userResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             }[];
         } & {
+            role: import(".prisma/client").$Enums.Role;
             id: string;
             email: string;
             password: string;
@@ -248,9 +254,9 @@ export declare const userResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         }[]>;

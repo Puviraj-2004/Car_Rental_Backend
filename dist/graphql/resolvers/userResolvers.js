@@ -50,8 +50,8 @@ exports.userResolvers = {
                 },
                 include: { bookings: true }
             });
-            // Generate JWT token
-            const token = (0, auth_1.generateToken)(user.id);
+            // Generate JWT token with role
+            const token = (0, auth_1.generateToken)(user.id, user.role);
             return {
                 token,
                 user
@@ -72,8 +72,8 @@ exports.userResolvers = {
             if (!isValidPassword) {
                 throw new Error('Invalid credentials');
             }
-            // Generate JWT token
-            const token = (0, auth_1.generateToken)(user.id);
+            // Generate JWT token with role
+            const token = (0, auth_1.generateToken)(user.id, user.role);
             return {
                 token,
                 user

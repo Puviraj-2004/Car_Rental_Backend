@@ -1,41 +1,62 @@
 import { ApolloServer } from '@apollo/server';
-import { startStandaloneServer } from '@apollo/server/standalone';
+import { expressMiddleware } from '@apollo/server/express4';
+import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
+import express from 'express';
+import http from 'http';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import { graphqlUploadExpress } from 'graphql-upload-ts';
+
 import typeDefs from './graphql/typeDefs';
 import resolvers from './graphql/resolvers';
 import { verifyToken } from './utils/auth';
+import path from 'path';
+
 
 async function startServer() {
+  const app = express(); // 🚀 இந்த app-தான் சர்வரை இயக்குகிறது
+  const httpServer = http.createServer(app);
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
+    plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+    introspection: true,
   });
 
-  const { url } = await startStandaloneServer(server, {
-    listen: { port: 4000 },
-    context: async ({ req }: any) => {
-      // Apply auth middleware to extract userId from token
-      const context: any = {};
+  await server.start();
+  app.use(cors<cors.CorsRequest>());
+  app.use(bodyParser.json());
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-      // Extract authorization header
-      const authHeader = req.headers.authorization;
+  // Middleware for File Uploads
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
 
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        const token = authHeader.split(' ')[1];
-        try {
-          const decoded: any = verifyToken(token);
-          context.userId = decoded.userId;
-        } catch (error) {
-          console.error('Token verification error:', error);
+  // GraphQL Middleware
+  app.use(
+    '/graphql',
+    expressMiddleware(server, {
+      context: async ({ req }) => {
+        const context: any = {};
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          const token = authHeader.split(' ')[1];
+          try {
+            const decoded: any = verifyToken(token);
+            context.userId = decoded.userId;
+          } catch (error) {
+            console.error('Token verification error:', error);
+          }
         }
-      }
+        return context;
+      },
+    }) as any
+  );
 
-      return context;
-    },
-  });
-
-  console.log(`🚀 Server ready at: ${url}`);
+  await new Promise<void>((resolve) => httpServer.listen({ port: 4000 }, resolve));
+  console.log(`🚀 Server ready at http://localhost:4000/graphql`);
+  console.log(`📂 Static files served at http://localhost:4000/uploads`);
 }
-
 startServer().catch(error => {
   console.error('Error starting server:', error);
 });

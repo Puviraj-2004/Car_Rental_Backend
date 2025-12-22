@@ -12,9 +12,9 @@ export declare const paymentResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             };
@@ -23,13 +23,13 @@ export declare const paymentResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         })[]>;
         payment: (_: any, { id }: {
             id: string;
@@ -45,9 +45,9 @@ export declare const paymentResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             };
@@ -56,13 +56,13 @@ export declare const paymentResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         }) | null>;
         bookingPayment: (_: any, { bookingId }: {
             bookingId: string;
@@ -78,9 +78,9 @@ export declare const paymentResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             };
@@ -89,13 +89,13 @@ export declare const paymentResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         }) | null>;
     };
     Mutation: {
@@ -113,9 +113,9 @@ export declare const paymentResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             };
@@ -124,13 +124,13 @@ export declare const paymentResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         }>;
         updatePaymentStatus: (_: any, { input }: {
             input: any;
@@ -146,9 +146,9 @@ export declare const paymentResolvers: {
                 totalPrice: number;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: string;
+                rentalType: import(".prisma/client").$Enums.RentalType;
                 rentalValue: number;
-                status: string;
+                status: import(".prisma/client").$Enums.BookingStatus;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
             };
@@ -157,13 +157,13 @@ export declare const paymentResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         }>;
     };
     Payment: {
@@ -178,9 +178,9 @@ export declare const paymentResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         } | null>;

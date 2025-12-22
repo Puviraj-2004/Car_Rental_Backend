@@ -3,6 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.userTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.userTypeDefs = (0, graphql_tag_1.gql) `
+  enum Role {
+    USER
+    ADMIN
+  }
+
   type User {
     id: ID!
     email: String!
@@ -14,6 +19,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     city: String
     country: String
     postalCode: String
+    role: Role!
     language: String!
     gdprConsent: Boolean!
     consentDate: String
@@ -69,6 +75,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
     updateUser(input: UpdateUserInput!): User!
+    updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!
   }
 `;

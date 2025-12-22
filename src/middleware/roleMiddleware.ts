@@ -1,5 +1,3 @@
-import { verifyToken } from '../utils/auth';
-
 export const checkRole = (requiredRole: string) => {
   return (context: any) => {
     if (!context.userId) {

@@ -1,7 +1,7 @@
 import { gql } from 'graphql-tag';
 
 export const userTypeDefs = gql`
-  enum UserRole {
+  enum Role {
     USER
     ADMIN
   }
@@ -17,7 +17,8 @@ export const userTypeDefs = gql`
     city: String
     country: String
     postalCode: String
-    role: UserRole!
+    isVerified: Boolean!
+    role: Role!
     language: String!
     gdprConsent: Boolean!
     consentDate: String
@@ -73,6 +74,7 @@ export const userTypeDefs = gql`
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
     updateUser(input: UpdateUserInput!): User!
+    updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!
   }
 `;

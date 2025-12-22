@@ -2,6 +2,7 @@ export declare const bookingResolvers: {
     Query: {
         bookings: () => Promise<({
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -27,14 +28,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -44,13 +45,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -63,9 +64,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         })[]>;
@@ -73,6 +74,7 @@ export declare const bookingResolvers: {
             id: string;
         }) => Promise<({
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -98,14 +100,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -115,13 +117,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -134,9 +136,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         }) | null>;
@@ -144,6 +146,7 @@ export declare const bookingResolvers: {
             userId: string;
         }) => Promise<({
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -169,14 +172,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -186,13 +189,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -205,9 +208,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         })[]>;
@@ -215,6 +218,7 @@ export declare const bookingResolvers: {
             carId: string;
         }) => Promise<({
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -240,14 +244,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -257,13 +261,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -276,9 +280,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         })[]>;
@@ -288,6 +292,7 @@ export declare const bookingResolvers: {
             input: any;
         }, context: any) => Promise<{
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -313,14 +318,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -330,13 +335,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -349,9 +354,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         }>;
@@ -359,6 +364,7 @@ export declare const bookingResolvers: {
             input: any;
         }) => Promise<{
             user: {
+                role: import(".prisma/client").$Enums.Role;
                 id: string;
                 email: string;
                 password: string;
@@ -384,14 +390,14 @@ export declare const bookingResolvers: {
                 brand: string;
                 model: string;
                 plateNumber: string;
-                fuelType: string;
-                transmission: string;
+                fuelType: import(".prisma/client").$Enums.FuelType;
+                transmission: import(".prisma/client").$Enums.TransmissionType;
                 seats: number;
                 doors: number;
                 pricePerHour: number;
                 pricePerKm: number;
                 pricePerDay: number;
-                critAirRating: number;
+                critAirRating: import(".prisma/client").$Enums.CritAirCategory;
                 availability: boolean;
                 descriptionEn: string | null;
                 descriptionFr: string | null;
@@ -401,13 +407,13 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 taxAmount: number;
-                status: string;
+                status: import(".prisma/client").$Enums.PaymentStatus;
                 bookingId: string;
+                transactionId: string | null;
                 amount: number;
                 baseAmount: number;
                 currency: string;
-                paymentMethod: string | null;
-                transactionId: string | null;
+                paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
             } | null;
         } & {
             userId: string;
@@ -420,9 +426,9 @@ export declare const bookingResolvers: {
             totalPrice: number;
             basePrice: number;
             taxAmount: number;
-            rentalType: string;
+            rentalType: import(".prisma/client").$Enums.RentalType;
             rentalValue: number;
-            status: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
             pickupLocation: string | null;
             dropoffLocation: string | null;
         }>;
@@ -432,6 +438,7 @@ export declare const bookingResolvers: {
     };
     Booking: {
         user: (parent: any) => Promise<{
+            role: import(".prisma/client").$Enums.Role;
             id: string;
             email: string;
             password: string;
@@ -457,14 +464,14 @@ export declare const bookingResolvers: {
             brand: string;
             model: string;
             plateNumber: string;
-            fuelType: string;
-            transmission: string;
+            fuelType: import(".prisma/client").$Enums.FuelType;
+            transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             doors: number;
             pricePerHour: number;
             pricePerKm: number;
             pricePerDay: number;
-            critAirRating: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
             availability: boolean;
             descriptionEn: string | null;
             descriptionFr: string | null;
@@ -474,13 +481,13 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             taxAmount: number;
-            status: string;
+            status: import(".prisma/client").$Enums.PaymentStatus;
             bookingId: string;
+            transactionId: string | null;
             amount: number;
             baseAmount: number;
             currency: string;
-            paymentMethod: string | null;
-            transactionId: string | null;
+            paymentMethod: import(".prisma/client").$Enums.PaymentMethod | null;
         } | null>;
     };
 };
