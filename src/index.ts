@@ -6,7 +6,7 @@ import http from 'http';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import { graphqlUploadExpress } from 'graphql-upload-ts';
-
+import prisma from './utils/database';
 import typeDefs from './graphql/typeDefs';
 import resolvers from './graphql/resolvers';
 import { verifyToken } from './utils/auth';
@@ -37,7 +37,7 @@ async function startServer() {
     '/graphql',
     expressMiddleware(server, {
       context: async ({ req }) => {
-        const context: any = {};
+        const context: any = { prisma };
         const authHeader = req.headers.authorization;
         if (authHeader && authHeader.startsWith('Bearer ')) {
           const token = authHeader.split(' ')[1];

@@ -11,6 +11,7 @@ const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const graphql_upload_ts_1 = require("graphql-upload-ts");
+const database_1 = __importDefault(require("./utils/database"));
 const typeDefs_1 = __importDefault(require("./graphql/typeDefs"));
 const resolvers_1 = __importDefault(require("./graphql/resolvers"));
 const auth_1 = require("./utils/auth");
@@ -33,7 +34,7 @@ async function startServer() {
     // GraphQL Middleware
     app.use('/graphql', (0, express4_1.expressMiddleware)(server, {
         context: async ({ req }) => {
-            const context = {};
+            const context = { prisma: database_1.default };
             const authHeader = req.headers.authorization;
             if (authHeader && authHeader.startsWith('Bearer ')) {
                 const token = authHeader.split(' ')[1];

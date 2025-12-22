@@ -19,6 +19,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     city: String
     country: String
     postalCode: String
+    isVerified: Boolean!
     role: Role!
     language: String!
     gdprConsent: Boolean!

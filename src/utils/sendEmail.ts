@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 
-export const sendVerificationEmail = async (email: string, token: string) => {
+export const sendVerificationEmail = async (email: string, otp: string) => {
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -9,14 +9,17 @@ export const sendVerificationEmail = async (email: string, token: string) => {
     },
   });
 
-  const url = `http://localhost:3000/verify-email?token=${token}`;
-
   await transporter.sendMail({
-    from: '"Car Rental Support" <your-email@gmail.com>',
+    from: `"Car Rental" <${process.env.EMAIL_USER}>`,
     to: email,
-    subject: "Verify your email address",
-    html: `<h3>Welcome to our Car Rental!</h3>
-           <p>Please click the link below to verify your email:</p>
-           <a href="${url}">${url}</a>`,
+    subject: "Your Verification Code",
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
+        <h2>Welcome to Car Rental!</h2>
+        <p>Your 6-digit verification code is:</p>
+        <h1 style="color: #293D91; letter-spacing: 5px;">${otp}</h1>
+        <p>This code will expire in 10 minutes.</p>
+      </div>
+    `,
   });
 };

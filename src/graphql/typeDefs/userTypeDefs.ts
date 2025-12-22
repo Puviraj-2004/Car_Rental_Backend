@@ -30,6 +30,12 @@ export const userTypeDefs = gql`
   type AuthPayload {
     token: String!
     user: User!
+    message: String
+  }
+
+  type VerifyResponse {
+    success: Boolean!
+    message: String!
   }
 
   input RegisterInput {
@@ -73,6 +79,8 @@ export const userTypeDefs = gql`
   type Mutation {
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
+    verifyOTP(email: String!, otp: String!): VerifyResponse!
+
     updateUser(input: UpdateUserInput!): User!
     updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!
