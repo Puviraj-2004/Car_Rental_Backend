@@ -3,6 +3,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.paymentTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
+  enum PaymentStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    REFUNDED
+  }
+
+  enum PaymentMethod {
+    CREDIT_CARD
+    DEBIT_CARD
+    PAYPAL
+    STRIPE
+    BANK_TRANSFER
+  }
+
   type Payment {
     id: ID!
     bookingId: ID!
@@ -10,8 +25,8 @@ exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
     baseAmount: Float!
     taxAmount: Float!
     currency: String!
-    status: String!
-    paymentMethod: String
+    status: PaymentStatus!
+    paymentMethod: PaymentMethod
     transactionId: String
     createdAt: String!
     updatedAt: String!
@@ -24,13 +39,13 @@ exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
     baseAmount: Float!
     taxAmount: Float!
     currency: String
-    paymentMethod: String
+    paymentMethod: PaymentMethod
     transactionId: String
   }
 
   input UpdatePaymentStatusInput {
     id: ID!
-    status: String!
+    status: PaymentStatus!
     transactionId: String
   }
 

@@ -1,6 +1,7 @@
 import { calculateTax, calculateTotalPrice, calculateRentalCost } from '../../utils/pricing';
 import { validateBookingInput } from '../../utils/validation';
 import prisma from '../../utils/database';
+import { BookingStatus } from '.prisma/client/default';
 
 export const bookingResolvers = {
   Query: {
@@ -71,7 +72,7 @@ export const bookingResolvers = {
         const overlappingBookings = await prisma.booking.findMany({
           where: {
             carId,
-            status: { not: 'cancelled' },
+            status: { not: BookingStatus.CANCELLED },
             AND: [
               { startDate: { lte: end } },
               { endDate: { gte: start } }
@@ -130,7 +131,7 @@ export const bookingResolvers = {
           basePrice,
           taxAmount,
           totalPrice,
-          status: 'pending',
+          status: BookingStatus.PENDING,
           pickupLocation,
           dropoffLocation
         },
@@ -164,13 +165,13 @@ export const bookingResolvers = {
       }
 
       // Only allow cancellation of pending or confirmed bookings
-      if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+      if (booking.status !== BookingStatus.PENDING && booking.status !== BookingStatus.CONFIRMED) {
         throw new Error('Cannot cancel booking with current status');
       }
 
       await prisma.booking.update({
         where: { id },
-        data: { status: 'cancelled' }
+        data: { status: BookingStatus.CANCELLED }
       });
 
       return true;

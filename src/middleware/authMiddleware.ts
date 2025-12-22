@@ -5,6 +5,7 @@ declare global {
   namespace Express {
     interface Request {
       userId?: string;
+      role?: string;
     }
   }
 }
@@ -22,6 +23,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction):
   try {
     const decoded: any = verifyToken(token);
     req.userId = decoded.userId;
+    req.role = decoded.role || 'USER';
     next();
   } catch (error) {
     res.status(401).json({ message: 'Invalid token' });

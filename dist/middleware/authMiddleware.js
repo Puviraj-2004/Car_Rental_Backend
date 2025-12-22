@@ -12,6 +12,7 @@ const authMiddleware = (req, res, next) => {
     try {
         const decoded = (0, auth_1.verifyToken)(token);
         req.userId = decoded.userId;
+        req.role = decoded.role || 'USER';
         next();
     }
     catch (error) {

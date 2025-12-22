@@ -1,5 +1,6 @@
 import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
 import prisma from '../../utils/database';
+import { sendVerificationEmail } from '../../utils/sendEmail';
 
 export const userResolvers = {
   Query: {
@@ -30,59 +31,115 @@ export const userResolvers = {
 
   Mutation: {
     register: async (_: any, { input }: { input: any }) => {
-      // Check if user already exists
+      // 1. மின்னஞ்சல் ஏற்கனவே உள்ளதா எனச் சரிபார்க்க
       const existingUser = await prisma.user.findUnique({
         where: { email: input.email }
       });
 
       if (existingUser) {
-        throw new Error('User already exists');
+        throw new Error('User already exists with this email');
       }
 
-      // Hash password
+      // 2. Password-ஐ Hash செய்ய
       const hashedPassword = await hashPassword(input.password);
 
-      // Create user
+      // 3. 6-இலக்க OTP மற்றும் காலாவதி நேரம் உருவாக்கம் (10 நிமிடம்)
+      const generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); 
+
+      // 4. User-ஐ உருவாக்குதல்
       const user = await prisma.user.create({
         data: {
-          ...input,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          email: input.email,
           password: hashedPassword,
-          language: input.language || 'en',
-          consentDate: input.gdprConsent ? new Date() : null
+          phoneNumber: input.phoneNumber,
+          isVerified: false,
+          otp: generatedOTP,
+          otpExpires: otpExpiry,
         },
         include: { bookings: true }
       });
 
-      // Generate JWT token
-      const token = generateToken(user.id);
+      // 5. மின்னஞ்சல் வழியாக OTP அனுப்புதல்
+      try {
+        await sendVerificationEmail(user.email, generatedOTP);
+      } catch (error) {
+        console.error("Email sending failed:", error);
+      }
+
+      // 6. லாகின் டோக்கன் (விரும்பினால்)
+      const token = generateToken(user.id, user.role);
 
       return {
         token,
-        user
+        user,
+        message: "Registration successful! Please check your email for the 6-digit OTP."
+      };
+    },
+
+    // 🚀 OTP-ஐச் சரிபார்க்கும் புதிய மியூட்டேஷன்
+    verifyOTP: async (_: any, { email, otp }: { email: string, otp: string }) => {
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (user.isVerified) {
+        throw new Error('User is already verified');
+      }
+
+      // OTP சரியாக இருக்கிறதா எனச் சரிபார்க்க
+      if (user.otp !== otp) {
+        throw new Error('Invalid OTP code');
+      }
+
+      // OTP காலாவதியாகிவிட்டதா எனச் சரிபார்க்க
+      if (user.otpExpires && new Date() > user.otpExpires) {
+        throw new Error('OTP has expired. Please request a new one.');
+      }
+
+      // User-ஐ Verified என மாற்றுதல்
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          isVerified: true, 
+          otp: null, 
+          otpExpires: null 
+        }
+      });
+
+      return {
+        success: true,
+        message: "Account verified successfully! You can now login."
       };
     },
 
     login: async (_: any, { input }: { input: any }) => {
       const { email, password } = input;
 
-      // Find user
       const user = await prisma.user.findUnique({
         where: { email },
         include: { bookings: true }
       });
 
-      if (!user) {
-        throw new Error('Invalid credentials');
+      if (!user || !user.password) {
+        throw new Error('Invalid email or password');
       }
 
-      // Check password
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
-        throw new Error('Invalid credentials');
+        throw new Error('Invalid email or password');
       }
 
-      // Generate JWT token
-      const token = generateToken(user.id);
+      // 🛡️ மின்னஞ்சல் சரிபார்க்கப்படாவிட்டால் லாகினைத் தடுத்தல்
+      if (!user.isVerified) {
+        throw new Error('Please verify your email address using the OTP before logging in.');
+      }
+
+      const token = generateToken(user.id, user.role);
 
       return {
         token,

@@ -7,6 +7,7 @@ exports.bookingResolvers = void 0;
 const pricing_1 = require("../../utils/pricing");
 const validation_1 = require("../../utils/validation");
 const database_1 = __importDefault(require("../../utils/database"));
+const default_1 = require(".prisma/client/default");
 exports.bookingResolvers = {
     Query: {
         bookings: async () => {
@@ -68,7 +69,7 @@ exports.bookingResolvers = {
                 const overlappingBookings = await database_1.default.booking.findMany({
                     where: {
                         carId,
-                        status: { not: 'cancelled' },
+                        status: { not: default_1.BookingStatus.CANCELLED },
                         AND: [
                             { startDate: { lte: end } },
                             { endDate: { gte: start } }
@@ -112,7 +113,7 @@ exports.bookingResolvers = {
                     basePrice,
                     taxAmount,
                     totalPrice,
-                    status: 'pending',
+                    status: default_1.BookingStatus.PENDING,
                     pickupLocation,
                     dropoffLocation
                 },
@@ -142,12 +143,12 @@ exports.bookingResolvers = {
                 throw new Error('Booking not found');
             }
             // Only allow cancellation of pending or confirmed bookings
-            if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+            if (booking.status !== default_1.BookingStatus.PENDING && booking.status !== default_1.BookingStatus.CONFIRMED) {
                 throw new Error('Cannot cancel booking with current status');
             }
             await database_1.default.booking.update({
                 where: { id },
-                data: { status: 'cancelled' }
+                data: { status: default_1.BookingStatus.CANCELLED }
             });
             return true;
         }

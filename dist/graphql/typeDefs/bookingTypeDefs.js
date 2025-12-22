@@ -3,6 +3,19 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.bookingTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
+  enum RentalType {
+    HOUR
+    KM
+    DAY
+  }
+
+  enum BookingStatus {
+    PENDING
+    CONFIRMED
+    CANCELLED
+    COMPLETED
+  }
+
   type Booking {
     id: ID!
     user: User!
@@ -14,18 +27,12 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     taxAmount: Float!
     rentalType: RentalType!
     rentalValue: Float! # Hours for HOUR, KM for KM, Days for DAY
-    status: String!
+    status: BookingStatus!
     pickupLocation: String
     dropoffLocation: String
     createdAt: String!
     updatedAt: String!
     payment: Payment
-  }
-
-  enum RentalType {
-    HOUR
-    KM
-    DAY
   }
 
   input CreateBookingInput {
@@ -40,7 +47,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
 
   input UpdateBookingStatusInput {
     id: ID!
-    status: String!
+    status: BookingStatus!
   }
 
   type Query {

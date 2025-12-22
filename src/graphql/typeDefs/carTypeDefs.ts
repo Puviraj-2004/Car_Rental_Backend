@@ -2,27 +2,51 @@ import { gql } from 'graphql-tag';
 
 export const carTypeDefs = gql`
   scalar Upload
+
+
+  enum CritAirCategory {
+    CRIT_AIR_0
+    CRIT_AIR_1
+    CRIT_AIR_2
+    CRIT_AIR_3
+    CRIT_AIR_4
+    CRIT_AIR_5
+    NO_STICKER
+  }
+
+  enum FuelType {
+    PETROL
+    DIESEL
+    ELECTRIC
+    HYBRID
+  }
+
+  enum TransmissionType {
+    MANUAL
+    AUTOMATIC
+  }
+
   type Car {
-    id: ID!
-    brand: String!
-    model: String!
-    year: Int!
-    plateNumber: String!
-    fuelType: String!
-    transmission: String!
-    seats: Int!
-    doors: Int!
-    pricePerHour: Float!
-    pricePerKm: Float!
-    pricePerDay: Float!
-    critAirRating: Int!
-    availability: Boolean!
-    descriptionEn: String
-    descriptionFr: String
-    createdAt: String!
-    updatedAt: String!
-    bookings: [Booking!]!
-    images: [CarImage!]!
+  id: ID!
+  brand: String!
+  model: String!
+  year: Int!
+  plateNumber: String!
+  fuelType: FuelType!
+  transmission: TransmissionType!
+  seats: Int!
+  doors: Int!
+  pricePerHour: Float!
+  pricePerKm: Float!
+  pricePerDay: Float!
+  critAirRating: CritAirCategory!
+  availability: Boolean!
+  descriptionEn: String
+  descriptionFr: String
+  createdAt: String!
+  updatedAt: String!
+  images: [CarImage!]!    
+  bookings: [Booking!]!
   }
 
   type CarImage {
@@ -39,13 +63,13 @@ export const carTypeDefs = gql`
   input CarFilterInput {
     brand: String
     model: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     minPricePerDay: Float
     maxPricePerDay: Float
     minPricePerHour: Float
     maxPricePerHour: Float
-    critAirRating: Int
+    critAirRating: CritAirCategory
     availability: Boolean
   }
 
@@ -61,14 +85,14 @@ export const carTypeDefs = gql`
     model: String!
     year: Int!
     plateNumber: String!
-    fuelType: String!
-    transmission: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
     seats: Int!
     doors: Int!
     pricePerHour: Float!
     pricePerKm: Float!
     pricePerDay: Float!
-    critAirRating: Int!
+    critAirRating: CritAirCategory!
     availability: Boolean
     descriptionEn: String
     descriptionFr: String
@@ -79,14 +103,14 @@ export const carTypeDefs = gql`
     model: String
     year: Int
     plateNumber: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     seats: Int
     doors: Int
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
-    critAirRating: Int
+    critAirRating: CritAirCategory
     availability: Boolean
     descriptionEn: String
     descriptionFr: String

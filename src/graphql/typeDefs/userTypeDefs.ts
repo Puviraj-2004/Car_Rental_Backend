@@ -1,6 +1,11 @@
 import { gql } from 'graphql-tag';
 
 export const userTypeDefs = gql`
+  enum Role {
+    USER
+    ADMIN
+  }
+
   type User {
     id: ID!
     email: String!
@@ -12,6 +17,8 @@ export const userTypeDefs = gql`
     city: String
     country: String
     postalCode: String
+    isVerified: Boolean!
+    role: Role!
     language: String!
     gdprConsent: Boolean!
     consentDate: String
@@ -23,6 +30,12 @@ export const userTypeDefs = gql`
   type AuthPayload {
     token: String!
     user: User!
+    message: String
+  }
+
+  type VerifyResponse {
+    success: Boolean!
+    message: String!
   }
 
   input RegisterInput {
@@ -66,7 +79,10 @@ export const userTypeDefs = gql`
   type Mutation {
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
+    verifyOTP(email: String!, otp: String!): VerifyResponse!
+
     updateUser(input: UpdateUserInput!): User!
+    updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!
   }
 `;

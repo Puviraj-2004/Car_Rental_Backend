@@ -4,27 +4,51 @@ exports.carTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.carTypeDefs = (0, graphql_tag_1.gql) `
   scalar Upload
+
+
+  enum CritAirCategory {
+    CRIT_AIR_0
+    CRIT_AIR_1
+    CRIT_AIR_2
+    CRIT_AIR_3
+    CRIT_AIR_4
+    CRIT_AIR_5
+    NO_STICKER
+  }
+
+  enum FuelType {
+    PETROL
+    DIESEL
+    ELECTRIC
+    HYBRID
+  }
+
+  enum TransmissionType {
+    MANUAL
+    AUTOMATIC
+  }
+
   type Car {
-    id: ID!
-    brand: String!
-    model: String!
-    year: Int!
-    plateNumber: String!
-    fuelType: String!
-    transmission: String!
-    seats: Int!
-    doors: Int!
-    pricePerHour: Float!
-    pricePerKm: Float!
-    pricePerDay: Float!
-    critAirRating: Int!
-    availability: Boolean!
-    descriptionEn: String
-    descriptionFr: String
-    createdAt: String!
-    updatedAt: String!
-    bookings: [Booking!]!
-    images: [CarImage!]!
+  id: ID!
+  brand: String!
+  model: String!
+  year: Int!
+  plateNumber: String!
+  fuelType: FuelType!
+  transmission: TransmissionType!
+  seats: Int!
+  doors: Int!
+  pricePerHour: Float!
+  pricePerKm: Float!
+  pricePerDay: Float!
+  critAirRating: CritAirCategory!
+  availability: Boolean!
+  descriptionEn: String
+  descriptionFr: String
+  createdAt: String!
+  updatedAt: String!
+  images: [CarImage!]!    
+  bookings: [Booking!]!
   }
 
   type CarImage {
@@ -41,13 +65,13 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
   input CarFilterInput {
     brand: String
     model: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     minPricePerDay: Float
     maxPricePerDay: Float
     minPricePerHour: Float
     maxPricePerHour: Float
-    critAirRating: Int
+    critAirRating: CritAirCategory
     availability: Boolean
   }
 
@@ -63,14 +87,14 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     model: String!
     year: Int!
     plateNumber: String!
-    fuelType: String!
-    transmission: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
     seats: Int!
     doors: Int!
     pricePerHour: Float!
     pricePerKm: Float!
     pricePerDay: Float!
-    critAirRating: Int!
+    critAirRating: CritAirCategory!
     availability: Boolean
     descriptionEn: String
     descriptionFr: String
@@ -81,14 +105,14 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     model: String
     year: Int
     plateNumber: String
-    fuelType: String
-    transmission: String
+    fuelType: FuelType
+    transmission: TransmissionType
     seats: Int
     doors: Int
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
-    critAirRating: Int
+    critAirRating: CritAirCategory
     availability: Boolean
     descriptionEn: String
     descriptionFr: String

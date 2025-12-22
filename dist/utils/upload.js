@@ -19,7 +19,7 @@ const createUploadDir = async (dirPath) => {
 // Configure multer storage
 const storage = multer_1.default.diskStorage({
     destination: async (_req, _file, cb) => {
-        const uploadPath = path_1.default.join(__dirname, '../../uploads/cars');
+        const uploadPath = path_1.default.join(__dirname, '../../uploads');
         await createUploadDir(uploadPath);
         cb(null, uploadPath);
     },
@@ -47,11 +47,15 @@ exports.upload = (0, multer_1.default)({
     fileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024, // 5MB limit per file
-        files: 10 // Maximum 10 files per upload
+        files: 10
     }
 });
 // Utility function to get relative path for database storage
 const getRelativePath = (absolutePath) => {
+    if (!absolutePath) {
+        console.error("getRelativePath received undefined path");
+        return ""; // அல்லது ஒரு டிபால்ட் பாத்
+    }
     const uploadsDir = path_1.default.join(__dirname, '../../uploads');
     return path_1.default.relative(uploadsDir, absolutePath);
 };
@@ -59,12 +63,15 @@ exports.getRelativePath = getRelativePath;
 // Utility function to delete uploaded files
 const deleteUploadedFile = async (relativePath) => {
     try {
-        const fullPath = path_1.default.join(__dirname, '../../uploads', relativePath);
-        await fs_1.promises.unlink(fullPath);
+        const fullPath = path_1.default.join(process.cwd(), relativePath);
+        const fileExists = await fs_1.promises.access(fullPath).then(() => true).catch(() => false);
+        if (fileExists) {
+            await fs_1.promises.unlink(fullPath);
+            console.log('Successfully deleted:', fullPath);
+        }
     }
     catch (error) {
         console.error('Error deleting file:', error);
-        // Don't throw error if file doesn't exist
     }
 };
 exports.deleteUploadedFile = deleteUploadedFile;
