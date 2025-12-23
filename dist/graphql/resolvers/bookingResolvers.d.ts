@@ -3,15 +3,16 @@ export declare const bookingResolvers: {
         bookings: () => Promise<({
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -70,15 +71,16 @@ export declare const bookingResolvers: {
         }) => Promise<({
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -137,15 +139,16 @@ export declare const bookingResolvers: {
         }) => Promise<({
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -204,15 +207,16 @@ export declare const bookingResolvers: {
         }) => Promise<({
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -273,15 +277,16 @@ export declare const bookingResolvers: {
         }, context: any) => Promise<{
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -340,15 +345,16 @@ export declare const bookingResolvers: {
         }) => Promise<{
             user: {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -409,15 +415,16 @@ export declare const bookingResolvers: {
     Booking: {
         user: (parent: any) => Promise<{
             role: import(".prisma/client").$Enums.Role;
+            password: string | null;
             id: string;
             email: string;
+            otp: string | null;
             googleId: string | null;
             firstName: string;
             lastName: string;
-            password: string | null;
             phoneNumber: string | null;
             isVerified: boolean;
-            verifyToken: string | null;
+            otpExpires: Date | null;
             createdAt: Date;
             updatedAt: Date;
         } | null>;

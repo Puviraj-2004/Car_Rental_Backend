@@ -5,7 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sendVerificationEmail = void 0;
 const nodemailer_1 = __importDefault(require("nodemailer"));
-const sendVerificationEmail = async (email, token) => {
+const sendVerificationEmail = async (email, otp) => {
     const transporter = nodemailer_1.default.createTransport({
         service: 'gmail',
         auth: {
@@ -13,14 +13,18 @@ const sendVerificationEmail = async (email, token) => {
             pass: process.env.EMAIL_PASS,
         },
     });
-    const url = `http://localhost:3000/verify-email?token=${token}`;
     await transporter.sendMail({
-        from: `"Car Rental Support" <${process.env.EMAIL_USER}>`,
+        from: `"Car Rental" <${process.env.EMAIL_USER}>`,
         to: email,
-        subject: "Verify your email address",
-        html: `<h3>Welcome to our Car Rental!</h3>
-           <p>Please click the link below to verify your email:</p>
-           <a href="${url}">${url}</a>`,
+        subject: "Your Verification Code",
+        html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee;">
+        <h2>Welcome to Car Rental!</h2>
+        <p>Your 6-digit verification code is:</p>
+        <h1 style="color: #293D91; letter-spacing: 5px;">${otp}</h1>
+        <p>This code will expire in 10 minutes.</p>
+      </div>
+    `,
     });
 };
 exports.sendVerificationEmail = sendVerificationEmail;
