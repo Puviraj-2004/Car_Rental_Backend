@@ -3,68 +3,21 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 // --- ENUMS ---
 // GraphQL TypeDefs-லும் இதே பெயர்களில் Enum இருக்க வேண்டும்
 
-enum Role {
-  USER
-  ADMIN
-}
-
-enum FuelType {
-  PETROL
-  DIESEL
-  ELECTRIC
-  HYBRID
-}
-
-enum TransmissionType {
-  MANUAL
-  AUTOMATIC
-}
-
-enum CritAirCategory {
-  CRIT_AIR_0
-  CRIT_AIR_1
-  CRIT_AIR_2
-  CRIT_AIR_3
-  CRIT_AIR_4
-  CRIT_AIR_5
-  NO_STICKER
-}
 
 
-enum RentalType {
-  HOUR
-  KM
-  DAY
-}
 
-enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
-}
 
-enum PaymentStatus {
-  PENDING
-  COMPLETED
-  FAILED
-  REFUNDED
-}
 
-enum PaymentMethod {
-  CREDIT_CARD
-  DEBIT_CARD
-  PAYPAL
-  STRIPE
-  BANK_TRANSFER
-}
+
+
+
 
 // --- MODELS ---
 
@@ -75,7 +28,7 @@ model User {
   email         String    @unique
   password      String?
   phoneNumber   String?
-  role          Role      @default(USER)
+  role          String    @default("USER")
   isVerified    Boolean   @default(false)
   otp           String?   
   otpExpires    DateTime? 
@@ -94,14 +47,14 @@ model Car {
   model          String
   year           Int
   plateNumber    String           @unique
-  fuelType       FuelType
-  transmission   TransmissionType
+  fuelType       String
+  transmission   String
   seats          Int
   doors          Int
   pricePerHour   Float
   pricePerKm     Float
   pricePerDay    Float
-  critAirRating  CritAirCategory              
+  critAirRating  String              
   availability   Boolean          @default(true)
   descriptionEn  String?          
   descriptionFr  String?          
@@ -135,9 +88,9 @@ model Booking {
   totalPrice      Float         
   basePrice       Float         
   taxAmount       Float         
-  rentalType      RentalType
+  rentalType      String
   rentalValue     Float         
-  status          BookingStatus @default(PENDING)
+  status          String @default("PENDING")
   pickupLocation  String?
   dropoffLocation String?
   createdAt       DateTime      @default(now())
@@ -156,8 +109,8 @@ model Payment {
   baseAmount    Float         
   taxAmount     Float         
   currency      String        @default("EUR")
-  status        PaymentStatus @default(PENDING)
-  paymentMethod PaymentMethod?
+  status        String @default("PENDING")
+  paymentMethod String?
   transactionId String?       @unique // Stripe Payment Intent ID-க்கு பயனுள்ளது
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt

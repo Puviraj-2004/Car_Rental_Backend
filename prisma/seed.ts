@@ -1,4 +1,4 @@
-import { PrismaClient, Role } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -14,7 +14,7 @@ async function main() {
     where: { email: adminEmail },
     update: {
       password: hashedPassword,
-      role: Role.ADMIN,
+      role: 'ADMIN',
       isVerified: true,
     },
     create: {
@@ -23,7 +23,7 @@ async function main() {
       firstName: 'Admin',
       lastName: 'User',
       phoneNumber: '+33 6 12 34 56 78',
-      role: Role.ADMIN,
+      role: 'ADMIN',
       isVerified: true,
     },
   });
