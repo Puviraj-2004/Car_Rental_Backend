@@ -1,6 +1,7 @@
 import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
 import prisma from '../../utils/database';
 import { sendVerificationEmail } from '../../utils/sendEmail';
+import { validatePassword } from '../../utils/validation';
 
 export const userResolvers = {
   Query: {
@@ -22,11 +23,17 @@ export const userResolvers = {
       });
     },
 
-    users: async () => {
+    users: async (_: any, __: any, context: any) => {
+
+      if (!context.userId || context.role !== 'ADMIN') {
+        
+        throw new Error('Access denied. Admin only.');
+      }
       return await prisma.user.findMany({
         include: { bookings: true }
       });
     }
+
   },
 
   Mutation: {
@@ -39,15 +46,21 @@ export const userResolvers = {
       if (existingUser) {
         throw new Error('User already exists with this email');
       }
+      
+      // 2. Validate password strength
+      const passwordValidation = validatePassword(input.password);
+      if (!passwordValidation.isValid) {
+        throw new Error(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
+      }
 
-      // 2. Password-ஐ Hash செய்ய
+      // 3. Password-ஐ Hash செய்ய
       const hashedPassword = await hashPassword(input.password);
 
-      // 3. 6-இலக்க OTP மற்றும் காலாவதி நேரம் உருவாக்கம் (10 நிமிடம்)
+      // 4. 6-இலக்க OTP மற்றும் காலாவதி நேரம் உருவாக்கம் (10 நிமிடம்)
       const generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
       const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
-      // 4. User-ஐ உருவாக்குதல்
+      // 5. User-ஐ உருவாக்குதல்
       const user = await prisma.user.create({
         data: {
           firstName: input.firstName,
@@ -62,14 +75,14 @@ export const userResolvers = {
         include: { bookings: true }
       });
 
-      // 5. மின்னஞ்சல் வழியாக OTP அனுப்புதல்
+      // 6. மின்னஞ்சல் வழியாக OTP அனுப்புதல்
       try {
         await sendVerificationEmail(user.email, generatedOTP);
       } catch (error) {
         console.error("Email sending failed:", error);
       }
 
-      // 6. லாகின் டோக்கன் (விரும்பினால்)
+      // 7. லாகின் டோக்கன் (விரும்பினால்)
       const token = generateToken(user.id, user.role);
 
       return {
@@ -132,6 +145,12 @@ export const userResolvers = {
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) {
         throw new Error('Invalid email or password');
+      }
+      
+      // Additional check: if user's password is weak, suggest they update it
+      const passwordValidation = validatePassword(password);
+      if (!passwordValidation.isValid) {
+        console.warn(`User ${email} logged in with a weak password. Consider updating.`);
       }
 
       // 🛡️ மின்னஞ்சல் சரிபார்க்கப்படாவிட்டால் லாகினைத் தடுத்தல்
