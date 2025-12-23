@@ -6,8 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.comparePasswords = exports.hashPassword = exports.verifyToken = exports.generateToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
-// JWT secret - in production, use environment variable
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+// env-இல் உள்ள Secret-ஐ எடுக்கிறது, இல்லையென்றால் பாதுகாப்புக்காக ஒரு டீபால்ட் கீ
+const JWT_SECRET = process.env.JWT_SECRET || 'your_random_secret_string';
 const generateToken = (userId, role = 'USER') => {
     return jsonwebtoken_1.default.sign({ userId, role }, JWT_SECRET, { expiresIn: '7d' });
 };

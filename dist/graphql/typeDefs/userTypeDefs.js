@@ -32,6 +32,12 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   type AuthPayload {
     token: String!
     user: User!
+    message: String
+  }
+
+  type VerifyResponse {
+    success: Boolean!
+    message: String!
   }
 
   input RegisterInput {
@@ -75,6 +81,8 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   type Mutation {
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
+    verifyOTP(email: String!, otp: String!): VerifyResponse!
+
     updateUser(input: UpdateUserInput!): User!
     updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!

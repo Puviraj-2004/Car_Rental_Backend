@@ -1,7 +1,7 @@
 "use strict";
 // Validation utilities for the Car Rental API
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.validateBookingInput = exports.validateCarData = exports.validateRentalValue = exports.validateDateRange = exports.validatePostalCode = exports.validatePhoneNumber = exports.validateEmail = void 0;
+exports.validateBookingInput = exports.validatePassword = exports.validateCarData = exports.validateRentalValue = exports.validateDateRange = exports.validatePostalCode = exports.validatePhoneNumber = exports.validateEmail = void 0;
 const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -98,6 +98,45 @@ const validateCarData = (carData) => {
     };
 };
 exports.validateCarData = validateCarData;
+const validatePassword = (password) => {
+    const errors = [];
+    if (password.length < 8) {
+        errors.push('Password must be at least 8 characters long');
+    }
+    if (password.length > 128) {
+        errors.push('Password must not exceed 128 characters');
+    }
+    if (!/[A-Z]/.test(password)) {
+        errors.push('Password must contain at least one uppercase letter');
+    }
+    if (!/[a-z]/.test(password)) {
+        errors.push('Password must contain at least one lowercase letter');
+    }
+    if (!/[0-9]/.test(password)) {
+        errors.push('Password must contain at least one number');
+    }
+    if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password)) {
+        errors.push('Password must contain at least one special character');
+    }
+    // Check for common passwords
+    const commonPasswords = [
+        'password', '12345678', 'qwerty123', 'password123',
+        'admin123', 'letmein', 'welcome', 'monkey', '1234567890'
+    ];
+    const lowerPassword = password.toLowerCase();
+    if (commonPasswords.some(common => lowerPassword.includes(common))) {
+        errors.push('Password contains common password patterns');
+    }
+    // Check for repeated characters (more than 3 in a row)
+    if (/(.)\1{3,}/.test(password)) {
+        errors.push('Password must not contain more than 3 identical characters in a row');
+    }
+    return {
+        isValid: errors.length === 0,
+        errors
+    };
+};
+exports.validatePassword = validatePassword;
 const validateBookingInput = (input) => {
     const errors = [];
     if (!input.carId)

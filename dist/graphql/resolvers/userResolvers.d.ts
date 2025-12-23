@@ -20,15 +20,16 @@ export declare const userResolvers: {
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
+            password: string | null;
             id: string;
             email: string;
+            otp: string | null;
             googleId: string | null;
             firstName: string;
             lastName: string;
-            password: string | null;
             phoneNumber: string | null;
             isVerified: boolean;
-            verifyToken: string | null;
+            otpExpires: Date | null;
             createdAt: Date;
             updatedAt: Date;
         }) | null>;
@@ -54,19 +55,20 @@ export declare const userResolvers: {
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
+            password: string | null;
             id: string;
             email: string;
+            otp: string | null;
             googleId: string | null;
             firstName: string;
             lastName: string;
-            password: string | null;
             phoneNumber: string | null;
             isVerified: boolean;
-            verifyToken: string | null;
+            otpExpires: Date | null;
             createdAt: Date;
             updatedAt: Date;
         }) | null>;
-        users: () => Promise<({
+        users: (_: any, __: any, context: any) => Promise<({
             bookings: {
                 userId: string;
                 id: string;
@@ -86,15 +88,16 @@ export declare const userResolvers: {
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
+            password: string | null;
             id: string;
             email: string;
+            otp: string | null;
             googleId: string | null;
             firstName: string;
             lastName: string;
-            password: string | null;
             phoneNumber: string | null;
             isVerified: boolean;
-            verifyToken: string | null;
+            otpExpires: Date | null;
             createdAt: Date;
             updatedAt: Date;
         })[]>;
@@ -124,22 +127,24 @@ export declare const userResolvers: {
                 }[];
             } & {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
             message: string;
         }>;
-        verifyEmail: (_: any, { token }: {
-            token: string;
+        verifyOTP: (_: any, { email, otp }: {
+            email: string;
+            otp: string;
         }) => Promise<{
             success: boolean;
             message: string;
@@ -168,15 +173,16 @@ export declare const userResolvers: {
                 }[];
             } & {
                 role: import(".prisma/client").$Enums.Role;
+                password: string | null;
                 id: string;
                 email: string;
+                otp: string | null;
                 googleId: string | null;
                 firstName: string;
                 lastName: string;
-                password: string | null;
                 phoneNumber: string | null;
                 isVerified: boolean;
-                verifyToken: string | null;
+                otpExpires: Date | null;
                 createdAt: Date;
                 updatedAt: Date;
             };
@@ -203,15 +209,16 @@ export declare const userResolvers: {
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
+            password: string | null;
             id: string;
             email: string;
+            otp: string | null;
             googleId: string | null;
             firstName: string;
             lastName: string;
-            password: string | null;
             phoneNumber: string | null;
             isVerified: boolean;
-            verifyToken: string | null;
+            otpExpires: Date | null;
             createdAt: Date;
             updatedAt: Date;
         }>;
