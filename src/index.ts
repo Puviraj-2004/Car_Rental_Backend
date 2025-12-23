@@ -44,6 +44,7 @@ async function startServer() {
           try {
             const decoded: any = verifyToken(token);
             context.userId = decoded.userId;
+            context.role = decoded.role;
           } catch (error) {
             console.error('Token verification error:', error);
           }
