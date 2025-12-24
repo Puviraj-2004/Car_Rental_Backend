@@ -1,0 +1,11 @@
+# Security Key for JWT (Make sure this matches what you used before)
+JWT_SECRET="super_secret_student_key"
+PORT=4000
+DATABASE_URL="postgresql://postgres:1234@localhost:5432/car_rental?schema=public"
+
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET="super-secret-jwtfwefiwhuifhwuihwuihwuihwuihwiuh"
+
+
+
+
