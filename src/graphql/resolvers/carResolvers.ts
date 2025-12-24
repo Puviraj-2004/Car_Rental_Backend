@@ -15,7 +15,8 @@ export const carResolvers = {
         if (filter.modelId && filter.modelId !== "") where.modelId = filter.modelId;
         if (filter.fuelType && filter.fuelType !== "") where.fuelType = filter.fuelType;
         if (filter.transmission && filter.transmission !== "") where.transmission = filter.transmission;
-        if (filter.availability !== undefined) where.availability = filter.availability;
+        if (filter.status && filter.status !== "") where.status = filter.status;
+        if (filter.critAirRating && filter.critAirRating !== "") where.critAirRating = filter.critAirRating;
       }
       return await (prisma.car as any).findMany({
         where,
@@ -48,6 +49,36 @@ export const carResolvers = {
       where: { brandId }, 
       orderBy: { name: 'asc' } 
     }),
+    availableCars: async (_: any, { startDate, endDate }: any) => {
+      // Convert string dates to Date objects
+      const startDateTime = new Date(startDate);
+      const endDateTime = new Date(endDate);
+      
+      // Find cars that don't have overlapping bookings
+      const cars = await (prisma.car as any).findMany({
+        include: { 
+          brand: true, 
+          model: true, 
+          images: true,
+          bookings: {
+            where: {
+              // Check for overlapping bookings
+              AND: [
+                { startDate: { lt: endDateTime } }, // Booking starts before the requested end date
+                { endDate: { gt: startDateTime } }  // Booking ends after the requested start date
+              ]
+            }
+          }
+        }
+      });
+      
+      // Filter to only include cars that are available (not booked during the requested period)
+      // and have status as AVAILABLE
+      return cars.filter((car: any) => {
+        // Car must have status 'AVAILABLE' and no overlapping bookings
+        return car.status === 'AVAILABLE' && car.bookings.length === 0;
+      });
+    },
   },
 
   Mutation: {
@@ -72,9 +103,30 @@ export const carResolvers = {
       return true;
     },
     createCar: async (_: any, { input }: any) => {
+      // Set default status to AVAILABLE if not provided
+      const data = {
+        ...input,
+        status: input.status || 'AVAILABLE'
+      };
       return await (prisma.car as any).create({ 
-        data: { ...input }, 
+        data,
         include: { brand: true, model: true } 
+      });
+    },
+    
+    updateCar: async (_: any, { id, input }: any) => {
+      // Filter out undefined values to only update provided fields
+      const updateData: any = {};
+      Object.keys(input).forEach(key => {
+        if (input[key] !== undefined) {
+          updateData[key] = input[key];
+        }
+      });
+      
+      return await (prisma.car as any).update({ 
+        where: { id }, 
+        data: updateData,
+        include: { brand: true, model: true }
       });
     },
     uploadCarImages: async (_: any, { input }: any) => {
@@ -103,10 +155,27 @@ export const carResolvers = {
       for (const img of images) await deleteUploadedFile(img.imagePath);
       await (prisma.car as any).delete({ where: { id } });
       return true;
+    },
+    deleteCarImage: async (_: any, { imageId }: any) => {
+      try {
+        const image = await (prisma as any).carImage.findUnique({ where: { id: imageId } });
+        if (!image) {
+          throw new Error('Image not found');
+        }
+        
+        await deleteUploadedFile(image.imagePath);
+        await (prisma as any).carImage.delete({ where: { id: imageId } });
+        
+        return true;
+      } catch (error) {
+        console.error('Error deleting car image:', error);
+        throw error;
+      }
     }
   },
-
+  
   Car: {
+
     brand: async (parent: any) => await (prisma as any).brand.findUnique({ where: { id: parent.brandId } }),
     model: async (parent: any) => await (prisma as any).model.findUnique({ where: { id: parent.modelId } }),
     bookings: (parent: any) => parent.bookings || [], // 🚀 இதுதான் அந்த Non-nullable எரரைச் சரி செய்யும்

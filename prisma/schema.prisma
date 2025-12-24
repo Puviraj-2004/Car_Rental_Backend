@@ -31,7 +31,14 @@ enum CritAirCategory {
   CRIT_AIR_3
   CRIT_AIR_4
   CRIT_AIR_5
+  CRIT_AIR_6
   NO_STICKER
+}
+
+enum CarStatus {
+  AVAILABLE
+  BOOKED
+  MAINTENANCE
 }
 
 enum RentalType {
@@ -116,7 +123,7 @@ model Car {
   pricePerKm      Float?
   pricePerDay     Float?
   critAirRating   CritAirCategory
-  availability    Boolean          @default(true)
+  status          CarStatus        @default(AVAILABLE)
   descriptionEn   String?
   descriptionFr   String?
   createdAt       DateTime         @default(now())
