@@ -1,6 +1,7 @@
 import { gql } from 'graphql-tag';
 
 export const bookingTypeDefs = gql`
+  # --- Enums ---
   enum RentalType {
     HOUR
     KM
@@ -14,12 +15,15 @@ export const bookingTypeDefs = gql`
     COMPLETED
   }
 
+  # --- Types ---
   type Booking {
     id: ID!
+    userId: ID!
     user: User!
+    carId: ID!
     car: Car!
-    startDate: String # Only required for DAY rentals
-    endDate: String # Only required for DAY rentals
+    startDate: String
+    endDate: String
     totalPrice: Float!
     basePrice: Float!
     taxAmount: Float!
@@ -33,10 +37,15 @@ export const bookingTypeDefs = gql`
     payment: Payment
   }
 
+  # --- Inputs ---
   input CreateBookingInput {
+    userId: ID!      # User ID கட்டாயம் தேவை
     carId: ID!
-    startDate: String # Only required for DAY rentals
-    endDate: String # Only required for DAY rentals
+    startDate: String
+    endDate: String
+    totalPrice: Float!
+    basePrice: Float!
+    taxAmount: Float!
     rentalType: RentalType!
     rentalValue: Float!
     pickupLocation: String
@@ -48,16 +57,22 @@ export const bookingTypeDefs = gql`
     status: BookingStatus!
   }
 
+  # --- Queries ---
   type Query {
     bookings: [Booking!]!
     booking(id: ID!): Booking
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
+    # 🚀 Resolver-ல் இருந்த 'myBookings' இங்கே சேர்க்கப்பட்டுள்ளது
+    myBookings: [Booking!]!
   }
 
+  # --- Mutations ---
   type Mutation {
     createBooking(input: CreateBookingInput!): Booking!
-    updateBookingStatus(input: UpdateBookingStatusInput!): Booking!
+    # Status அப்டேட் செய்ய input ஆப்ஜெக்ட் பயன்படுத்துமாறு மாற்றப்பட்டுள்ளது
+    updateBookingStatus(id: ID!, status: BookingStatus!): Booking!
     cancelBooking(id: ID!): Boolean!
+    deleteBooking(id: ID!): Boolean!
   }
 `;

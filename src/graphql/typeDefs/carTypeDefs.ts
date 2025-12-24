@@ -3,50 +3,43 @@ import { gql } from 'graphql-tag';
 export const carTypeDefs = gql`
   scalar Upload
 
-
-  enum CritAirCategory {
-    CRIT_AIR_0
-    CRIT_AIR_1
-    CRIT_AIR_2
-    CRIT_AIR_3
-    CRIT_AIR_4
-    CRIT_AIR_5
-    NO_STICKER
+  type Brand {
+    id: ID!
+    name: String!
+    models: [Model!]
+    createdAt: String!
   }
 
-  enum FuelType {
-    PETROL
-    DIESEL
-    ELECTRIC
-    HYBRID
-  }
-
-  enum TransmissionType {
-    MANUAL
-    AUTOMATIC
+  type Model {
+    id: ID!
+    name: String!
+    brandId: ID!
+    brand: Brand!
+    createdAt: String!
   }
 
   type Car {
-  id: ID!
-  brand: String!
-  model: String!
-  year: Int!
-  plateNumber: String!
-  fuelType: FuelType!
-  transmission: TransmissionType!
-  seats: Int!
-  doors: Int!
-  pricePerHour: Float!
-  pricePerKm: Float!
-  pricePerDay: Float!
-  critAirRating: CritAirCategory!
-  availability: Boolean!
-  descriptionEn: String
-  descriptionFr: String
-  createdAt: String!
-  updatedAt: String!
-  images: [CarImage!]!    
-  bookings: [Booking!]!
+    id: ID!
+    brandId: ID!
+    brand: Brand!
+    modelId: ID!
+    model: Model!
+    year: Int!
+    plateNumber: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
+    seats: Int!
+    pricePerHour: Float
+    pricePerKm: Float
+    pricePerDay: Float
+    critAirRating: CritAirCategory!
+    availability: Boolean!
+    descriptionEn: String
+    descriptionFr: String
+    createdAt: String!
+    updatedAt: String!
+    images: [CarImage!]!    
+    bookings: [Booking!]!
   }
 
   type CarImage {
@@ -57,20 +50,6 @@ export const carTypeDefs = gql`
     isPrimary: Boolean!
     createdAt: String!
     updatedAt: String!
-    car: Car!
-  }
-
-  input CarFilterInput {
-    brand: String
-    model: String
-    fuelType: FuelType
-    transmission: TransmissionType
-    minPricePerDay: Float
-    maxPricePerDay: Float
-    minPricePerHour: Float
-    maxPricePerHour: Float
-    critAirRating: CritAirCategory
-    availability: Boolean
   }
 
   input UploadCarImagesInput {
@@ -81,53 +60,52 @@ export const carTypeDefs = gql`
   }
 
   input CreateCarInput {
-    brand: String!
-    model: String!
+    brandId: ID!
+    modelId: ID!
     year: Int!
     plateNumber: String!
     fuelType: FuelType!
     transmission: TransmissionType!
     seats: Int!
-    doors: Int!
-    pricePerHour: Float!
-    pricePerKm: Float!
-    pricePerDay: Float!
+    pricePerHour: Float
+    pricePerKm: Float
+    pricePerDay: Float
     critAirRating: CritAirCategory!
     availability: Boolean
     descriptionEn: String
     descriptionFr: String
   }
 
-  input UpdateCarInput {
-    brand: String
-    model: String
-    year: Int
-    plateNumber: String
+  input CarFilterInput {
+    brandId: ID
+    modelId: ID
     fuelType: FuelType
     transmission: TransmissionType
-    seats: Int
-    doors: Int
-    pricePerHour: Float
-    pricePerKm: Float
-    pricePerDay: Float
-    critAirRating: CritAirCategory
     availability: Boolean
-    descriptionEn: String
-    descriptionFr: String
   }
 
   type Query {
     cars(filter: CarFilterInput): [Car!]!
     car(id: ID!): Car
-    availableCars(startDate: String!, endDate: String!): [Car!]!
+    brands: [Brand!]!
+    models(brandId: ID!): [Model!]!
   }
 
   type Mutation {
     createCar(input: CreateCarInput!): Car!
-    updateCar(id: ID!, input: UpdateCarInput!): Car!
     deleteCar(id: ID!): Boolean!
+    createBrand(name: String!): Brand!
+    updateBrand(id: ID!, name: String!): Brand!
+    deleteBrand(id: ID!): Boolean!
+    createModel(name: String!, brandId: ID!): Model!
+    updateModel(id: ID!, name: String!): Model!
+    deleteModel(id: ID!): Boolean!
     uploadCarImages(input: UploadCarImagesInput!): [CarImage!]!
     deleteCarImage(imageId: ID!): Boolean!
     setPrimaryCarImage(carId: ID!, imageId: ID!): Boolean!
   }
+
+  enum CritAirCategory { CRIT_AIR_0 CRIT_AIR_1 CRIT_AIR_2 CRIT_AIR_3 CRIT_AIR_4 CRIT_AIR_5 NO_STICKER }
+  enum FuelType { PETROL DIESEL ELECTRIC HYBRID }
+  enum TransmissionType { MANUAL AUTOMATIC }
 `;
