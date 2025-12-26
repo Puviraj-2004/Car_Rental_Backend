@@ -56,8 +56,32 @@ async function main() {
   }
 
   console.log('🎉 Seeding completed!');
-}
 
+
+// --- 2. Standard User Seed ---
+  const userEmail = 'user@carrental.com';
+  const userPassword = await bcrypt.hash('User@123456', 10);
+
+  const standardUser = await prisma.user.upsert({
+    where: { email: userEmail },
+    update: {
+      password: userPassword,
+      role: Role.USER, // Explicitly setting USER role
+      isEmailVerified: true,
+    },
+    create: {
+      email: userEmail,
+      password: userPassword,
+      username: 'John Doe',
+      phoneNumber: '+33 6 98 76 54 32',
+      role: Role.USER,
+      isEmailVerified: true, // Set to true so you can login immediately
+    },
+  });
+
+  console.log(`✅ Standard user ready: ${standardUser.email}`);
+  console.log('🎉 Seeding completed!');
+}
 main()
   .catch((e) => {
     console.error('❌ Seeding failed:', e);
