@@ -1,6 +1,8 @@
 import { gql } from 'graphql-tag';
 
 export const paymentTypeDefs = gql`
+  scalar JSON 
+
   enum PaymentStatus {
     PENDING
     COMPLETED
@@ -19,26 +21,26 @@ export const paymentTypeDefs = gql`
   type Payment {
     id: ID!
     bookingId: ID!
+    booking: Booking!
+    
     amount: Float!
-    baseAmount: Float!
-    taxAmount: Float!
     currency: String!
     status: PaymentStatus!
     paymentMethod: PaymentMethod
     transactionId: String
+    metadata: JSON # Stores extra response data from Stripe/Paypal
+    
     createdAt: String!
     updatedAt: String!
-    booking: Booking!
   }
 
   input CreatePaymentInput {
     bookingId: ID!
     amount: Float!
-    baseAmount: Float!
-    taxAmount: Float!
     currency: String
     paymentMethod: PaymentMethod
     transactionId: String
+    metadata: JSON
   }
 
   input UpdatePaymentStatusInput {

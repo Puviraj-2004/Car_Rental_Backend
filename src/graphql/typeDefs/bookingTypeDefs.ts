@@ -9,10 +9,14 @@ export const bookingTypeDefs = gql`
   }
 
   enum BookingStatus {
-    PENDING
+    DRAFT
+    AWAITING_VERIFICATION
+    AWAITING_PAYMENT
     CONFIRMED
-    CANCELLED
+    ONGOING
     COMPLETED
+    CANCELLED
+    REJECTED
   }
 
   # --- Types ---
@@ -22,39 +26,48 @@ export const bookingTypeDefs = gql`
     user: User!
     carId: ID!
     car: Car!
+    
     startDate: String
     endDate: String
+    
+    # Financials
     totalPrice: Float!
     basePrice: Float!
     taxAmount: Float!
+    depositAmount: Float!
     rentalType: RentalType!
-    rentalValue: Float! # Hours for HOUR, KM for KM, Days for DAY
+    
     status: BookingStatus!
     pickupLocation: String
     dropoffLocation: String
+    
     createdAt: String!
     updatedAt: String!
+    
     payment: Payment
+  }
+
+  type BookingLinkResponse {
+    success: Boolean!
+    message: String!
+    bookingId: ID!
   }
 
   # --- Inputs ---
   input CreateBookingInput {
-    userId: ID!      # User ID கட்டாயம் தேவை
+    userId: ID! 
     carId: ID!
-    startDate: String
-    endDate: String
+    startDate: String!
+    endDate: String!
+    
     totalPrice: Float!
     basePrice: Float!
     taxAmount: Float!
+    depositAmount: Float!
     rentalType: RentalType!
-    rentalValue: Float!
+    
     pickupLocation: String
     dropoffLocation: String
-  }
-
-  input UpdateBookingStatusInput {
-    id: ID!
-    status: BookingStatus!
   }
 
   # --- Queries ---
@@ -63,15 +76,23 @@ export const bookingTypeDefs = gql`
     booking(id: ID!): Booking
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
-    # 🚀 Resolver-ல் இருந்த 'myBookings' இங்கே சேர்க்கப்பட்டுள்ளது
     myBookings: [Booking!]!
   }
 
   # --- Mutations ---
   type Mutation {
+    # Step 1: User creates a draft booking
     createBooking(input: CreateBookingInput!): Booking!
-    # Status அப்டேட் செய்ய input ஆப்ஜெக்ட் பயன்படுத்துமாறு மாற்றப்பட்டுள்ளது
+    
+    # Step 2: System sends the verification link (email)
+    sendBookingVerificationLink(bookingId: ID!): BookingLinkResponse!
+    
+    # Step 3: Verify the token from email (User clicks the link)
+    verifyBookingToken(token: String!): BookingLinkResponse!
+    
+    # Admin or System updates status
     updateBookingStatus(id: ID!, status: BookingStatus!): Booking!
+    
     cancelBooking(id: ID!): Boolean!
     deleteBooking(id: ID!): Boolean!
   }

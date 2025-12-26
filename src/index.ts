@@ -1,3 +1,4 @@
+// backend/src/index.ts
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
@@ -6,15 +7,18 @@ import http from 'http';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import { graphqlUploadExpress } from 'graphql-upload-ts';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config();
+
 import prisma from './utils/database';
 import typeDefs from './graphql/typeDefs';
 import resolvers from './graphql/resolvers';
 import { verifyToken } from './utils/auth';
-import path from 'path';
-
 
 async function startServer() {
-  const app = express(); // 🚀 இந்த app-தான் சர்வரை இயக்குகிறது
+  const app = express();
   const httpServer = http.createServer(app);
 
   const server = new ApolloServer({
@@ -25,20 +29,23 @@ async function startServer() {
   });
 
   await server.start();
+
+  // ✅ முக்கியமான வரிசை: CORS மற்றும் Upload முதலில் வர வேண்டும்
   app.use(cors<cors.CorsRequest>());
+  
+  // 📸 இமேஜ் அப்லோடுக்கு இது மிக அவசியம்
+  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
+
   app.use(bodyParser.json());
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-  // Middleware for File Uploads
-  app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
-
-  // GraphQL Middleware
   app.use(
     '/graphql',
     expressMiddleware(server, {
       context: async ({ req }) => {
         const context: any = { prisma };
         const authHeader = req.headers.authorization;
+
         if (authHeader && authHeader.startsWith('Bearer ')) {
           const token = authHeader.split(' ')[1];
           try {
@@ -46,7 +53,7 @@ async function startServer() {
             context.userId = decoded.userId;
             context.role = decoded.role;
           } catch (error) {
-            console.error('Token verification error:', error);
+            // Token verification failed
           }
         }
         return context;
@@ -54,10 +61,12 @@ async function startServer() {
     }) as any
   );
 
-  await new Promise<void>((resolve) => httpServer.listen({ port: 4000 }, resolve));
-  console.log(`🚀 Server ready at http://localhost:4000/graphql`);
-  console.log(`📂 Static files served at http://localhost:4000/uploads`);
+  const PORT = process.env.PORT || 4000;
+  await new Promise<void>((resolve) => httpServer.listen({ port: parseInt(PORT.toString()) }, resolve));
+  
+  console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
 }
+
 startServer().catch(error => {
   console.error('Error starting server:', error);
 });

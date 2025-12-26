@@ -1,183 +1,180 @@
-import { deleteUploadedFile } from '../../utils/upload';
 import prisma from '../../utils/database';
-import { GraphQLUpload } from 'graphql-upload-ts';
-import path from 'path';
-import fs from 'fs';
+import { isAdmin } from '../../utils/authguard';
+import { uploadToCloudinary, deleteFromCloudinary } from '../../utils/cloudinary';
 
 export const carResolvers = {
-  Upload: GraphQLUpload,
-
   Query: {
     cars: async (_: any, { filter }: any) => {
       const where: any = {};
+      
       if (filter) {
-        if (filter.brandId && filter.brandId !== "") where.brandId = filter.brandId;
-        if (filter.modelId && filter.modelId !== "") where.modelId = filter.modelId;
-        if (filter.fuelType && filter.fuelType !== "") where.fuelType = filter.fuelType;
-        if (filter.transmission && filter.transmission !== "") where.transmission = filter.transmission;
-        if (filter.status && filter.status !== "") where.status = filter.status;
-        if (filter.critAirRating && filter.critAirRating !== "") where.critAirRating = filter.critAirRating;
+        if (filter.brandId) where.brandId = filter.brandId;
+        if (filter.modelId) where.modelId = filter.modelId;
+        if (filter.fuelType) where.fuelType = filter.fuelType;
+        if (filter.transmission) where.transmission = filter.transmission;
+        if (filter.status) where.status = filter.status;
+        if (filter.critAirRating) where.critAirRating = filter.critAirRating;
+        if (filter.minPrice || filter.maxPrice) {
+          where.pricePerDay = {};
+          if (filter.minPrice) where.pricePerDay.gte = filter.minPrice;
+          if (filter.maxPrice) where.pricePerDay.lte = filter.maxPrice;
+        }
       }
-      return await (prisma.car as any).findMany({
+
+      return await prisma.car.findMany({
         where,
         include: { brand: true, model: true, images: true },
         orderBy: { createdAt: 'desc' }
       });
     },
 
+    // 🔍 ஒரு காரின் முழு விவரங்களை எடுக்க
     car: async (_: any, { id }: any) => {
-      const car = await (prisma.car as any).findUnique({ 
+      return await prisma.car.findUnique({ 
         where: { id }, 
         include: { 
           brand: true, 
           model: true, 
           images: { orderBy: { isPrimary: 'desc' } },
-          bookings: true // 🚀 Bookings சேர்க்கப்பட்டுள்ளது
+          bookings: true 
         } 
       });
-      
-      // Ensure bookings is always an array, not null
-      if (car) {
-        car.bookings = car.bookings || [];
-      }
-      
-      return car;
     },
     
-    brands: async () => await (prisma as any).brand.findMany({ orderBy: { name: 'asc' } }),
-    models: async (_: any, { brandId }: any) => await (prisma as any).model.findMany({ 
-      where: { brandId }, 
-      orderBy: { name: 'asc' } 
-    }),
+    // 🏢 பிராண்டுகள் மற்றும் மாடல்களை எடுக்க
+    brands: async () => await prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+    
+    models: async (_: any, { brandId }: any) => 
+      await prisma.model.findMany({ where: { brandId }, orderBy: { name: 'asc' } }),
+
+    // 🗓️ குறிப்பிட்ட தேதிகளில் கிடைக்கும் கார்களை மட்டும் எடுக்க
     availableCars: async (_: any, { startDate, endDate }: any) => {
-      // Convert string dates to Date objects
       const startDateTime = new Date(startDate);
       const endDateTime = new Date(endDate);
       
-      // Find cars that don't have overlapping bookings
-      const cars = await (prisma.car as any).findMany({
-        include: { 
-          brand: true, 
-          model: true, 
-          images: true,
+      return await prisma.car.findMany({
+        where: {
+          status: 'AVAILABLE',
           bookings: {
-            where: {
-              // Check for overlapping bookings
-              AND: [
-                { startDate: { lt: endDateTime } }, // Booking starts before the requested end date
-                { endDate: { gt: startDateTime } }  // Booking ends after the requested start date
+            none: {
+              OR: [
+                {
+                   AND: [
+                     { startDate: { lt: endDateTime } },
+                     { endDate: { gt: startDateTime } }
+                   ]
+                }
               ]
             }
           }
-        }
-      });
-      
-      // Filter to only include cars that are available (not booked during the requested period)
-      // and have status as AVAILABLE
-      return cars.filter((car: any) => {
-        // Car must have status 'AVAILABLE' and no overlapping bookings
-        return car.status === 'AVAILABLE' && car.bookings.length === 0;
+        },
+        include: { brand: true, model: true, images: true }
       });
     },
   },
 
   Mutation: {
-    createBrand: async (_: any, { name }: any) => {
-      return await (prisma as any).brand.create({ data: { name: name.trim() } });
+    // 🛠️ --- ADMIN ONLY OPERATIONS ---
+    
+    createBrand: async (_: any, args: any, context: any) => {
+      isAdmin(context);
+      return await prisma.brand.create({ data: args });
     },
-    updateBrand: async (_: any, { id, name }: any) => {
-      return await (prisma as any).brand.update({ where: { id }, data: { name: name.trim() } });
+    
+    updateBrand: async (_: any, { id, ...args }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.brand.update({ where: { id }, data: args });
     },
-    deleteBrand: async (_: any, { id }: any) => {
-      await (prisma as any).brand.delete({ where: { id } });
+    
+    deleteBrand: async (_: any, { id }: any, context: any) => {
+      isAdmin(context);
+      await prisma.brand.delete({ where: { id } });
       return true;
     },
-    createModel: async (_: any, { name, brandId }: any) => {
-      return await (prisma as any).model.create({ data: { name: name.trim(), brandId } });
+
+    createModel: async (_: any, args: any, context: any) => {
+      isAdmin(context);
+      return await prisma.model.create({ data: args });
     },
-    updateModel: async (_: any, { id, name }: any) => {
-      return await (prisma as any).model.update({ where: { id }, data: { name: name.trim() } });
-    },
-    deleteModel: async (_: any, { id }: any) => {
-      await (prisma as any).model.delete({ where: { id } });
-      return true;
-    },
-    createCar: async (_: any, { input }: any) => {
-      // Set default status to AVAILABLE if not provided
-      const data = {
-        ...input,
-        status: input.status || 'AVAILABLE'
-      };
-      return await (prisma.car as any).create({ 
-        data,
+
+    createCar: async (_: any, { input }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.car.create({ 
+        data: { ...input, status: input.status || 'AVAILABLE' },
         include: { brand: true, model: true } 
       });
     },
     
-    updateCar: async (_: any, { id, input }: any) => {
-      // Filter out undefined values to only update provided fields
-      const updateData: any = {};
-      Object.keys(input).forEach(key => {
-        if (input[key] !== undefined) {
-          updateData[key] = input[key];
-        }
-      });
-      
-      return await (prisma.car as any).update({ 
+    updateCar: async (_: any, { id, input }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.car.update({ 
         where: { id }, 
-        data: updateData,
+        data: input,
         include: { brand: true, model: true }
       });
     },
-    uploadCarImages: async (_: any, { input }: any) => {
-      const { carId, images, primaryIndex } = input;
-      const uploadedImages = [];
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-      for (let i = 0; i < images.length; i++) {
-        const file = await images[i];
-        const { createReadStream, filename } = file;
-        const newFilename = `${carId}-${Date.now()}-${i}${path.extname(filename)}`;
-        const filePath = path.join(uploadDir, newFilename);
-        const stream = createReadStream();
-        await new Promise((res, rej) => stream.pipe(fs.createWriteStream(filePath)).on('finish', res).on('error', rej));
-
-        const img = await (prisma as any).carImage.create({ 
-          data: { carId, imagePath: `/uploads/${newFilename}`, isPrimary: i === (primaryIndex || 0) } 
-        });
-        uploadedImages.push(img);
+    // 🗑️ காரை நீக்கும்போது Cloudinary படங்களையும் நீக்குகிறது
+    deleteCar: async (_: any, { id }: any, context: any) => {
+      isAdmin(context);
+      
+      // 1. காரின் படங்களை எடுத்து Cloudinary-ல் இருந்து நீக்குதல்
+      const images = await prisma.carImage.findMany({ where: { carId: id } });
+      for (const img of images) {
+        if (img.publicId) await deleteFromCloudinary(img.publicId);
       }
-      return uploadedImages;
-    },
-    deleteCar: async (_: any, { id }: any) => {
-      const images = await (prisma as any).carImage.findMany({ where: { carId: id } });
-      for (const img of images) await deleteUploadedFile(img.imagePath);
-      await (prisma.car as any).delete({ where: { id } });
+
+      // 2. காரை டேட்டாபேஸில் இருந்து நீக்குதல்
+      await prisma.car.delete({ where: { id } });
       return true;
     },
-    deleteCarImage: async (_: any, { imageId }: any) => {
-      try {
-        const image = await (prisma as any).carImage.findUnique({ where: { id: imageId } });
-        if (!image) {
-          throw new Error('Image not found');
-        }
-        
-        await deleteUploadedFile(image.imagePath);
-        await (prisma as any).carImage.delete({ where: { id: imageId } });
-        
-        return true;
-      } catch (error) {
-        console.error('Error deleting car image:', error);
-        throw error;
-      }
-    }
-  },
-  
-  Car: {
 
-    brand: async (parent: any) => await (prisma as any).brand.findUnique({ where: { id: parent.brandId } }),
-    model: async (parent: any) => await (prisma as any).model.findUnique({ where: { id: parent.modelId } }),
-    bookings: (parent: any) => parent.bookings || [], // 🚀 இதுதான் அந்த Non-nullable எரரைச் சரி செய்யும்
+    addCarImage: async (_: any, { carId, file, isPrimary }: any, context: any) => {
+      isAdmin(context);
+      const { createReadStream } = await file;
+      
+      if (!createReadStream) {
+        throw new Error("File upload failed: createReadStream is not available.");
+      }
+      const fileStream = createReadStream();
+      const uploadResult = await uploadToCloudinary(fileStream, 'cars');
+      if (isPrimary) {
+        await prisma.carImage.updateMany({
+          where: { carId },
+          data: { isPrimary: false }
+        });
+      }
+      return await prisma.carImage.create({
+        data: {
+          carId,
+          imagePath: uploadResult.secure_url,
+          publicId: uploadResult.public_id,
+          isPrimary: isPrimary || false
+        }
+      });
+    },
+
+    deleteCarImage: async (_: any, { imageId }: any, context: any) => {
+      isAdmin(context);
+      const image = await prisma.carImage.findUnique({ where: { id: imageId } });
+      if (!image) throw new Error('Image not found');
+      
+      // Cloudinary-ல் இருந்து நீக்குதல்
+      if (image.publicId) {
+        await deleteFromCloudinary(image.publicId);
+      }
+
+      await prisma.carImage.delete({ where: { id: imageId } });
+      return true;
+    },
+
+    setPrimaryCarImage: async (_: any, { carId, imageId }: any, context: any) => {
+      isAdmin(context);
+      await prisma.$transaction([
+        prisma.carImage.updateMany({ where: { carId }, data: { isPrimary: false } }),
+        prisma.carImage.update({ where: { id: imageId }, data: { isPrimary: true } })
+      ]);
+      return true;
+    }
   }
 };
