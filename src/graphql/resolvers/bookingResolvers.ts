@@ -1,200 +1,151 @@
-import { calculateTax, calculateTotalPrice, calculateRentalCost } from '../../utils/pricing';
-import { validateBookingInput } from '../../utils/validation';
 import prisma from '../../utils/database';
-import { BookingStatus } from '.prisma/client/default';
+import { v4 as uuidv4 } from 'uuid';
+import { isAuthenticated, isAdmin, isOwnerOrAdmin } from '../../utils/authguard';
 
 export const bookingResolvers = {
   Query: {
-    bookings: async () => {
+    bookings: async (_: any, __: any, context: any) => {
+      isAdmin(context); // Only Admin sees all bookings
       return await prisma.booking.findMany({
         include: {
           user: true,
-          car: true,
-          payment: true
-        }
+          car: { include: { brand: true, model: true } },
+          payment: true,
+        },
+        orderBy: { createdAt: 'desc' },
       });
     },
 
-    booking: async (_: any, { id }: { id: string }) => {
-      return await prisma.booking.findUnique({
+    myBookings: async (_: any, __: any, context: any) => {
+      isAuthenticated(context);
+      return await prisma.booking.findMany({
+        where: { userId: context.userId },
+        include: {
+          car: { include: { brand: true, model: true, images: true } },
+          payment: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    },
+
+    booking: async (_: any, { id }: { id: string }, context: any) => {
+      const booking = await prisma.booking.findUnique({
         where: { id },
         include: {
           user: true,
-          car: true,
-          payment: true
-        }
+          car: { include: { brand: true, model: true } },
+          payment: true,
+          verification: true
+        },
       });
+      
+      if (!booking) throw new Error('Booking not found');
+      isOwnerOrAdmin(context, booking.userId); // Check permission
+      
+      return booking;
     },
-
-    userBookings: async (_: any, { userId }: { userId: string }) => {
-      return await prisma.booking.findMany({
-        where: { userId },
-        include: {
-          user: true,
-          car: true,
-          payment: true
-        }
-      });
-    },
-
-    carBookings: async (_: any, { carId }: { carId: string }) => {
-      return await prisma.booking.findMany({
-        where: { carId },
-        include: {
-          user: true,
-          car: true,
-          payment: true
-        }
-      });
-    }
   },
 
   Mutation: {
     createBooking: async (_: any, { input }: { input: any }, context: any) => {
-      if (!context.userId) {
-        throw new Error('Authentication required');
-      }
+      isAuthenticated(context);
 
-      // Validate input
-      const validation = validateBookingInput(input);
-      if (!validation.isValid) {
-        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
-      }
-
-      const { carId, startDate, endDate, rentalType, rentalValue, pickupLocation, dropoffLocation } = input;
-
-      // Check if dates are valid and car availability (only for DAY rentals)
-      if (rentalType === 'DAY') {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        // Check if car is available for the given dates
-        const overlappingBookings = await prisma.booking.findMany({
-          where: {
-            carId,
-            status: { not: BookingStatus.CANCELLED },
-            AND: [
-              { startDate: { lte: end } },
-              { endDate: { gte: start } }
-            ]
-          }
-        });
-
-        if (overlappingBookings.length > 0) {
-          throw new Error('Car is not available for the selected dates');
-        }
-      }
-
-      // Get car details
-      const car = await prisma.car.findUnique({
-        where: { id: carId }
-      });
-
-      if (!car) {
-        throw new Error('Car not found');
-      }
-
-      if (!car.availability) {
-        throw new Error('Car is not available');
-      }
-
-      // Calculate pricing based on rental type
-      let calculatedRentalValue = rentalValue;
-
-      if (rentalType === 'DAY' && !rentalValue) {
-        // Calculate days if not provided
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        calculatedRentalValue = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      }
-
-      const basePrice = calculateRentalCost(
-        rentalType,
-        calculatedRentalValue,
-        car.pricePerHour,
-        car.pricePerKm,
-        car.pricePerDay
-      );
-
-      const taxAmount = calculateTax(basePrice);
-      const totalPrice = calculateTotalPrice(basePrice, taxAmount);
-
-      // Create booking
       return await prisma.booking.create({
         data: {
+          ...input,
           userId: context.userId,
-          carId,
-          startDate: rentalType === 'DAY' ? new Date(startDate) : null,
-          endDate: rentalType === 'DAY' ? new Date(endDate) : null,
-          rentalType,
-          rentalValue: calculatedRentalValue,
-          basePrice,
-          taxAmount,
-          totalPrice,
-          status: BookingStatus.PENDING,
-          pickupLocation,
-          dropoffLocation
+          status: 'DRAFT',
         },
         include: {
-          user: true,
-          car: true,
-          payment: true
-        }
+          car: { include: { brand: true, model: true } },
+        },
       });
     },
 
-    updateBookingStatus: async (_: any, { input }: { input: any }) => {
+    // User requests verification link
+    sendBookingVerificationLink: async (_: any, { bookingId }: { bookingId: string }, context: any) => {
+      // Need to fetch booking to check ownership
+      const booking = await prisma.booking.findUnique({ where: { id: bookingId }});
+      if (!booking) throw new Error('Booking not found');
+      
+      isOwnerOrAdmin(context, booking.userId);
+
+      const token = uuidv4();
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+
+      await prisma.bookingVerification.upsert({
+        where: { bookingId },
+        update: { token, expiresAt, isVerified: false },
+        create: { bookingId, token, expiresAt }
+      });
+
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: 'AWAITING_VERIFICATION' }
+      });
+
+      // Email Logic Here (e.g. await sendEmail(...))
+
+      return {
+        success: true,
+        message: "Verification link sent to your email.",
+        bookingId
+      };
+    },
+
+    // Public Route (Relies on Token)
+    verifyBookingToken: async (_: any, { token }: { token: string }) => {
+      const verification = await prisma.bookingVerification.findUnique({
+        where: { token }
+      });
+
+      if (!verification) throw new Error("Invalid token");
+      if (new Date() > verification.expiresAt) throw new Error("Token expired");
+
+      await prisma.bookingVerification.update({
+        where: { id: verification.id },
+        data: { isVerified: true, verifiedAt: new Date() }
+      });
+
+      await prisma.booking.update({
+        where: { id: verification.bookingId },
+        data: { status: 'AWAITING_PAYMENT' }
+      });
+
+      return {
+        success: true,
+        message: "Booking verified. You can now proceed to payment.",
+        bookingId: verification.bookingId
+      };
+    },
+
+    updateBookingStatus: async (_: any, { id, status }: { id: string, status: any }, context: any) => {
+      isAdmin(context);
+      
+      // If status is CONFIRMED, maybe send an email?
       return await prisma.booking.update({
-        where: { id: input.id },
-        data: { status: input.status },
-        include: {
-          user: true,
-          car: true,
-          payment: true
-        }
+        where: { id },
+        data: { status },
       });
     },
-
-    cancelBooking: async (_: any, { id }: { id: string }) => {
-      const booking = await prisma.booking.findUnique({
-        where: { id }
-      });
-
-      if (!booking) {
-        throw new Error('Booking not found');
-      }
-
-      // Only allow cancellation of pending or confirmed bookings
-      if (booking.status !== BookingStatus.PENDING && booking.status !== BookingStatus.CONFIRMED) {
-        throw new Error('Cannot cancel booking with current status');
-      }
+    
+    cancelBooking: async (_: any, { id }: { id: string }, context: any) => {
+      const booking = await prisma.booking.findUnique({ where: { id }});
+      if (!booking) throw new Error('Not found');
+      
+      isOwnerOrAdmin(context, booking.userId);
 
       await prisma.booking.update({
         where: { id },
-        data: { status: BookingStatus.CANCELLED }
+        data: { status: 'CANCELLED' }
       });
-
       return true;
-    }
-  },
-
-  Booking: {
-    user: async (parent: any) => {
-      return await prisma.user.findUnique({
-        where: { id: parent.userId }
-      });
     },
 
-    car: async (parent: any) => {
-      return await prisma.car.findUnique({
-        where: { id: parent.carId }
-      });
-    },
-
-    payment: async (parent: any) => {
-      return await prisma.payment.findUnique({
-        where: { bookingId: parent.id }
-      });
+    deleteBooking: async (_: any, { id }: { id: string }, context: any) => {
+      isAdmin(context);
+      await prisma.booking.delete({ where: { id } });
+      return true;
     }
   }
 };

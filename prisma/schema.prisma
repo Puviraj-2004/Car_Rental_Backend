@@ -1,3 +1,6 @@
+// This is your complete Industrial Schema
+// Date: 2025
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,12 +10,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --- ENUMS ---
-// GraphQL TypeDefs-லும் இதே பெயர்களில் Enum இருக்க வேண்டும்
+// --------------------------------------
+// 1. ENUMS (Constants)
+// --------------------------------------
 
 enum Role {
   USER
   ADMIN
+  SUPPORT
 }
 
 enum FuelType {
@@ -34,9 +39,16 @@ enum CritAirCategory {
   CRIT_AIR_3
   CRIT_AIR_4
   CRIT_AIR_5
+  CRIT_AIR_6
   NO_STICKER
 }
 
+enum CarStatus {
+  AVAILABLE
+  BOOKED
+  MAINTENANCE
+  OUT_OF_SERVICE
+}
 
 enum RentalType {
   HOUR
@@ -45,10 +57,14 @@ enum RentalType {
 }
 
 enum BookingStatus {
-  PENDING
-  CONFIRMED
-  CANCELLED
-  COMPLETED
+  DRAFT                 // 1. User selects car, enters dates
+  AWAITING_VERIFICATION // 2. Link sent to email
+  AWAITING_PAYMENT      // 3. Docs verified by AI, waiting for money
+  CONFIRMED             // 4. Paid & Admin Approved
+  ONGOING               // 5. Car picked up
+  COMPLETED             // 6. Car returned
+  CANCELLED             // User cancelled
+  REJECTED              // Admin/AI rejected docs
 }
 
 enum PaymentStatus {
@@ -66,102 +82,106 @@ enum PaymentMethod {
   BANK_TRANSFER
 }
 
-// --- MODELS ---
+enum VerificationStatus {
+  NOT_UPLOADED
+  PENDING_REVIEW
+  VERIFIED_BY_AI      // AI Passed
+  VERIFIED_BY_ADMIN   // Admin Manual Check
+  REJECTED
+}
+
+// --------------------------------------
+// 2. CONFIGURATION MODELS
+// --------------------------------------
+
+// Site Settings (Admin can manage Logo, Name, Tax here)
+model PlatformSettings {
+  id                 String   @id @default(uuid())
+  companyName        String   @default("My Car Rental")
+  description        String?  // Footer text
+  
+  logoUrl            String?  // Cloudinary URL
+  logoPublicId       String?  // Cloudinary ID (for delete)
+  
+  supportEmail       String?
+  supportPhone       String?
+  address            String?  
+
+  // Social Media Links (New)
+  facebookUrl        String?
+  twitterUrl         String?
+  instagramUrl       String?
+  linkedinUrl        String?
+  
+  termsAndConditions String?  // Rich text or Link
+  privacyPolicy      String?
+  
+  currency           String   @default("EUR")
+  taxPercentage      Float    @default(20.0) // Global Tax
+
+  updatedAt          DateTime @updatedAt
+}
+
+// --------------------------------------
+// 3. USER & AUTH MODELS
+// --------------------------------------
 
 model User {
-  id            String    @id @default(uuid())
-  firstName     String
-  lastName      String
-  email         String    @unique
-  password      String?
-  phoneNumber   String?
-  role          Role      @default(USER)
-  isVerified    Boolean   @default(false)
-  otp           String?   
-  otpExpires    DateTime? 
-  googleId      String?   @unique
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  bookings      Booking[]
+  id              String         @id @default(uuid())
+  username        String         @unique // Added username (Required)
+  email           String         @unique // Required
+  password        String?        // Optional (Needed for Google Login)
+  phoneNumber     String         @unique // Changed to Required (Must)
+  role            Role           @default(USER)
+  
+  isEmailVerified Boolean        @default(false)
+  
+  // Auth Logic
+  otp             String?
+  otpExpires      DateTime?
+  googleId        String?        @unique
+  
+  // Relations
+  driverProfile   DriverProfile? 
+  bookings        Booking[]
+  refreshTokens   RefreshToken[]
+  auditLogs       AuditLog[]     
 
-  @@index([email])
-  refreshTokens RefreshToken[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([email, username])
 }
 
-model Car {
-  id             String           @id @default(uuid())
-  brand          String
-  model          String
-  year           Int
-  plateNumber    String           @unique
-  fuelType       FuelType
-  transmission   TransmissionType
-  seats          Int
-  doors          Int
-  pricePerHour   Float
-  pricePerKm     Float
-  pricePerDay    Float
-  critAirRating  CritAirCategory              
-  availability   Boolean          @default(true)
-  descriptionEn  String?          
-  descriptionFr  String?          
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  bookings       Booking[]
-  images         CarImage[]
+model DriverProfile {
+  id                   String             @id @default(uuid())
+  userId               String             @unique
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // AI Extracted Details
+  licenseNumber        String?            @unique
+  licenseExpiry        DateTime?
+  idProofNumber        String?
+  address              String?
+  dateOfBirth          DateTime?
+  
+  // Cloudinary URLs (Private/Authenticated)
+  licenseFrontUrl      String?
+  licenseBackUrl       String?
+  idProofUrl           String?
+  addressProofUrl      String?
 
-  @@index([brand, model]) // Filter செய்யும்போது வேகம் அதிகரிக்கும்
-}
+  // Cloudinary Public IDs (To delete old files)
+  licenseFrontPublicId String?
+  licenseBackPublicId  String?
+  idProofPublicId      String?
+  addressProofPublicId String?
 
-model CarImage {
-  id          String   @id @default(uuid())
-  carId       String
-  imagePath   String   // Cloudinary/S3 URL அல்லது Local Path
-  altText     String?  
-  isPrimary   Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  car         Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+  status               VerificationStatus @default(NOT_UPLOADED)
+  verificationNote     String?            // Reason if rejected
 
-  @@index([carId])
-}
-
-model Booking {
-  id              String        @id @default(uuid())
-  userId          String
-  carId           String
-  startDate       DateTime?     
-  endDate         DateTime?     
-  totalPrice      Float         
-  basePrice       Float         
-  taxAmount       Float         
-  rentalType      RentalType
-  rentalValue     Float         
-  status          BookingStatus @default(PENDING)
-  pickupLocation  String?
-  dropoffLocation String?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  user            User          @relation(fields: [userId], references: [id])
-  car             Car           @relation(fields: [carId], references: [id])
-  payment         Payment?
-
-  @@index([userId, carId])
-}
-
-model Payment {
-  id            String        @id @default(uuid())
-  bookingId     String        @unique
-  amount        Float         
-  baseAmount    Float         
-  taxAmount     Float         
-  currency      String        @default("EUR")
-  status        PaymentStatus @default(PENDING)
-  paymentMethod PaymentMethod?
-  transactionId String?       @unique // Stripe Payment Intent ID-க்கு பயனுள்ளது
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 }
 
 model RefreshToken {
@@ -171,4 +191,163 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// --------------------------------------
+// 4. CAR & INVENTORY MODELS
+// --------------------------------------
+
+model Brand {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  logoUrl      String?
+  logoPublicId String?
+  models       Model[]
+  cars         Car[]
+  createdAt    DateTime @default(now())
+}
+
+model Model {
+  id        String   @id @default(uuid())
+  name      String
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  cars      Car[]
+  createdAt DateTime @default(now())
+
+  @@unique([name, brandId])
+}
+
+model Car {
+  id              String           @id @default(uuid())
+  brandId         String
+  brand           Brand            @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  modelId         String
+  model           Model            @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  
+  year            Int
+  plateNumber     String           @unique
+  fuelType        FuelType
+  transmission    TransmissionType
+  seats           Int
+  mileage         Float            @default(0)
+  
+  // Pricing
+  pricePerHour    Float?
+  pricePerKm      Float?
+  pricePerDay     Float?
+  depositAmount   Float            @default(0) // Security Deposit
+
+  critAirRating   CritAirCategory
+  status          CarStatus        @default(AVAILABLE)
+  
+  descriptionEn   String?
+  descriptionFr   String?
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  
+  bookings        Booking[]
+  images          CarImage[]
+
+  @@index([brandId, modelId])
+  @@index([status])
+}
+
+model CarImage {
+  id        String   @id @default(uuid())
+  carId     String
+  imagePath String   // Cloudinary URL
+  publicId  String?  // Cloudinary Public ID
+  
+  altText   String?
+  isPrimary Boolean  @default(false)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  car       Car      @relation(fields: [carId], references: [id], onDelete: Cascade)
+
+  @@index([carId])
+}
+
+// --------------------------------------
+// 5. BOOKING & PAYMENT MODELS
+// --------------------------------------
+
+model Booking {
+  id              String        @id @default(uuid())
+  userId          String
+  carId           String
+  
+  startDate       DateTime
+  endDate         DateTime
+  
+  pickupLocation  String?
+  dropoffLocation String?
+  
+  // Financials
+  totalPrice      Float
+  basePrice       Float
+  taxAmount       Float
+  depositAmount   Float         @default(0)
+  rentalType      RentalType
+  
+  status          BookingStatus @default(DRAFT)
+  
+  // Relations
+  user            User          @relation(fields: [userId], references: [id])
+  car             Car           @relation(fields: [carId], references: [id])
+  payment         Payment?
+  verification    BookingVerification? 
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId, carId])
+  @@index([status])
+}
+
+// The "Magic Link" logic
+model BookingVerification {
+  id            String   @id @default(uuid())
+  bookingId     String   @unique
+  booking       Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  token         String   @unique // Token sent in email
+  expiresAt     DateTime
+  
+  isVerified    Boolean  @default(false)
+  verifiedAt    DateTime?
+  
+  createdAt     DateTime @default(now())
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  bookingId     String        @unique
+  booking       Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  
+  amount        Float
+  currency      String        @default("EUR")
+  status        PaymentStatus @default(PENDING)
+  paymentMethod PaymentMethod?
+  transactionId String?       @unique // Stripe/Paypal ID
+  
+  metadata      Json?         // Store raw response from Gateway
+  
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// --------------------------------------
+// 6. LOGGING
+// --------------------------------------
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // e.g., "CAR_ADDED", "BOOKING_APPROVED"
+  details   Json?    // Snapshot of data
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }

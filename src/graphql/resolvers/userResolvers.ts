@@ -1,197 +1,208 @@
-import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
+// backend/src/graphql/resolvers/userResolvers.ts
+
+import { OAuth2Client } from 'google-auth-library';
 import prisma from '../../utils/database';
+import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
 import { sendVerificationEmail } from '../../utils/sendEmail';
 import { validatePassword } from '../../utils/validation';
+import { isAuthenticated, isAdmin, isOwnerOrAdmin } from '../../utils/authguard';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const userResolvers = {
   Query: {
     me: async (_: any, __: any, context: any) => {
-      if (!context.userId) {
-        throw new Error('Authentication required');
-      }
-
+      isAuthenticated(context);
       return await prisma.user.findUnique({
         where: { id: context.userId },
-        include: { bookings: true }
+        include: { driverProfile: true, bookings: true }
       });
     },
 
-    user: async (_: any, { id }: { id: string }) => {
+    user: async (_: any, { id }: { id: string }, context: any) => {
+      isOwnerOrAdmin(context, id);
       return await prisma.user.findUnique({
         where: { id },
-        include: { bookings: true }
+        include: { driverProfile: true, bookings: true }
       });
     },
 
     users: async (_: any, __: any, context: any) => {
-
-      if (!context.userId || context.role !== 'ADMIN') {
-        
-        throw new Error('Access denied. Admin only.');
-      }
+      isAdmin(context);
       return await prisma.user.findMany({
-        include: { bookings: true }
+        include: { driverProfile: true, bookings: true }
+      });
+    },
+    
+    myDriverProfile: async (_: any, __: any, context: any) => {
+      isAuthenticated(context);
+      return await prisma.driverProfile.findUnique({
+        where: { userId: context.userId }
       });
     }
-
   },
 
   Mutation: {
+    // 1. Updated Simple Register (Username, Email, Phone, Password)
     register: async (_: any, { input }: { input: any }) => {
-      // 1. மின்னஞ்சல் ஏற்கனவே உள்ளதா எனச் சரிபார்க்க
-      const existingUser = await prisma.user.findUnique({
-        where: { email: input.email }
+      const { email, username, password, phoneNumber } = input;
+
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          OR: [{ email }, { username }]
+        }
       });
 
       if (existingUser) {
-        throw new Error('User already exists with this email');
+        throw new Error('User already exists with this email or username');
       }
       
-      // 2. Validate password strength
-      const passwordValidation = validatePassword(input.password);
+      const passwordValidation = validatePassword(password);
       if (!passwordValidation.isValid) {
-        throw new Error(`Password validation failed: ${passwordValidation.errors.join(', ')}`);
+        throw new Error(`Password weak: ${passwordValidation.errors.join(', ')}`);
       }
 
-      // 3. Password-ஐ Hash செய்ய
-      const hashedPassword = await hashPassword(input.password);
-
-      // 4. 6-இலக்க OTP மற்றும் காலாவதி நேரம் உருவாக்கம் (10 நிமிடம்)
+      const hashedPassword = await hashPassword(password);
       const generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
       const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); 
 
-      // 5. User-ஐ உருவாக்குதல்
       const user = await prisma.user.create({
         data: {
-          firstName: input.firstName,
-          lastName: input.lastName,
-          email: input.email,
+          username,
+          email,
           password: hashedPassword,
-          phoneNumber: input.phoneNumber,
-          isVerified: false,
+          phoneNumber,
+          isEmailVerified: false,
           otp: generatedOTP,
           otpExpires: otpExpiry,
-        },
-        include: { bookings: true }
+          role: 'USER'
+        }
       });
 
-      // 6. மின்னஞ்சல் வழியாக OTP அனுப்புதல்
-      try {
-        await sendVerificationEmail(user.email, generatedOTP);
-      } catch (error) {
-        console.error("Email sending failed:", error);
-      }
-
-      // 7. லாகின் டோக்கன் (விரும்பினால்)
+      sendVerificationEmail(user.email, generatedOTP).catch(console.error);
       const token = generateToken(user.id, user.role);
 
       return {
         token,
         user,
-        message: "Registration successful! Please check your email for the 6-digit OTP."
+        message: "Registration successful. Please verify your email."
       };
     },
 
-    // 🚀 OTP-ஐச் சரிபார்க்கும் புதிய மியூட்டேஷன்
+    // 2. Login Resolver
+    login: async (_: any, { input }: { input: any }) => {
+      const { email, password } = input;
+      const user = await prisma.user.findUnique({
+        where: { email },
+        include: { driverProfile: true }
+      });
+
+      if (!user || !user.password) throw new Error('Invalid email or password');
+
+      const isValidPassword = await comparePasswords(password, user.password);
+      if (!isValidPassword) throw new Error('Invalid email or password');
+
+      if (!user.isEmailVerified) throw new Error('Email not verified. Please verify using OTP.');
+
+      const token = generateToken(user.id, user.role);
+      return { token, user };
+    },
+
+    // 3. Updated Google Login (Handling Username for new users)
+    googleLogin: async (_: any, { idToken }: { idToken: string }) => {
+      try {
+        const ticket = await client.verifyIdToken({
+          idToken,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) throw new Error('Invalid Google token');
+
+        const { email, sub: googleId } = payload;
+
+        let user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) {
+          // Creating a unique username from email prefix for social login
+          const baseUsername = email.split('@')[0];
+          user = await prisma.user.create({
+            data: {
+              email,
+              googleId,
+              username: `${baseUsername}_${Math.floor(Math.random() * 1000)}`,
+              phoneNumber: '', // Google doesn't provide phone; can be updated later
+              isEmailVerified: true,
+              role: 'USER'
+            }
+          });
+        } else if (!user.googleId) {
+          user = await prisma.user.update({
+            where: { email },
+            data: { googleId, isEmailVerified: true }
+          });
+        }
+
+        const token = generateToken(user.id, user.role);
+        return { token, user, message: "Google login successful" };
+      } catch (error) {
+        console.error("Google Auth Error:", error);
+        throw new Error('Google authentication failed');
+      }
+    },
+
     verifyOTP: async (_: any, { email, otp }: { email: string, otp: string }) => {
       const user = await prisma.user.findUnique({ where: { email } });
 
-      if (!user) {
-        throw new Error('User not found');
-      }
+      if (!user) throw new Error('User not found');
+      if (user.isEmailVerified) throw new Error('User already verified');
+      if (user.otp !== otp) throw new Error('Invalid OTP');
+      if (user.otpExpires && new Date() > user.otpExpires) throw new Error('OTP expired');
 
-      if (user.isVerified) {
-        throw new Error('User is already verified');
-      }
-
-      // OTP சரியாக இருக்கிறதா எனச் சரிபார்க்க
-      if (user.otp !== otp) {
-        throw new Error('Invalid OTP code');
-      }
-
-      // OTP காலாவதியாகிவிட்டதா எனச் சரிபார்க்க
-      if (user.otpExpires && new Date() > user.otpExpires) {
-        throw new Error('OTP has expired. Please request a new one.');
-      }
-
-      // User-ஐ Verified என மாற்றுதல்
       await prisma.user.update({
         where: { id: user.id },
-        data: { 
-          isVerified: true, 
-          otp: null, 
-          otpExpires: null 
-        }
+        data: { isEmailVerified: true, otp: null, otpExpires: null }
       });
 
-      return {
-        success: true,
-        message: "Account verified successfully! You can now login."
-      };
-    },
-
-    login: async (_: any, { input }: { input: any }) => {
-      const { email, password } = input;
-
-      const user = await prisma.user.findUnique({
-        where: { email },
-        include: { bookings: true }
-      });
-
-      if (!user || !user.password) {
-        throw new Error('Invalid email or password');
-      }
-
-      const isValidPassword = await comparePasswords(password, user.password);
-      if (!isValidPassword) {
-        throw new Error('Invalid email or password');
-      }
-      
-      // Additional check: if user's password is weak, suggest they update it
-      const passwordValidation = validatePassword(password);
-      if (!passwordValidation.isValid) {
-        console.warn(`User ${email} logged in with a weak password. Consider updating.`);
-      }
-
-      // 🛡️ மின்னஞ்சல் சரிபார்க்கப்படாவிட்டால் லாகினைத் தடுத்தல்
-      if (!user.isVerified) {
-        throw new Error('Please verify your email address using the OTP before logging in.');
-      }
-
-      const token = generateToken(user.id, user.role);
-
-      return {
-        token,
-        user
-      };
+      return { success: true, message: "Email verified successfully." };
     },
 
     updateUser: async (_: any, { input }: { input: any }, context: any) => {
-      if (!context.userId) {
-        throw new Error('Authentication required');
-      }
-
+      isAuthenticated(context);
       return await prisma.user.update({
         where: { id: context.userId },
-        data: input,
-        include: { bookings: true }
+        data: input
       });
     },
 
-    deleteUser: async (_: any, { id }: { id: string }) => {
-      await prisma.user.delete({
-        where: { id }
-      });
+    createOrUpdateDriverProfile: async (_: any, { input }: { input: any }, context: any) => {
+      isAuthenticated(context);
+      const dataToSave = { ...input, status: 'PENDING_REVIEW' };
 
+      return await prisma.driverProfile.upsert({
+        where: { userId: context.userId },
+        update: dataToSave,
+        create: { userId: context.userId, ...dataToSave }
+      });
+    },
+
+    verifyDriverProfile: async (_: any, { userId, status, note }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.driverProfile.update({
+        where: { userId },
+        data: { status, verificationNote: note }
+      });
+    },
+
+    deleteUser: async (_: any, { id }: { id: string }, context: any) => {
+      isAdmin(context);
+      await prisma.user.delete({ where: { id } });
       return true;
     }
   },
-
+  
   User: {
-    bookings: async (parent: any) => {
-      return await prisma.booking.findMany({
-        where: { userId: parent.id }
-      });
+    driverProfile: async (parent: any) => {
+      return await prisma.driverProfile.findUnique({ where: { userId: parent.id } });
     }
   }
 };

@@ -1,132 +1,147 @@
 import { gql } from 'graphql-tag';
 
 export const carTypeDefs = gql`
+  # 🚀 முக்கியமான மாற்றம்: இமேஜ் அப்லோட் செய்ய இது தேவை
   scalar Upload
 
+  # --- Enums ---
+  enum CritAirCategory { CRIT_AIR_0 CRIT_AIR_1 CRIT_AIR_2 CRIT_AIR_3 CRIT_AIR_4 CRIT_AIR_5 CRIT_AIR_6 NO_STICKER }
+  enum FuelType { PETROL DIESEL ELECTRIC HYBRID }
+  enum TransmissionType { MANUAL AUTOMATIC }
+  enum CarStatus { AVAILABLE BOOKED MAINTENANCE OUT_OF_SERVICE }
 
-  enum CritAirCategory {
-    CRIT_AIR_0
-    CRIT_AIR_1
-    CRIT_AIR_2
-    CRIT_AIR_3
-    CRIT_AIR_4
-    CRIT_AIR_5
-    NO_STICKER
+  # --- Types ---
+  type Brand {
+    id: ID!
+    name: String!
+    logoUrl: String
+    logoPublicId: String
+    models: [Model!]
+    createdAt: String!
   }
 
-  enum FuelType {
-    PETROL
-    DIESEL
-    ELECTRIC
-    HYBRID
-  }
-
-  enum TransmissionType {
-    MANUAL
-    AUTOMATIC
-  }
-
-  type Car {
-  id: ID!
-  brand: String!
-  model: String!
-  year: Int!
-  plateNumber: String!
-  fuelType: FuelType!
-  transmission: TransmissionType!
-  seats: Int!
-  doors: Int!
-  pricePerHour: Float!
-  pricePerKm: Float!
-  pricePerDay: Float!
-  critAirRating: CritAirCategory!
-  availability: Boolean!
-  descriptionEn: String
-  descriptionFr: String
-  createdAt: String!
-  updatedAt: String!
-  images: [CarImage!]!    
-  bookings: [Booking!]!
+  type Model {
+    id: ID!
+    name: String!
+    brandId: ID!
+    brand: Brand!
+    createdAt: String!
   }
 
   type CarImage {
     id: ID!
     carId: ID!
     imagePath: String!
+    publicId: String
     altText: String
     isPrimary: Boolean!
     createdAt: String!
     updatedAt: String!
-    car: Car!
   }
 
-  input CarFilterInput {
-    brand: String
-    model: String
-    fuelType: FuelType
-    transmission: TransmissionType
-    minPricePerDay: Float
-    maxPricePerDay: Float
-    minPricePerHour: Float
-    maxPricePerHour: Float
-    critAirRating: CritAirCategory
-    availability: Boolean
-  }
-
-  input UploadCarImagesInput {
-    carId: ID!
-    images: [Upload!]!
-    altTexts: [String]
-    primaryIndex: Int
-  }
-
-  input CreateCarInput {
-    brand: String!
-    model: String!
+  type Car {
+    id: ID!
+    brandId: ID!
+    brand: Brand!
+    modelId: ID!
+    model: Model!
     year: Int!
     plateNumber: String!
     fuelType: FuelType!
     transmission: TransmissionType!
     seats: Int!
-    doors: Int!
-    pricePerHour: Float!
-    pricePerKm: Float!
-    pricePerDay: Float!
+    mileage: Float!
+    pricePerHour: Float
+    pricePerKm: Float
+    pricePerDay: Float
+    depositAmount: Float!
     critAirRating: CritAirCategory!
-    availability: Boolean
+    status: CarStatus!
+    descriptionEn: String
+    descriptionFr: String
+    createdAt: String!
+    updatedAt: String!
+    images: [CarImage!]!    
+    bookings: [Booking!]!
+  }
+
+  # --- Inputs ---
+  input CreateCarInput {
+    brandId: ID!
+    modelId: ID!
+    year: Int!
+    plateNumber: String!
+    fuelType: FuelType!
+    transmission: TransmissionType!
+    seats: Int!
+    mileage: Float
+    pricePerHour: Float
+    pricePerKm: Float
+    pricePerDay: Float
+    depositAmount: Float!
+    critAirRating: CritAirCategory!
+    status: CarStatus
     descriptionEn: String
     descriptionFr: String
   }
 
   input UpdateCarInput {
-    brand: String
-    model: String
+    brandId: ID
+    modelId: ID
     year: Int
     plateNumber: String
     fuelType: FuelType
     transmission: TransmissionType
     seats: Int
-    doors: Int
+    mileage: Float
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
+    depositAmount: Float
     critAirRating: CritAirCategory
-    availability: Boolean
+    status: CarStatus
     descriptionEn: String
     descriptionFr: String
   }
 
+  input CarFilterInput {
+    brandId: ID
+    modelId: ID
+    fuelType: FuelType
+    transmission: TransmissionType
+    status: CarStatus
+    critAirRating: CritAirCategory
+    minPrice: Float
+    maxPrice: Float
+  }
+
+  # --- Queries ---
   type Query {
     cars(filter: CarFilterInput): [Car!]!
     car(id: ID!): Car
+    brands: [Brand!]!
+    models(brandId: ID!): [Model!]!
     availableCars(startDate: String!, endDate: String!): [Car!]!
   }
 
+  # --- Mutations ---
   type Mutation {
     createCar(input: CreateCarInput!): Car!
     updateCar(id: ID!, input: UpdateCarInput!): Car!
     deleteCar(id: ID!): Boolean!
-    uploadCarImages(input: UploadCarImagesInput!): [CarImage!]!
+    
+    createBrand(name: String!, logoUrl: String, logoPublicId: String): Brand!
+    updateBrand(id: ID!, name: String!, logoUrl: String, logoPublicId: String): Brand!
+    deleteBrand(id: ID!): Boolean!
+    
+    createModel(name: String!, brandId: ID!): Model!
+    updateModel(id: ID!, name: String!): Model!
+    deleteModel(id: ID!): Boolean!
+    
+    # ✅ திருத்தப்பட்டது: 'input' நீக்கப்பட்டு நேரடியாக ஆர்குமெண்ட்கள் சேர்க்கப்பட்டுள்ளன
+    # இது உன் 'carResolvers.ts' உடன் மேட்ச் ஆகும்
+    addCarImage(carId: ID!, file: Upload!, isPrimary: Boolean): CarImage!
+    
     deleteCarImage(imageId: ID!): Boolean!
     setPrimaryCarImage(carId: ID!, imageId: ID!): Boolean!
   }

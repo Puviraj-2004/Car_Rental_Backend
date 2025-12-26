@@ -1,118 +1,180 @@
-import {  deleteUploadedFile } from '../../utils/upload';
 import prisma from '../../utils/database';
-import { GraphQLUpload } from 'graphql-upload-ts';
-import path from 'path';
-import fs from 'fs';
+import { isAdmin } from '../../utils/authguard';
+import { uploadToCloudinary, deleteFromCloudinary } from '../../utils/cloudinary';
 
 export const carResolvers = {
-  Upload: GraphQLUpload,
-
   Query: {
-    cars: async (_: any, { filter }: { filter: any }) => {
+    cars: async (_: any, { filter }: any) => {
       const where: any = {};
+      
       if (filter) {
-        if (filter.brand) where.brand = { contains: filter.brand, mode: 'insensitive' };
-        if (filter.model) where.model = { contains: filter.model, mode: 'insensitive' };
+        if (filter.brandId) where.brandId = filter.brandId;
+        if (filter.modelId) where.modelId = filter.modelId;
         if (filter.fuelType) where.fuelType = filter.fuelType;
         if (filter.transmission) where.transmission = filter.transmission;
-        if (filter.availability !== undefined) where.availability = filter.availability;
+        if (filter.status) where.status = filter.status;
+        if (filter.critAirRating) where.critAirRating = filter.critAirRating;
+        if (filter.minPrice || filter.maxPrice) {
+          where.pricePerDay = {};
+          if (filter.minPrice) where.pricePerDay.gte = filter.minPrice;
+          if (filter.maxPrice) where.pricePerDay.lte = filter.maxPrice;
+        }
       }
 
       return await prisma.car.findMany({
         where,
-        include: { images: true, bookings: true }
+        include: { brand: true, model: true, images: true },
+        orderBy: { createdAt: 'desc' }
       });
     },
 
-    car: async (_: any, { id }: { id: string }) => {
-      return await prisma.car.findUnique({
-        where: { id },
-        include: { images: true, bookings: true }
+    // 🔍 ஒரு காரின் முழு விவரங்களை எடுக்க
+    car: async (_: any, { id }: any) => {
+      return await prisma.car.findUnique({ 
+        where: { id }, 
+        include: { 
+          brand: true, 
+          model: true, 
+          images: { orderBy: { isPrimary: 'desc' } },
+          bookings: true 
+        } 
+      });
+    },
+    
+    // 🏢 பிராண்டுகள் மற்றும் மாடல்களை எடுக்க
+    brands: async () => await prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+    
+    models: async (_: any, { brandId }: any) => 
+      await prisma.model.findMany({ where: { brandId }, orderBy: { name: 'asc' } }),
+
+    // 🗓️ குறிப்பிட்ட தேதிகளில் கிடைக்கும் கார்களை மட்டும் எடுக்க
+    availableCars: async (_: any, { startDate, endDate }: any) => {
+      const startDateTime = new Date(startDate);
+      const endDateTime = new Date(endDate);
+      
+      return await prisma.car.findMany({
+        where: {
+          status: 'AVAILABLE',
+          bookings: {
+            none: {
+              OR: [
+                {
+                   AND: [
+                     { startDate: { lt: endDateTime } },
+                     { endDate: { gt: startDateTime } }
+                   ]
+                }
+              ]
+            }
+          }
+        },
+        include: { brand: true, model: true, images: true }
       });
     },
   },
 
   Mutation: {
-    createCar: async (_: any, { input }: { input: any }) => {
-      return await prisma.car.create({
-        data: { ...input, availability: input.availability ?? true },
-        include: { images: true }
+    // 🛠️ --- ADMIN ONLY OPERATIONS ---
+    
+    createBrand: async (_: any, args: any, context: any) => {
+      isAdmin(context);
+      return await prisma.brand.create({ data: args });
+    },
+    
+    updateBrand: async (_: any, { id, ...args }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.brand.update({ where: { id }, data: args });
+    },
+    
+    deleteBrand: async (_: any, { id }: any, context: any) => {
+      isAdmin(context);
+      await prisma.brand.delete({ where: { id } });
+      return true;
+    },
+
+    createModel: async (_: any, args: any, context: any) => {
+      isAdmin(context);
+      return await prisma.model.create({ data: args });
+    },
+
+    createCar: async (_: any, { input }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.car.create({ 
+        data: { ...input, status: input.status || 'AVAILABLE' },
+        include: { brand: true, model: true } 
+      });
+    },
+    
+    updateCar: async (_: any, { id, input }: any, context: any) => {
+      isAdmin(context);
+      return await prisma.car.update({ 
+        where: { id }, 
+        data: input,
+        include: { brand: true, model: true }
       });
     },
 
-    uploadCarImages: async (_: any, { input }: { input: any }) => {
-      const { carId, images, altTexts, primaryIndex } = input;
+    // 🗑️ காரை நீக்கும்போது Cloudinary படங்களையும் நீக்குகிறது
+    deleteCar: async (_: any, { id }: any, context: any) => {
+      isAdmin(context);
       
-      const car = await prisma.car.findUnique({ where: { id: carId } });
-      if (!car) throw new Error('Car not found');
-
-      const uploadedImages = [];
-
-      // Ensure upload directory exists
-      const uploadDir = path.join(process.cwd(), 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-
-      for (let i = 0; i < images.length; i++) {
-        const file = await images[i];
-        const { createReadStream, filename } = file;
-        
-        const fileExt = path.extname(filename);
-        const newFilename = `${carId}-${Date.now()}-${i}${fileExt}`;
-        const filePath = path.join(uploadDir, newFilename);
-
-        // Save file to filesystem
-        const stream = createReadStream();
-        await new Promise((resolve, reject) => {
-          const writeStream = fs.createWriteStream(filePath);
-          stream.pipe(writeStream);
-          writeStream.on('finish', resolve);
-          writeStream.on('error', reject);
-        });
-
-        const isPrimary = i === (primaryIndex || 0);
-
-        // Save to Database
-        const carImage = await prisma.carImage.create({
-          data: {
-            carId,
-            imagePath: `/uploads/${newFilename}`,
-            altText: altTexts?.[i] || `${car.brand} ${car.model}`,
-            isPrimary
-          }
-        });
-
-        uploadedImages.push(carImage);
-      }
-
-      return uploadedImages;
-    },
-
-    deleteCar: async (_: any, { id }: { id: string }) => {
+      // 1. காரின் படங்களை எடுத்து Cloudinary-ல் இருந்து நீக்குதல்
       const images = await prisma.carImage.findMany({ where: { carId: id } });
-      for (const image of images) {
-        await deleteUploadedFile(image.imagePath);
+      for (const img of images) {
+        if (img.publicId) await deleteFromCloudinary(img.publicId);
       }
+
+      // 2. காரை டேட்டாபேஸில் இருந்து நீக்குதல்
       await prisma.car.delete({ where: { id } });
       return true;
     },
 
-    deleteCarImage: async (_: any, { imageId }: { imageId: string }) => {
+    addCarImage: async (_: any, { carId, file, isPrimary }: any, context: any) => {
+      isAdmin(context);
+      const { createReadStream } = await file;
+      
+      if (!createReadStream) {
+        throw new Error("File upload failed: createReadStream is not available.");
+      }
+      const fileStream = createReadStream();
+      const uploadResult = await uploadToCloudinary(fileStream, 'cars');
+      if (isPrimary) {
+        await prisma.carImage.updateMany({
+          where: { carId },
+          data: { isPrimary: false }
+        });
+      }
+      return await prisma.carImage.create({
+        data: {
+          carId,
+          imagePath: uploadResult.secure_url,
+          publicId: uploadResult.public_id,
+          isPrimary: isPrimary || false
+        }
+      });
+    },
+
+    deleteCarImage: async (_: any, { imageId }: any, context: any) => {
+      isAdmin(context);
       const image = await prisma.carImage.findUnique({ where: { id: imageId } });
       if (!image) throw new Error('Image not found');
-      await deleteUploadedFile(image.imagePath);
+      
+      // Cloudinary-ல் இருந்து நீக்குதல்
+      if (image.publicId) {
+        await deleteFromCloudinary(image.publicId);
+      }
+
       await prisma.carImage.delete({ where: { id: imageId } });
       return true;
     },
-  },
 
-  Car: {
-    images: async (parent: any) => {
-      return await prisma.carImage.findMany({
-        where: { carId: parent.id },
-        orderBy: { isPrimary: 'desc' }
-      });
+    setPrimaryCarImage: async (_: any, { carId, imageId }: any, context: any) => {
+      isAdmin(context);
+      await prisma.$transaction([
+        prisma.carImage.updateMany({ where: { carId }, data: { isPrimary: false } }),
+        prisma.carImage.update({ where: { id: imageId }, data: { isPrimary: true } })
+      ]);
+      return true;
     }
   }
 };
