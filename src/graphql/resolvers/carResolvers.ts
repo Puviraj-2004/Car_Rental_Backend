@@ -131,27 +131,73 @@ export const carResolvers = {
 
     addCarImage: async (_: any, { carId, file, isPrimary }: any, context: any) => {
       isAdmin(context);
-      const { createReadStream } = await file;
-      
-      if (!createReadStream) {
+
+      // Get upload details and validate
+      const uploadObj = await file;
+      const { filename, mimetype, createReadStream } = uploadObj as any;
+      console.log(`addCarImage called for carId=${carId}, filename=${filename}, mimetype=${mimetype}, isPrimary=${isPrimary}`);
+
+      if (!createReadStream || typeof createReadStream !== 'function') {
+        console.error('File upload failed: createReadStream is not available or invalid.');
         throw new Error("File upload failed: createReadStream is not available.");
       }
-      const fileStream = createReadStream();
-      const uploadResult = await uploadToCloudinary(fileStream, 'cars');
-      if (isPrimary) {
-        await prisma.carImage.updateMany({
-          where: { carId },
-          data: { isPrimary: false }
-        });
-      }
-      return await prisma.carImage.create({
-        data: {
-          carId,
-          imagePath: uploadResult.secure_url,
-          publicId: uploadResult.public_id,
-          isPrimary: isPrimary || false
+
+      let fileStream = createReadStream();
+      let uploadResult: any;
+
+      // Try upload with one retry: if Cloudinary upload fails and fallback requires a fresh stream,
+      // recreate the stream and attempt fallback again (local save) before giving up.
+      try {
+        uploadResult = await uploadToCloudinary(fileStream, 'cars', false, filename);
+      } catch (err: any) {
+        console.error('Cloudinary upload failed for file (first attempt)', filename, err);
+        // If the stream was consumed and fallback can't reuse it, recreate the stream and retry once
+        const msg = (err && err.message) || '';
+        if (/fallback is not available|retry the upload/i.test(msg)) {
+          console.log('Retrying upload with a fresh stream for local fallback...');
+          fileStream = createReadStream();
+          try {
+            uploadResult = await uploadToCloudinary(fileStream, 'cars', false, filename);
+          } catch (err2) {
+            console.error('Second upload attempt also failed for file', filename, err2);
+            throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
+          }
+        } else {
+          throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
         }
-      });
+      }
+
+      try {
+        // Ensure the car exists
+        const car = await prisma.car.findUnique({ where: { id: carId } });
+        if (!car) throw new Error('Car not found for image upload.');
+
+        if (isPrimary) {
+          await prisma.carImage.updateMany({
+            where: { carId },
+            data: { isPrimary: false }
+          });
+        }
+
+        const created = await prisma.carImage.create({
+          data: {
+            carId,
+            imagePath: uploadResult.secure_url,
+            publicId: uploadResult.public_id,
+            isPrimary: isPrimary || false
+          }
+        });
+
+        console.log('addCarImage success', created.id);
+        return created;
+      } catch (error) {
+        // If DB save fails, delete the uploaded image from Cloudinary
+        console.error('Saving image record failed, deleting uploaded image from Cloudinary', error);
+        if (uploadResult?.public_id) {
+          await deleteFromCloudinary(uploadResult.public_id);
+        }
+        throw error;
+      }
     },
 
     deleteCarImage: async (_: any, { imageId }: any, context: any) => {
