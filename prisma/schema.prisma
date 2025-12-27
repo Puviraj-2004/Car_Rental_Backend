@@ -141,6 +141,7 @@ model User {
   otp             String?
   otpExpires      DateTime?
   googleId        String?        @unique
+  facebookId  String? @unique
   
   // Relations
   driverProfile   DriverProfile? 

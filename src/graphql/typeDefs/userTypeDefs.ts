@@ -117,6 +117,9 @@ export const userTypeDefs = gql`
     
     # Google Auth (NextAuth Bridge)
     googleLogin(idToken: String!): AuthPayload!
+    # Facebook Login    
+    # Facebook Auth (NextAuth Bridge)
+    facebookLogin(accessToken: String!): AuthPayload!
     
     # User Management
     updateUser(input: UpdateUserInput!): User!

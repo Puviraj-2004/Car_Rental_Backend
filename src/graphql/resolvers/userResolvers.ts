@@ -92,8 +92,9 @@ export const userResolvers = {
     // 2. Login Resolver
     login: async (_: any, { input }: { input: any }) => {
       const { email, password } = input;
+      const normalizedEmail = email.toLowerCase();
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email:normalizedEmail},
         include: { driverProfile: true }
       });
 
@@ -147,6 +148,70 @@ export const userResolvers = {
       } catch (error) {
         console.error("Google Auth Error:", error);
         throw new Error('Google authentication failed');
+      }
+    },
+
+    // 4. ✅  Facebook Login Resolver
+    facebookLogin: async (_: any, { accessToken }: { accessToken: string }) => {
+      try {
+        // Verify token directly with Facebook Graph API
+        // This fetches ID, Name, and Email
+        const fbResponse = await fetch(
+          `https://graph.facebook.com/me?fields=id,name,email&access_token=${accessToken}`
+        );
+        
+        const fbData: any = await fbResponse.json();
+
+        // Check for error from Facebook
+        if (fbData.error) {
+          console.error("Facebook API Error:", fbData.error);
+          throw new Error('Invalid Facebook Token');
+        }
+
+        // Ensure email exists (some FB accounts verify via phone only)
+        if (!fbData.email) {
+          throw new Error('Facebook account must have an email address to sign up.');
+        }
+
+        const { email, id: facebookId } = fbData;
+
+        // Check if user exists
+        let user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) {
+          // Create new user
+          const baseUsername = email.split('@')[0];
+          user = await prisma.user.create({
+            data: {
+              email,
+              facebookId,
+              // Generate a random unique username
+              username: `${baseUsername}_${Math.floor(Math.random() * 1000)}`,
+              phoneNumber: '',
+              isEmailVerified: true,
+              role: 'USER'
+            }
+          });
+        } else if (!user.facebookId) {
+          // Merge existing user with Facebook ID
+          user = await prisma.user.update({
+            where: { email },
+            data: { facebookId, isEmailVerified: true }
+          });
+        }
+
+        // Generate Backend JWT
+        const token = generateToken(user.id, user.role);
+        
+        return { 
+          token, 
+          user, 
+          message: "Facebook login successful" 
+        };
+
+      } catch (error) {
+        console.error("Facebook Auth Error:", error);
+        throw new Error('Facebook authentication failed');
       }
     },
 
