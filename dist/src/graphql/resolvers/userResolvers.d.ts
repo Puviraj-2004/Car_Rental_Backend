@@ -8,6 +8,7 @@ export declare const userResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 licenseNumber: string | null;
+                licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
                 address: string | null;
@@ -38,6 +39,7 @@ export declare const userResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -63,6 +65,7 @@ export declare const userResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 licenseNumber: string | null;
+                licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
                 address: string | null;
@@ -93,6 +96,7 @@ export declare const userResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -116,6 +120,7 @@ export declare const userResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 licenseNumber: string | null;
+                licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
                 address: string | null;
@@ -146,6 +151,7 @@ export declare const userResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -168,6 +174,7 @@ export declare const userResolvers: {
             createdAt: Date;
             updatedAt: Date;
             licenseNumber: string | null;
+            licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
             address: string | null;
@@ -216,6 +223,7 @@ export declare const userResolvers: {
                     createdAt: Date;
                     updatedAt: Date;
                     licenseNumber: string | null;
+                    licenseIssueDate: Date | null;
                     licenseExpiry: Date | null;
                     idProofNumber: string | null;
                     address: string | null;
@@ -272,22 +280,6 @@ export declare const userResolvers: {
             success: boolean;
             message: string;
         }>;
-        updateUser: (_: any, { input }: {
-            input: any;
-        }, context: any) => Promise<{
-            role: import(".prisma/client").$Enums.Role;
-            id: string;
-            email: string;
-            otp: string | null;
-            username: string;
-            phoneNumber: string;
-            googleId: string | null;
-            password: string | null;
-            isEmailVerified: boolean;
-            otpExpires: Date | null;
-            createdAt: Date;
-            updatedAt: Date;
-        }>;
         createOrUpdateDriverProfile: (_: any, { input }: {
             input: any;
         }, context: any) => Promise<{
@@ -297,6 +289,7 @@ export declare const userResolvers: {
             createdAt: Date;
             updatedAt: Date;
             licenseNumber: string | null;
+            licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
             address: string | null;
@@ -318,6 +311,7 @@ export declare const userResolvers: {
             createdAt: Date;
             updatedAt: Date;
             licenseNumber: string | null;
+            licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
             address: string | null;
@@ -332,32 +326,25 @@ export declare const userResolvers: {
             addressProofPublicId: string | null;
             verificationNote: string | null;
         }>;
+        updateUser: (_: any, { input }: {
+            input: any;
+        }, context: any) => Promise<{
+            role: import(".prisma/client").$Enums.Role;
+            id: string;
+            email: string;
+            otp: string | null;
+            username: string;
+            phoneNumber: string;
+            googleId: string | null;
+            password: string | null;
+            isEmailVerified: boolean;
+            otpExpires: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        }>;
         deleteUser: (_: any, { id }: {
             id: string;
         }, context: any) => Promise<boolean>;
-    };
-    User: {
-        driverProfile: (parent: any) => Promise<{
-            userId: string;
-            id: string;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            createdAt: Date;
-            updatedAt: Date;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            idProofNumber: string | null;
-            address: string | null;
-            dateOfBirth: Date | null;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idProofUrl: string | null;
-            addressProofUrl: string | null;
-            licenseFrontPublicId: string | null;
-            licenseBackPublicId: string | null;
-            idProofPublicId: string | null;
-            addressProofPublicId: string | null;
-            verificationNote: string | null;
-        } | null>;
     };
 };
 //# sourceMappingURL=userResolvers.d.ts.map

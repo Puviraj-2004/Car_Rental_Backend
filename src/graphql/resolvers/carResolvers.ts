@@ -6,19 +6,62 @@ export const carResolvers = {
   Query: {
     cars: async (_: any, { filter }: any) => {
       const where: any = {};
-      
+
       if (filter) {
         if (filter.brandId) where.brandId = filter.brandId;
         if (filter.modelId) where.modelId = filter.modelId;
         if (filter.fuelType) where.fuelType = filter.fuelType;
         if (filter.transmission) where.transmission = filter.transmission;
-        if (filter.status) where.status = filter.status;
         if (filter.critAirRating) where.critAirRating = filter.critAirRating;
-        if (filter.minPrice || filter.maxPrice) {
-          where.pricePerDay = {};
-          if (filter.minPrice) where.pricePerDay.gte = filter.minPrice;
-          if (filter.maxPrice) where.pricePerDay.lte = filter.maxPrice;
+
+        if (filter.startDate && filter.endDate) {
+          const startDateTime = new Date(filter.startDate);
+          const endDateTime = new Date(filter.endDate);
+          const bufferMs = 24 * 60 * 60 * 1000; // 24 Hours
+
+          where.status = 'AVAILABLE';
+
+          // 🚀 The Logic: Exclude cars that meet ANY of these conflict conditions
+          where.bookings = {
+            none: {
+              OR: [
+                // 1. Direct Overlap
+                {
+                  AND: [
+                    { startDate: { lt: endDateTime } },
+                    { endDate: { gt: startDateTime } }
+                  ]
+                },
+                // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
+                {
+                  AND: [
+                    { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
+                    { endDate: { lt: startDateTime } }
+                  ]
+                },
+                // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
+                {
+                  AND: [
+                    { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
+                    { startDate: { gt: endDateTime } }
+                  ]
+                }
+              ]
+            }
+          };
+        } else {
+          // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
+          if (!filter.includeOutOfService) {
+            where.status = { not: 'OUT_OF_SERVICE' };
+          }
+          // If includeOutOfService is true, show all cars regardless of status
         }
+      } else {
+        // No filter provided - default behavior
+        if (!filter.includeOutOfService) {
+          where.status = { not: 'OUT_OF_SERVICE' };
+        }
+        // If includeOutOfService is true, show all cars regardless of status
       }
 
       return await prisma.car.findMany({

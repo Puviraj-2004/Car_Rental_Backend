@@ -10,28 +10,33 @@ exports.platformTypeDefs = (0, graphql_tag_1.gql) `
     id: ID!
     companyName: String!
     description: String
-    
+
     # Visuals
     logoUrl: String
     logoPublicId: String
-    
+
     # Contact Info
     supportEmail: String
     supportPhone: String
     address: String         # ✅ Added
-    
+
     # Social Media Links    # ✅ Added
     facebookUrl: String
     twitterUrl: String
     instagramUrl: String
     linkedinUrl: String
-    
+
+    # Driver Policies
+    youngDriverMinAge: Int
+    youngDriverFee: Float
+    noviceLicenseYears: Int
+
     # Legal & Finance
     termsAndConditions: String
     privacyPolicy: String
     currency: String!
     taxPercentage: Float!
-    
+
     updatedAt: String!
   }
 
@@ -50,16 +55,20 @@ exports.platformTypeDefs = (0, graphql_tag_1.gql) `
     description: String
     logoUrl: String
     logoPublicId: String
-    
+
     supportEmail: String
     supportPhone: String
     address: String         # ✅ Added
-    
+
     facebookUrl: String     # ✅ Added
     twitterUrl: String      # ✅ Added
     instagramUrl: String    # ✅ Added
     linkedinUrl: String     # ✅ Added
-    
+
+    youngDriverMinAge: Int
+    youngDriverFee: Float
+    noviceLicenseYears: Int
+
     termsAndConditions: String
     privacyPolicy: String
     currency: String
