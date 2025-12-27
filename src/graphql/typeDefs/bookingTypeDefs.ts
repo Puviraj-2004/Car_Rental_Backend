@@ -35,6 +35,7 @@ export const bookingTypeDefs = gql`
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
+    surchargeAmount: Float!
     rentalType: RentalType!
     
     status: BookingStatus!
@@ -64,6 +65,7 @@ export const bookingTypeDefs = gql`
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
+    surchargeAmount: Float!
     rentalType: RentalType!
     
     pickupLocation: String

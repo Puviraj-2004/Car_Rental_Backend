@@ -75,6 +75,7 @@ export declare const carResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             }[];
             images: {
                 id: string;

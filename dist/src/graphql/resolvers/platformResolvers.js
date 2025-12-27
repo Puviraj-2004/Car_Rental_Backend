@@ -1,4 +1,5 @@
 "use strict";
+// backend/src/graphql/resolvers/platformResolvers.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -8,55 +9,96 @@ const database_1 = __importDefault(require("../../utils/database"));
 const authguard_1 = require("../../utils/authguard");
 exports.platformResolvers = {
     Query: {
-        // 🌍 Public Access: Anyone can read site settings (for Footer/Navbar)
+        // 🌍 Public: Header, Footer, matrum Booking page-kaaga settings-ai yaaru venaalum paarkkalaam
         platformSettings: async () => {
-            // Try to find existing settings
-            const settings = await database_1.default.platformSettings.findFirst();
-            // If no settings exist yet (fresh DB), create default ones
-            if (!settings) {
-                return await database_1.default.platformSettings.create({
-                    data: {
-                        companyName: 'RentCar',
-                        currency: 'EUR',
-                        taxPercentage: 20.0,
-                        description: 'Premium car rental service.',
-                        // Default empty values for new fields to avoid null issues if needed
-                        facebookUrl: '',
-                        twitterUrl: '',
-                        instagramUrl: '',
-                        linkedinUrl: '',
-                        address: ''
-                    }
-                });
+            try {
+                let settings = await database_1.default.platformSettings.findFirst();
+                // Oruvelai database-la settings illaiyendraal, default settings-ai create seiyyum
+                if (!settings) {
+                    settings = await database_1.default.platformSettings.create({
+                        data: {
+                            companyName: 'RentCar Premium',
+                            description: 'AI-powered premium car rental service.',
+                            currency: 'EUR',
+                            taxPercentage: 20.0,
+                            youngDriverMinAge: 25,
+                            youngDriverFee: 30.0,
+                            noviceLicenseYears: 2,
+                            supportEmail: 'support@rentcar.com',
+                            supportPhone: '+33 1 23 45 67 89',
+                            address: 'Paris, France',
+                            facebookUrl: '',
+                            twitterUrl: '',
+                            instagramUrl: '',
+                            linkedinUrl: ''
+                        }
+                    });
+                }
+                return settings;
             }
-            return settings;
+            catch (error) {
+                throw new Error("Failed to fetch platform settings.");
+            }
         },
-        // 🔒 Admin Only: View Audit Logs
+        // 🔒 Admin Only: System-il nadandha ellaa actions-aiyum (Logs) paarkka
         auditLogs: async (_, { limit, offset }, context) => {
             (0, authguard_1.isAdmin)(context); // Security Check
             return await database_1.default.auditLog.findMany({
                 take: limit || 50,
                 skip: offset || 0,
                 orderBy: { createdAt: 'desc' },
-                include: { user: true }
+                include: {
+                    user: {
+                        select: {
+                            id: true,
+                            username: true,
+                            email: true,
+                            role: true
+                        }
+                    }
+                }
             });
         }
     },
     Mutation: {
-        // 🔒 Admin Only: Update Settings
+        // 🔒 Admin Only: Site settings-ai update seiyya
         updatePlatformSettings: async (_, { input }, context) => {
             (0, authguard_1.isAdmin)(context); // Security Check
-            const existing = await database_1.default.platformSettings.findFirst();
-            if (existing) {
-                // Update existing record
+            const existingSettings = await database_1.default.platformSettings.findFirst();
+            if (existingSettings) {
+                // Irukkura settings-ai update seiyyal
                 return await database_1.default.platformSettings.update({
-                    where: { id: existing.id },
-                    data: input
+                    where: { id: existingSettings.id },
+                    data: {
+                        companyName: input.companyName,
+                        description: input.description,
+                        logoUrl: input.logoUrl,
+                        logoPublicId: input.logoPublicId,
+                        supportEmail: input.supportEmail,
+                        supportPhone: input.supportPhone,
+                        address: input.address,
+                        // Social Media Links
+                        facebookUrl: input.facebookUrl,
+                        twitterUrl: input.twitterUrl,
+                        instagramUrl: input.instagramUrl,
+                        linkedinUrl: input.linkedinUrl,
+                        // Young Driver & License Policies
+                        youngDriverMinAge: input.youngDriverMinAge,
+                        youngDriverFee: input.youngDriverFee,
+                        noviceLicenseYears: input.noviceLicenseYears,
+                        // Legal & Finance
+                        termsAndConditions: input.termsAndConditions,
+                        privacyPolicy: input.privacyPolicy,
+                        currency: input.currency,
+                        taxPercentage: input.taxPercentage
+                    }
                 });
             }
             else {
-                // Create new if somehow deleted
-                return await database_1.default.platformSettings.create({ data: input });
+                // Settings illaiyendraal pudhusa create seiyyal
+                return await database_1.default.platformSettings.create({
+                    data: input
+                });
             }
         }
     }

@@ -17,6 +17,7 @@ export const carTypeDefs = gql`
     logoUrl: String
     logoPublicId: String
     models: [Model!]
+    cars: [Car!]
     createdAt: String!
   }
 
@@ -25,6 +26,7 @@ export const carTypeDefs = gql`
     name: String!
     brandId: ID!
     brand: Brand!
+    cars: [Car!]
     createdAt: String!
   }
 
@@ -37,6 +39,7 @@ export const carTypeDefs = gql`
     isPrimary: Boolean!
     createdAt: String!
     updatedAt: String!
+    car: Car!
   }
 
   type Car {
@@ -113,6 +116,9 @@ export const carTypeDefs = gql`
     critAirRating: CritAirCategory
     minPrice: Float
     maxPrice: Float
+    startDate: String
+    endDate: String
+    includeOutOfService: Boolean
   }
 
   # --- Queries ---

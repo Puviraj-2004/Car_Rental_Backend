@@ -37,6 +37,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
+    surchargeAmount: Float!
     rentalType: RentalType!
     
     status: BookingStatus!
@@ -66,6 +67,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
+    surchargeAmount: Float!
     rentalType: RentalType!
     
     pickupLocation: String
