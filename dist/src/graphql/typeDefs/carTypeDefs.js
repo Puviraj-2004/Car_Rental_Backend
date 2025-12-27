@@ -19,6 +19,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     logoUrl: String
     logoPublicId: String
     models: [Model!]
+    cars: [Car!]
     createdAt: String!
   }
 
@@ -27,6 +28,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     name: String!
     brandId: ID!
     brand: Brand!
+    cars: [Car!]
     createdAt: String!
   }
 
@@ -39,6 +41,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     isPrimary: Boolean!
     createdAt: String!
     updatedAt: String!
+    car: Car!
   }
 
   type Car {
@@ -115,6 +118,9 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     critAirRating: CritAirCategory
     minPrice: Float
     maxPrice: Float
+    startDate: String
+    endDate: String
+    includeOutOfService: Boolean
   }
 
   # --- Queries ---

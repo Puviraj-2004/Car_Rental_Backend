@@ -35,6 +35,40 @@ async function startServer() {
     app.use((0, graphql_upload_ts_1.graphqlUploadExpress)({ maxFileSize: 10000000, maxFiles: 10 }));
     app.use(body_parser_1.default.json());
     app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
+    // Diagnostic HTTP routes to confirm Cloudinary env at runtime (non-sensitive values only)
+    app.get('/diag/cloudinary', (_req, res) => {
+        try {
+            const raw = process.env.CLOUDINARY_CLOUD_NAME;
+            const cloudLib = require('./utils/cloudinary');
+            const effective = (cloudLib && cloudLib.default && cloudLib.default.config && cloudLib.default.config().cloud_name) || null;
+            res.json({ rawCloudName: raw || null, effectiveCloudName: effective });
+        }
+        catch (e) {
+            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostic info', detail: e.message });
+        }
+    });
+    // Full diagnostics including ready state and last error
+    app.get('/diag/cloudinary/full', (_req, res) => {
+        try {
+            const { getCloudinaryDiagnostics } = require('./utils/cloudinary');
+            const diag = getCloudinaryDiagnostics();
+            res.json(diag);
+        }
+        catch (e) {
+            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostics', detail: e.message });
+        }
+    });
+    // Trigger an immediate revalidation of Cloudinary credentials (useful after updating .env and restarting)
+    app.post('/diag/cloudinary/validate', async (_req, res) => {
+        try {
+            const { revalidateCloudinaryCredentials } = require('./utils/cloudinary');
+            const diag = await revalidateCloudinaryCredentials();
+            res.json(diag);
+        }
+        catch (e) {
+            res.status(500).json({ error: 'Failed to revalidate Cloudinary credentials', detail: e.message });
+        }
+    });
     app.use('/graphql', (0, express4_1.expressMiddleware)(server, {
         context: async ({ req }) => {
             const context = { prisma: database_1.default };

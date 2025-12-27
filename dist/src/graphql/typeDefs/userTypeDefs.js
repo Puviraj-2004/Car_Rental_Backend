@@ -24,6 +24,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     id: ID!
     userId: ID!
     licenseNumber: String
+    licenseIssueDate: String
     licenseExpiry: String
     idProofNumber: String
     address: String
@@ -32,6 +33,10 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     licenseBackUrl: String
     idProofUrl: String
     addressProofUrl: String
+    licenseFrontPublicId: String
+    licenseBackPublicId: String
+    idProofPublicId: String
+    addressProofPublicId: String
     status: VerificationStatus!
     verificationNote: String
     createdAt: String!
@@ -86,6 +91,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
 
   input DriverProfileInput {
     licenseNumber: String
+    licenseIssueDate: String
     licenseExpiry: String
     idProofNumber: String
     address: String
