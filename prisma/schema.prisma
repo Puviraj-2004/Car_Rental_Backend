@@ -113,6 +113,10 @@ model PlatformSettings {
   twitterUrl         String?
   instagramUrl       String?
   linkedinUrl        String?
+
+  youngDriverMinAge  Int?      @default(25)   
+  youngDriverFee     Float?   @default(30.0)  
+  noviceLicenseYears Int?     @default(2) 
   
   termsAndConditions String?  // Rich text or Link
   privacyPolicy      String?
@@ -141,7 +145,7 @@ model User {
   otp             String?
   otpExpires      DateTime?
   googleId        String?        @unique
-  facebookId  String? @unique
+  facebookId      String?        @unique
   
   // Relations
   driverProfile   DriverProfile? 
@@ -162,10 +166,12 @@ model DriverProfile {
   
   // AI Extracted Details
   licenseNumber        String?            @unique
+  licenseIssueDate     DateTime?
   licenseExpiry        DateTime?
   idProofNumber        String?
   address              String?
   dateOfBirth          DateTime?
+  
   
   // Cloudinary URLs (Private/Authenticated)
   licenseFrontUrl      String?
@@ -293,6 +299,7 @@ model Booking {
   taxAmount       Float
   depositAmount   Float         @default(0)
   rentalType      RentalType
+  surchargeAmount Float    @default(0)
   
   status          BookingStatus @default(DRAFT)
   

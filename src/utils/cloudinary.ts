@@ -5,33 +5,177 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // 1. Cloudinary Configuration
+// Sanitize and validate env values (strip quotes, trim). Support CLOUDINARY_URL if provided
+const rawCloudNameFromEnv = process.env.CLOUDINARY_CLOUD_NAME || '';
+let cloudName = rawCloudNameFromEnv.replace(/"/g, '').trim();
+let apiKey = (process.env.CLOUDINARY_API_KEY || '').replace(/"/g, '').trim();
+let apiSecret = (process.env.CLOUDINARY_API_SECRET || '').replace(/"/g, '').trim();
+
+// If CLOUDINARY_URL is provided, parse it and override values. Format: cloudinary://<api_key>:<api_secret>@<cloud_name>
+const cloudinaryUrl = (process.env.CLOUDINARY_URL || '').trim();
+if (cloudinaryUrl) {
+  try {
+    const m = cloudinaryUrl.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+    if (m) {
+      apiKey = m[1];
+      apiSecret = m[2];
+      cloudName = m[3];
+      console.log('CLOUDINARY_URL parsed. Using cloud_name=' + cloudName);
+    } else {
+      console.warn('CLOUDINARY_URL found but could not parse it. Expected: cloudinary://<api_key>:<api_secret>@<cloud_name>');
+    }
+  } catch (err) {
+    console.warn('Error parsing CLOUDINARY_URL:', err);
+  }
+}
+
+if (!cloudName || !apiKey || !apiSecret) {
+  console.warn('Cloudinary env vars missing or invalid. Verify CLOUDINARY_CLOUD_NAME/API_KEY/API_SECRET or CLOUDINARY_URL in .env');
+}
+
+// For validation we check a lowercase char class, but keep the original cloudName for exact matching in the SDK
+if (cloudName && !/^[a-z0-9\-]+$/.test(cloudName.toLowerCase())) {
+  console.warn(`Cloudinary cloud_name "${cloudName}" looks unusual. Confirm the cloud name from your Cloudinary dashboard (case-sensitive).`);
+}
+
+import fs from 'fs';
+import path from 'path';
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: cloudName,
+  api_key: apiKey,
+  api_secret: apiSecret,
 });
 
+// Helpful diagnostic (non-secret) for debugging invalid cloud name issues
+console.log(`Cloudinary configured with cloud_name=${cloudName}`);
+
+let cloudinaryReady = true;
+let lastCloudinaryValidationError: any = null;
+
+export async function revalidateCloudinaryCredentials() {
+  if (!cloudName || !apiKey || !apiSecret) {
+    cloudinaryReady = false;
+    lastCloudinaryValidationError = new Error('Missing Cloudinary credentials');
+    console.warn('Cloudinary disabled: missing credentials');
+    return getCloudinaryDiagnostics();
+  }
+
+  try {
+    await cloudinary.api.resources({ max_results: 1 });
+    console.log('Cloudinary credentials validated (able to list resources).');
+    cloudinaryReady = true;
+    lastCloudinaryValidationError = null;
+  } catch (err: any) {
+    lastCloudinaryValidationError = err;
+    cloudinaryReady = false;
+    console.error('Cloudinary credential validation failed:', err);
+    if (err && err.http_code === 401) {
+      console.error('Cloudinary authentication failed (401). Check CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in your .env');
+    } else if (err && /Invalid cloud_name/i.test(err.message || '')) {
+      console.error('Cloudinary reports invalid cloud_name. Verify the exact cloud name from your Cloudinary dashboard (case-sensitive).');
+    }
+    console.warn('Falling back to local file storage for uploads until Cloudinary credentials are fixed.');
+  }
+
+  return getCloudinaryDiagnostics();
+}
+
+// Initial validation on startup
+(async () => {
+  await revalidateCloudinaryCredentials();
+})();
+
+export function isCloudinaryReady() {
+  return cloudinaryReady;
+}
+
+export function getCloudinaryDiagnostics() {
+  return {
+    cloudName: cloudName || null,
+    ready: cloudinaryReady,
+    lastError: lastCloudinaryValidationError ? (lastCloudinaryValidationError.message || String(lastCloudinaryValidationError)) : null
+  };
+}
+
 /**
- * @param createReadStream 
- * @param folder 
- * @param isPrivate 
+ * Upload with fallback to local disk when Cloudinary is unavailable
  */
 export const uploadToCloudinary = async (
   fileStream: any, 
   folder: string,
-  isPrivate: boolean = false
+  isPrivate: boolean = false,
+  originalFilename?: string
 ): Promise<any> => {
-  return new Promise((resolve, reject) => {
+  if (!cloudinaryReady) {
+    // Save to local uploads folder
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'car_rental_industrial', folder);
+    fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const ext = originalFilename ? path.extname(originalFilename) : '.jpg';
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+    const fullPath = path.join(uploadsDir, safeName);
+
+    await new Promise((resolve, reject) => {
+      const ws = fs.createWriteStream(fullPath);
+      fileStream.pipe(ws);
+      ws.on('finish', resolve);
+      ws.on('error', reject);
+    });
+
+    const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
+    const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
+    console.log(`Saved upload locally at ${fullPath}`);
+    return { secure_url: secureUrl, public_id: `local:uploads/${publicPath}`, url: secureUrl };
+  }
+
+  return new Promise(async (resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: `car_rental_industrial/${folder}`,
         type: isPrivate ? 'authenticated' : 'upload', 
         resource_type: 'auto',
       },
-      (error, result) => {
+      async (error, result) => {
         if (error) {
           console.error('Cloudinary Upload Error:', error);
-          return reject(error);
+          // Mark Cloudinary as unavailable and store last error
+          cloudinaryReady = false;
+          lastCloudinaryValidationError = error;
+          console.warn('Disabling Cloudinary and falling back to local storage due to upload error.');
+
+          // Fallback: save locally and return a compatible object
+          try {
+            const uploadsDir = path.join(process.cwd(), 'uploads', 'car_rental_industrial', folder);
+            fs.mkdirSync(uploadsDir, { recursive: true });
+
+            const ext = originalFilename ? path.extname(originalFilename) : '.jpg';
+            const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+            const fullPath = path.join(uploadsDir, safeName);
+
+            // We need to pipe the original stream again - if the stream has been consumed by Cloudinary upload_stream, we cannot re-use it.
+            // In most upload libraries, the fileStream is a fresh stream from createReadStream(), so callers should pass a new stream on fallback.
+            // As a safety, reject when stream is already consumed and tell caller to retry the upload.
+            if (!fileStream.readable) {
+              console.error('Original file stream is not readable for local fallback. Please retry the upload.');
+              return reject(new Error('Upload failed and fallback is not available; retry the upload.'));
+            }
+
+            await new Promise((res, rej) => {
+              const ws = fs.createWriteStream(fullPath);
+              fileStream.pipe(ws);
+              ws.on('finish', res);
+              ws.on('error', rej);
+            });
+
+            const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
+            const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
+            console.log(`Saved upload locally at ${fullPath} as fallback`);
+            return resolve({ secure_url: secureUrl, public_id: `local:uploads/${publicPath}`, url: secureUrl });
+          } catch (fallbackErr) {
+            console.error('Local fallback save failed:', fallbackErr);
+            return reject(error);
+          }
         }
         resolve(result);
       }
@@ -43,10 +187,23 @@ export const uploadToCloudinary = async (
 
 export const deleteFromCloudinary = async (publicId: string): Promise<void> => {
   try {
-    if (publicId) {
-      const result = await cloudinary.uploader.destroy(publicId);
-      console.log(`Deleted from Cloudinary: ${publicId}`, result);
+    if (!publicId) return;
+
+    if (publicId.startsWith('local:')) {
+      // Remove local file
+      const localPath = publicId.replace(/^local:/, '').replace(/\\/g, '/').replace(/^uploads\//, '');
+      const fullPath = path.join(process.cwd(), 'uploads', localPath);
+      try {
+        fs.unlinkSync(fullPath);
+        console.log(`Deleted local upload: ${fullPath}`);
+      } catch (err) {
+        console.warn(`Failed to delete local upload ${fullPath}:`, err);
+      }
+      return;
     }
+
+    const result = await cloudinary.uploader.destroy(publicId);
+    console.log(`Deleted from Cloudinary: ${publicId}`, result);
   } catch (error) {
     console.error('Cloudinary Delete Error:', error);
   }

@@ -1,4 +1,3 @@
-// prisma/seed.ts
 import { PrismaClient, Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
@@ -14,16 +13,16 @@ async function main() {
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
-      username: 'admin_user', // ✅ firstName/lastName-க்கு பதில் username
+      username: 'admin_user',
       password: hashedPassword,
       role: Role.ADMIN,
       isEmailVerified: true,
     },
     create: {
       email: adminEmail,
-      username: 'admin_user', // ✅ firstName/lastName-க்கு பதில் username
+      username: 'admin_user',
       password: hashedPassword,
-      phoneNumber: '+33612345678', // ✅ phoneNumber இப்போது கட்டாயம்
+      phoneNumber: '+33612345678',
       role: Role.ADMIN,
       isEmailVerified: true,
     },
@@ -44,6 +43,11 @@ async function main() {
         address: '123 Avenue des Champs-Élysées, Paris, France',
         currency: 'EUR',
         taxPercentage: 20.0,
+        
+        youngDriverMinAge: 25,     
+        youngDriverFee: 30.0,      
+        noviceLicenseYears: 2,   
+
         facebookUrl: 'https://facebook.com/rentcar',
         instagramUrl: 'https://instagram.com/rentcar',
         twitterUrl: 'https://twitter.com/rentcar',
@@ -52,7 +56,16 @@ async function main() {
     });
     console.log('✅ Platform Settings seeded successfully!');
   } else {
-    console.log('ℹ️ Platform Settings already exist, skipping...');
+    // 🔄 ஒருவேளை ஏற்கனவே செட்டிங்ஸ் இருந்தால், புதிய பில்ட்களை மட்டும் அப்டேட் செய்ய
+    await prisma.platformSettings.update({
+      where: { id: settings.id },
+      data: {
+        youngDriverMinAge: 25,
+        youngDriverFee: 30.0,
+        noviceLicenseYears: 2,
+      }
+    });
+    console.log('✅ Platform Settings updated with Young Driver rules!');
   }
 
   console.log('🎉 Seeding completed!');

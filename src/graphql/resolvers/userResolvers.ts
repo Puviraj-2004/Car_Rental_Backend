@@ -1,13 +1,11 @@
-// backend/src/graphql/resolvers/userResolvers.ts
-
 import { OAuth2Client } from 'google-auth-library';
 import prisma from '../../utils/database';
 import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
 import { sendVerificationEmail } from '../../utils/sendEmail';
 import { validatePassword } from '../../utils/validation';
-import { isAuthenticated, isAdmin, isOwnerOrAdmin } from '../../utils/authguard';
+import { isAuthenticated, isAdmin } from '../../utils/authguard';
 
-const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const userResolvers = {
   Query: {
@@ -20,7 +18,7 @@ export const userResolvers = {
     },
 
     user: async (_: any, { id }: { id: string }, context: any) => {
-      isOwnerOrAdmin(context, id);
+      isAdmin(context); // பொதுவாக அட்மின் மட்டுமே பிற யூசர்களைப் பார்க்க வேண்டும்
       return await prisma.user.findUnique({
         where: { id },
         include: { driverProfile: true, bookings: true }
@@ -43,14 +41,12 @@ export const userResolvers = {
   },
 
   Mutation: {
-    // 1. Updated Simple Register (Username, Email, Phone, Password)
+    // 1. Register: simplified & added Audit Log
     register: async (_: any, { input }: { input: any }) => {
       const { email, username, password, phoneNumber } = input;
 
       const existingUser = await prisma.user.findFirst({
-        where: {
-          OR: [{ email }, { username }]
-        }
+        where: { OR: [{ email }, { username }] }
       });
 
       if (existingUser) {
@@ -79,17 +75,26 @@ export const userResolvers = {
         }
       });
 
-      sendVerificationEmail(user.email, generatedOTP).catch(console.error);
-      const token = generateToken(user.id, user.role);
+      // Send OTP Email
+      await sendVerificationEmail(user.email, generatedOTP).catch(console.error);
+
+      // Industrial standard: Log the registration
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'USER_REGISTERED',
+          details: { email: user.email }
+        }
+      });
 
       return {
-        token,
+        token: "", // லாகின் செய்யும் போது மட்டும் டோக்கன் கொடுக்கலாம்
         user,
-        message: "Registration successful. Please verify your email."
+        message: "Registration successful. Please check your email for OTP."
       };
     },
 
-    // 2. Login Resolver
+    // 2. Login: added login check
     login: async (_: any, { input }: { input: any }) => {
       const { email, password } = input;
       const normalizedEmail = email.toLowerCase();
@@ -103,16 +108,22 @@ export const userResolvers = {
       const isValidPassword = await comparePasswords(password, user.password);
       if (!isValidPassword) throw new Error('Invalid email or password');
 
-      if (!user.isEmailVerified) throw new Error('Email not verified. Please verify using OTP.');
+      if (!user.isEmailVerified) throw new Error('Please verify your email first.');
 
       const token = generateToken(user.id, user.role);
+
+      // Log Login action
+      await prisma.auditLog.create({
+        data: { userId: user.id, action: 'USER_LOGIN' }
+      });
+
       return { token, user };
     },
 
-    // 3. Updated Google Login (Handling Username for new users)
+    // 3. Google Login with Required Field handling
     googleLogin: async (_: any, { idToken }: { idToken: string }) => {
       try {
-        const ticket = await client.verifyIdToken({
+        const ticket = await googleClient.verifyIdToken({
           idToken,
           audience: process.env.GOOGLE_CLIENT_ID,
         });
@@ -120,33 +131,25 @@ export const userResolvers = {
         if (!payload || !payload.email) throw new Error('Invalid Google token');
 
         const { email, sub: googleId } = payload;
-
         let user = await prisma.user.findUnique({ where: { email } });
 
         if (!user) {
-          // Creating a unique username from email prefix for social login
           const baseUsername = email.split('@')[0];
           user = await prisma.user.create({
             data: {
               email,
               googleId,
-              username: `${baseUsername}_${Math.floor(Math.random() * 1000)}`,
-              phoneNumber: '', // Google doesn't provide phone; can be updated later
+              username: `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`,
+              phoneNumber: '0000000000', // Placeholder as it's required!
               isEmailVerified: true,
               role: 'USER'
             }
-          });
-        } else if (!user.googleId) {
-          user = await prisma.user.update({
-            where: { email },
-            data: { googleId, isEmailVerified: true }
           });
         }
 
         const token = generateToken(user.id, user.role);
         return { token, user, message: "Google login successful" };
       } catch (error) {
-        console.error("Google Auth Error:", error);
         throw new Error('Google authentication failed');
       }
     },
@@ -187,7 +190,7 @@ export const userResolvers = {
               facebookId,
               // Generate a random unique username
               username: `${baseUsername}_${Math.floor(Math.random() * 1000)}`,
-              phoneNumber: '',
+              phoneNumber: `fb_${Date.now()}`,
               isEmailVerified: true,
               role: 'USER'
             }
@@ -219,7 +222,6 @@ export const userResolvers = {
       const user = await prisma.user.findUnique({ where: { email } });
 
       if (!user) throw new Error('User not found');
-      if (user.isEmailVerified) throw new Error('User already verified');
       if (user.otp !== otp) throw new Error('Invalid OTP');
       if (user.otpExpires && new Date() > user.otpExpires) throw new Error('OTP expired');
 
@@ -231,6 +233,58 @@ export const userResolvers = {
       return { success: true, message: "Email verified successfully." };
     },
 
+    // 5. KYC Profile Update - Using proper DateTime conversion
+    createOrUpdateDriverProfile: async (_: any, { input }: { input: any }, context: any) => {
+      isAuthenticated(context);
+      
+      // Industrial Logic: Convert string dates to actual Date objects for DB
+      const dataToSave = { 
+        ...input, 
+        licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : null,
+        licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : null,
+        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+        status: 'PENDING_REVIEW' 
+      };
+
+      const profile = await prisma.driverProfile.upsert({
+        where: { userId: context.userId },
+        update: dataToSave,
+        create: { userId: context.userId, ...dataToSave }
+      });
+
+      // Log the profile upload
+      await prisma.auditLog.create({
+        data: { 
+          userId: context.userId, 
+          action: 'DRIVER_PROFILE_UPLOADED',
+          details: { profileId: profile.id }
+        }
+      });
+
+      return profile;
+    },
+
+    // 6. Admin Verification
+    verifyDriverProfile: async (_: any, { userId, status, note }: any, context: any) => {
+      isAdmin(context);
+
+      const profile = await prisma.driverProfile.update({
+        where: { userId },
+        data: { status, verificationNote: note }
+      });
+
+      // Log Admin Action
+      await prisma.auditLog.create({
+        data: { 
+          userId: context.userId, 
+          action: `DRIVER_VERIFICATION_${status}`,
+          details: { targetUserId: userId, note }
+        }
+      });
+
+      return profile;
+    },
+
     updateUser: async (_: any, { input }: { input: any }, context: any) => {
       isAuthenticated(context);
       return await prisma.user.update({
@@ -239,35 +293,10 @@ export const userResolvers = {
       });
     },
 
-    createOrUpdateDriverProfile: async (_: any, { input }: { input: any }, context: any) => {
-      isAuthenticated(context);
-      const dataToSave = { ...input, status: 'PENDING_REVIEW' };
-
-      return await prisma.driverProfile.upsert({
-        where: { userId: context.userId },
-        update: dataToSave,
-        create: { userId: context.userId, ...dataToSave }
-      });
-    },
-
-    verifyDriverProfile: async (_: any, { userId, status, note }: any, context: any) => {
-      isAdmin(context);
-      return await prisma.driverProfile.update({
-        where: { userId },
-        data: { status, verificationNote: note }
-      });
-    },
-
     deleteUser: async (_: any, { id }: { id: string }, context: any) => {
       isAdmin(context);
       await prisma.user.delete({ where: { id } });
       return true;
-    }
-  },
-  
-  User: {
-    driverProfile: async (parent: any) => {
-      return await prisma.driverProfile.findUnique({ where: { userId: parent.id } });
     }
   }
 };

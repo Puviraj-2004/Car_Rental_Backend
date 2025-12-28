@@ -22,6 +22,7 @@ export const userTypeDefs = gql`
     id: ID!
     userId: ID!
     licenseNumber: String
+    licenseIssueDate: String
     licenseExpiry: String
     idProofNumber: String
     address: String
@@ -30,6 +31,10 @@ export const userTypeDefs = gql`
     licenseBackUrl: String
     idProofUrl: String
     addressProofUrl: String
+    licenseFrontPublicId: String
+    licenseBackPublicId: String
+    idProofPublicId: String
+    addressProofPublicId: String
     status: VerificationStatus!
     verificationNote: String
     createdAt: String!
@@ -84,6 +89,7 @@ export const userTypeDefs = gql`
 
   input DriverProfileInput {
     licenseNumber: String
+    licenseIssueDate: String
     licenseExpiry: String
     idProofNumber: String
     address: String

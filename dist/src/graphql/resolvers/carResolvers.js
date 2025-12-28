@@ -20,17 +20,56 @@ exports.carResolvers = {
                     where.fuelType = filter.fuelType;
                 if (filter.transmission)
                     where.transmission = filter.transmission;
-                if (filter.status)
-                    where.status = filter.status;
                 if (filter.critAirRating)
                     where.critAirRating = filter.critAirRating;
-                if (filter.minPrice || filter.maxPrice) {
-                    where.pricePerDay = {};
-                    if (filter.minPrice)
-                        where.pricePerDay.gte = filter.minPrice;
-                    if (filter.maxPrice)
-                        where.pricePerDay.lte = filter.maxPrice;
+                if (filter.startDate && filter.endDate) {
+                    const startDateTime = new Date(filter.startDate);
+                    const endDateTime = new Date(filter.endDate);
+                    const bufferMs = 24 * 60 * 60 * 1000; // 24 Hours
+                    where.status = 'AVAILABLE';
+                    // 🚀 The Logic: Exclude cars that meet ANY of these conflict conditions
+                    where.bookings = {
+                        none: {
+                            OR: [
+                                // 1. Direct Overlap
+                                {
+                                    AND: [
+                                        { startDate: { lt: endDateTime } },
+                                        { endDate: { gt: startDateTime } }
+                                    ]
+                                },
+                                // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
+                                {
+                                    AND: [
+                                        { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
+                                        { endDate: { lt: startDateTime } }
+                                    ]
+                                },
+                                // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
+                                {
+                                    AND: [
+                                        { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
+                                        { startDate: { gt: endDateTime } }
+                                    ]
+                                }
+                            ]
+                        }
+                    };
                 }
+                else {
+                    // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
+                    if (!filter.includeOutOfService) {
+                        where.status = { not: 'OUT_OF_SERVICE' };
+                    }
+                    // If includeOutOfService is true, show all cars regardless of status
+                }
+            }
+            else {
+                // No filter provided - default behavior
+                if (!filter.includeOutOfService) {
+                    where.status = { not: 'OUT_OF_SERVICE' };
+                }
+                // If includeOutOfService is true, show all cars regardless of status
             }
             return await database_1.default.car.findMany({
                 where,
@@ -126,26 +165,70 @@ exports.carResolvers = {
         },
         addCarImage: async (_, { carId, file, isPrimary }, context) => {
             (0, authguard_1.isAdmin)(context);
-            const { createReadStream } = file;
-            if (!createReadStream) {
+            // Get upload details and validate
+            const uploadObj = await file;
+            const { filename, mimetype, createReadStream } = uploadObj;
+            console.log(`addCarImage called for carId=${carId}, filename=${filename}, mimetype=${mimetype}, isPrimary=${isPrimary}`);
+            if (!createReadStream || typeof createReadStream !== 'function') {
+                console.error('File upload failed: createReadStream is not available or invalid.');
                 throw new Error("File upload failed: createReadStream is not available.");
             }
-            const fileStream = createReadStream();
-            const uploadResult = await (0, cloudinary_1.uploadToCloudinary)(fileStream, 'cars');
-            if (isPrimary) {
-                await database_1.default.carImage.updateMany({
-                    where: { carId },
-                    data: { isPrimary: false }
-                });
+            let fileStream = createReadStream();
+            let uploadResult;
+            // Try upload with one retry: if Cloudinary upload fails and fallback requires a fresh stream,
+            // recreate the stream and attempt fallback again (local save) before giving up.
+            try {
+                uploadResult = await (0, cloudinary_1.uploadToCloudinary)(fileStream, 'cars', false, filename);
             }
-            return await database_1.default.carImage.create({
-                data: {
-                    carId,
-                    imagePath: uploadResult.secure_url,
-                    publicId: uploadResult.public_id,
-                    isPrimary: isPrimary || false
+            catch (err) {
+                console.error('Cloudinary upload failed for file (first attempt)', filename, err);
+                // If the stream was consumed and fallback can't reuse it, recreate the stream and retry once
+                const msg = (err && err.message) || '';
+                if (/fallback is not available|retry the upload/i.test(msg)) {
+                    console.log('Retrying upload with a fresh stream for local fallback...');
+                    fileStream = createReadStream();
+                    try {
+                        uploadResult = await (0, cloudinary_1.uploadToCloudinary)(fileStream, 'cars', false, filename);
+                    }
+                    catch (err2) {
+                        console.error('Second upload attempt also failed for file', filename, err2);
+                        throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
+                    }
                 }
-            });
+                else {
+                    throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
+                }
+            }
+            try {
+                // Ensure the car exists
+                const car = await database_1.default.car.findUnique({ where: { id: carId } });
+                if (!car)
+                    throw new Error('Car not found for image upload.');
+                if (isPrimary) {
+                    await database_1.default.carImage.updateMany({
+                        where: { carId },
+                        data: { isPrimary: false }
+                    });
+                }
+                const created = await database_1.default.carImage.create({
+                    data: {
+                        carId,
+                        imagePath: uploadResult.secure_url,
+                        publicId: uploadResult.public_id,
+                        isPrimary: isPrimary || false
+                    }
+                });
+                console.log('addCarImage success', created.id);
+                return created;
+            }
+            catch (error) {
+                // If DB save fails, delete the uploaded image from Cloudinary
+                console.error('Saving image record failed, deleting uploaded image from Cloudinary', error);
+                if (uploadResult?.public_id) {
+                    await (0, cloudinary_1.deleteFromCloudinary)(uploadResult.public_id);
+                }
+                throw error;
+            }
         },
         deleteCarImage: async (_, { imageId }, context) => {
             (0, authguard_1.isAdmin)(context);

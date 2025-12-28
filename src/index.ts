@@ -39,8 +39,41 @@ async function startServer() {
   app.use(bodyParser.json());
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-  app.use(
-    '/graphql',
+  // Diagnostic HTTP routes to confirm Cloudinary env at runtime (non-sensitive values only)
+  app.get('/diag/cloudinary', (_req, res) => {
+    try {
+      const raw = process.env.CLOUDINARY_CLOUD_NAME;
+      const cloudLib = require('./utils/cloudinary');
+      const effective = (cloudLib && cloudLib.default && cloudLib.default.config && cloudLib.default.config().cloud_name) || null;
+      res.json({ rawCloudName: raw || null, effectiveCloudName: effective });
+    } catch (e: any) {
+      res.status(500).json({ error: 'Failed to fetch cloudinary diagnostic info', detail: e.message });
+    }
+  });
+
+  // Full diagnostics including ready state and last error
+  app.get('/diag/cloudinary/full', (_req, res) => {
+    try {
+      const { getCloudinaryDiagnostics } = require('./utils/cloudinary');
+      const diag = getCloudinaryDiagnostics();
+      res.json(diag);
+    } catch (e: any) {
+      res.status(500).json({ error: 'Failed to fetch cloudinary diagnostics', detail: e.message });
+    }
+  });
+
+  // Trigger an immediate revalidation of Cloudinary credentials (useful after updating .env and restarting)
+  app.post('/diag/cloudinary/validate', async (_req, res) => {
+    try {
+      const { revalidateCloudinaryCredentials } = require('./utils/cloudinary');
+      const diag = await revalidateCloudinaryCredentials();
+      res.json(diag);
+    } catch (e: any) {
+      res.status(500).json({ error: 'Failed to revalidate Cloudinary credentials', detail: e.message });
+    }
+  });
+
+  app.use('/graphql',
     expressMiddleware(server, {
       context: async ({ req }) => {
         const context: any = { prisma };

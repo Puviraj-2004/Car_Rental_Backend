@@ -17,6 +17,7 @@ export declare const paymentResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             };
         } & {
             id: string;
@@ -49,6 +50,7 @@ export declare const paymentResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             };
         } & {
             id: string;
@@ -83,6 +85,7 @@ export declare const paymentResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             };
         } & {
             id: string;
@@ -115,6 +118,7 @@ export declare const paymentResolvers: {
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                surchargeAmount: number;
             };
         } & {
             id: string;
