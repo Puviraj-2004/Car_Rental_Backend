@@ -190,7 +190,7 @@ export const userResolvers = {
               facebookId,
               // Generate a random unique username
               username: `${baseUsername}_${Math.floor(Math.random() * 1000)}`,
-              phoneNumber: '',
+              phoneNumber: `fb_${Date.now()}`,
               isEmailVerified: true,
               role: 'USER'
             }
@@ -218,7 +218,6 @@ export const userResolvers = {
       }
     },
 
-    // 4. Verify OTP
     verifyOTP: async (_: any, { email, otp }: { email: string, otp: string }) => {
       const user = await prisma.user.findUnique({ where: { email } });
 
