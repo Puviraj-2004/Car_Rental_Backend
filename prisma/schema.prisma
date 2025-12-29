@@ -52,7 +52,6 @@ enum CarStatus {
 
 enum RentalType {
   HOUR
-  KM
   DAY
 }
 
@@ -88,6 +87,11 @@ enum VerificationStatus {
   VERIFIED_BY_AI      // AI Passed
   VERIFIED_BY_ADMIN   // Admin Manual Check
   REJECTED
+}
+
+enum BookingType {
+  RENTAL      // Paid rental
+  REPLACEMENT // Free courtesy car
 }
 
 // --------------------------------------
@@ -237,7 +241,12 @@ model Car {
   transmission    TransmissionType
   seats           Int
   mileage         Float            @default(0)
-  
+
+  // KM Limits & Meter Tracking
+  dailyKmLimit    Float?           // If null, unlimited KM
+  extraKmCharge   Float?           // Cost per extra KM if limit exceeded
+  currentMileage  Float            @default(0) // Actual odometer reading (Starting Meter)
+
   // Pricing
   pricePerHour    Float?
   pricePerKm      Float?
@@ -287,20 +296,31 @@ model Booking {
   
   startDate       DateTime
   endDate         DateTime
-  
+
   pickupLocation  String?
   dropoffLocation String?
-  
+
+  // Meter Tracking & KM Management
+  startMeter      Float?         // Mileage when car is picked up
+  endMeter        Float?         // Mileage when car is returned
+  allowedKm       Float?         // Total allowed KM for this booking duration
+  extraKmUsed     Float          @default(0) // (endMeter - startMeter) - allowedKm
+  extraKmCharge   Float          @default(0) // Final cost for extra mileage
+
   // Financials
   totalPrice      Float
+  totalFinalPrice Float?         // Total cost after adding extra charges
   basePrice       Float
   taxAmount       Float
   depositAmount   Float         @default(0)
   rentalType      RentalType
-  surchargeAmount Float    @default(0)
-  
+  bookingType     BookingType   @default(RENTAL)
+  surchargeAmount Float         @default(0)
+  repairOrderId   String?       // Reference for courtesy car cases
+
   status          BookingStatus @default(DRAFT)
-  
+  expiresAt       DateTime?      // Auto-expiration for pending bookings (1 hour)
+
   // Relations
   user            User          @relation(fields: [userId], references: [id])
   car             Car           @relation(fields: [carId], references: [id])

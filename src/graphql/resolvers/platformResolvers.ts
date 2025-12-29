@@ -2,6 +2,8 @@
 
 import prisma from '../../utils/database';
 import { isAdmin } from '../../utils/authguard';
+import { cleanupService } from '../../services/cleanupService';
+import { expirationService } from '../../services/expirationService';
 
 export const platformResolvers = {
   Query: {
@@ -103,6 +105,56 @@ export const platformResolvers = {
           data: input
         });
       }
+    },
+
+    // 🔒 Admin Only: Database cleanup operations
+    cleanupExpiredVerifications: async (_: any, __: any, context: any) => {
+      isAdmin(context); // Security Check
+
+      const result = await cleanupService.cleanupExpiredVerifications();
+
+      return {
+        success: true,
+        message: `Cleaned up ${result.deletedCount} expired verification bookings`,
+        deletedCount: result.deletedCount
+      };
+    },
+
+    cleanupOldCompletedBookings: async (_: any, { daysOld }: { daysOld?: number }, context: any) => {
+      isAdmin(context); // Security Check
+
+      const result = await cleanupService.cleanupOldCompletedBookings(daysOld || 90);
+
+      return {
+        success: true,
+        message: `Cleaned up ${result.deletedCount} old completed bookings (older than ${daysOld || 90} days)`,
+        deletedCount: result.deletedCount
+      };
+    },
+
+    getCleanupStats: async (_: any, __: any, context: any) => {
+      isAdmin(context); // Security Check
+
+      return await cleanupService.getCleanupStats();
+    },
+
+    // Admin Only: Manual expiration check
+    triggerExpirationCheck: async (_: any, __: any, context: any) => {
+      isAdmin(context); // Security Check
+
+      const result = await expirationService.triggerExpirationCheck();
+
+      return {
+        success: true,
+        message: `Expiration check completed`,
+        details: result
+      };
+    },
+
+    getExpirationStats: async (_: any, __: any, context: any) => {
+      isAdmin(context); // Security Check
+
+      return await expirationService.getExpirationStats();
     }
   }
 };

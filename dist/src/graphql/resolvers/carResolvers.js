@@ -7,6 +7,72 @@ exports.carResolvers = void 0;
 const database_1 = __importDefault(require("../../utils/database"));
 const authguard_1 = require("../../utils/authguard");
 const cloudinary_1 = require("../../utils/cloudinary");
+// 🔍 Helper function to build booking availability filter for car listings
+const buildBookingAvailabilityFilter = (startDateTime, endDateTime, includeBuffer = false) => {
+    const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0; // 24 Hours buffer if enabled
+    // For car listings, only consider CONFIRMED, ONGOING, and AWAITING_PAYMENT as conflicts
+    // DRAFT and AWAITING_VERIFICATION bookings don't prevent cars from being shown as available
+    const conflictStatuses = ['CONFIRMED', 'ONGOING', 'AWAITING_PAYMENT'];
+    const dateOverlapConditions = includeBuffer ? [
+        // 1. Direct Overlap
+        {
+            AND: [
+                { startDate: { lt: endDateTime } },
+                { endDate: { gt: startDateTime } }
+            ]
+        },
+        // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
+        {
+            AND: [
+                { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
+                { endDate: { lt: startDateTime } }
+            ]
+        },
+        // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
+        {
+            AND: [
+                { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
+                { startDate: { gt: endDateTime } }
+            ]
+        }
+    ] : [
+        // Simple overlap check without buffer
+        {
+            AND: [
+                { startDate: { lt: endDateTime } },
+                { endDate: { gt: startDateTime } }
+            ]
+        }
+    ];
+    return {
+        none: {
+            AND: [
+                { status: { in: conflictStatuses } }, // Only these statuses create conflicts
+                {
+                    OR: dateOverlapConditions
+                }
+            ]
+        }
+    };
+};
+// 📊 Helper function to build status filter
+const buildStatusFilter = (includeOutOfService = false) => {
+    return includeOutOfService ? {} : { status: { not: 'OUT_OF_SERVICE' } };
+};
+// 🔧 Admin CRUD helper functions
+const createEntity = async (model, data, context) => {
+    (0, authguard_1.isAdmin)(context);
+    return await model.create({ data });
+};
+const updateEntity = async (model, id, data, context) => {
+    (0, authguard_1.isAdmin)(context);
+    return await model.update({ where: { id }, data });
+};
+const deleteEntity = async (model, id, context) => {
+    (0, authguard_1.isAdmin)(context);
+    await model.delete({ where: { id } });
+    return true;
+};
 exports.carResolvers = {
     Query: {
         cars: async (_, { filter }) => {
@@ -25,51 +91,17 @@ exports.carResolvers = {
                 if (filter.startDate && filter.endDate) {
                     const startDateTime = new Date(filter.startDate);
                     const endDateTime = new Date(filter.endDate);
-                    const bufferMs = 24 * 60 * 60 * 1000; // 24 Hours
                     where.status = 'AVAILABLE';
-                    // 🚀 The Logic: Exclude cars that meet ANY of these conflict conditions
-                    where.bookings = {
-                        none: {
-                            OR: [
-                                // 1. Direct Overlap
-                                {
-                                    AND: [
-                                        { startDate: { lt: endDateTime } },
-                                        { endDate: { gt: startDateTime } }
-                                    ]
-                                },
-                                // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
-                                {
-                                    AND: [
-                                        { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
-                                        { endDate: { lt: startDateTime } }
-                                    ]
-                                },
-                                // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
-                                {
-                                    AND: [
-                                        { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
-                                        { startDate: { gt: endDateTime } }
-                                    ]
-                                }
-                            ]
-                        }
-                    };
+                    where.bookings = buildBookingAvailabilityFilter(startDateTime, endDateTime, true); // Include buffer
                 }
                 else {
                     // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
-                    if (!filter.includeOutOfService) {
-                        where.status = { not: 'OUT_OF_SERVICE' };
-                    }
-                    // If includeOutOfService is true, show all cars regardless of status
+                    Object.assign(where, buildStatusFilter(filter.includeOutOfService));
                 }
             }
             else {
                 // No filter provided - default behavior
-                if (!filter.includeOutOfService) {
-                    where.status = { not: 'OUT_OF_SERVICE' };
-                }
-                // If includeOutOfService is true, show all cars regardless of status
+                Object.assign(where, buildStatusFilter(filter?.includeOutOfService));
             }
             return await database_1.default.car.findMany({
                 where,
@@ -99,18 +131,7 @@ exports.carResolvers = {
             return await database_1.default.car.findMany({
                 where: {
                     status: 'AVAILABLE',
-                    bookings: {
-                        none: {
-                            OR: [
-                                {
-                                    AND: [
-                                        { startDate: { lt: endDateTime } },
-                                        { endDate: { gt: startDateTime } }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
+                    bookings: buildBookingAvailabilityFilter(startDateTime, endDateTime, false) // No buffer
                 },
                 include: { brand: true, model: true, images: true }
             });
@@ -118,23 +139,10 @@ exports.carResolvers = {
     },
     Mutation: {
         // 🛠️ --- ADMIN ONLY OPERATIONS ---
-        createBrand: async (_, args, context) => {
-            (0, authguard_1.isAdmin)(context);
-            return await database_1.default.brand.create({ data: args });
-        },
-        updateBrand: async (_, { id, ...args }, context) => {
-            (0, authguard_1.isAdmin)(context);
-            return await database_1.default.brand.update({ where: { id }, data: args });
-        },
-        deleteBrand: async (_, { id }, context) => {
-            (0, authguard_1.isAdmin)(context);
-            await database_1.default.brand.delete({ where: { id } });
-            return true;
-        },
-        createModel: async (_, args, context) => {
-            (0, authguard_1.isAdmin)(context);
-            return await database_1.default.model.create({ data: args });
-        },
+        createBrand: async (_, args, context) => createEntity(database_1.default.brand, args, context),
+        updateBrand: async (_, { id, ...args }, context) => updateEntity(database_1.default.brand, id, args, context),
+        deleteBrand: async (_, { id }, context) => deleteEntity(database_1.default.brand, id, context),
+        createModel: async (_, args, context) => createEntity(database_1.default.model, args, context),
         createCar: async (_, { input }, context) => {
             (0, authguard_1.isAdmin)(context);
             return await database_1.default.car.create({

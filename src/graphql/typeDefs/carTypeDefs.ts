@@ -54,6 +54,12 @@ export const carTypeDefs = gql`
     transmission: TransmissionType!
     seats: Int!
     mileage: Float!
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float!
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
@@ -64,7 +70,7 @@ export const carTypeDefs = gql`
     descriptionFr: String
     createdAt: String!
     updatedAt: String!
-    images: [CarImage!]!    
+    images: [CarImage!]!
     bookings: [Booking!]!
   }
 
@@ -78,6 +84,12 @@ export const carTypeDefs = gql`
     transmission: TransmissionType!
     seats: Int!
     mileage: Float
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
@@ -97,6 +109,12 @@ export const carTypeDefs = gql`
     transmission: TransmissionType
     seats: Int
     mileage: Float
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float

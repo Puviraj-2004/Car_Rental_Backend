@@ -37,6 +37,9 @@ export declare const carResolvers: {
             transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             mileage: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number | null;
+            currentMileage: number;
             pricePerHour: number | null;
             pricePerKm: number | null;
             pricePerDay: number | null;
@@ -68,14 +71,23 @@ export declare const carResolvers: {
                 startDate: Date;
                 endDate: Date;
                 carId: string;
+                extraKmCharge: number;
                 depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
+                startMeter: number | null;
+                endMeter: number | null;
+                allowedKm: number | null;
+                extraKmUsed: number;
                 totalPrice: number;
+                totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
+                repairOrderId: string | null;
+                expiresAt: Date | null;
             }[];
             images: {
                 id: string;
@@ -100,6 +112,9 @@ export declare const carResolvers: {
             transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             mileage: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number | null;
+            currentMileage: number;
             pricePerHour: number | null;
             pricePerKm: number | null;
             pricePerDay: number | null;
@@ -158,6 +173,9 @@ export declare const carResolvers: {
             transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             mileage: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number | null;
+            currentMileage: number;
             pricePerHour: number | null;
             pricePerKm: number | null;
             pricePerDay: number | null;
@@ -168,27 +186,10 @@ export declare const carResolvers: {
         })[]>;
     };
     Mutation: {
-        createBrand: (_: any, args: any, context: any) => Promise<{
-            name: string;
-            id: string;
-            createdAt: Date;
-            logoUrl: string | null;
-            logoPublicId: string | null;
-        }>;
-        updateBrand: (_: any, { id, ...args }: any, context: any) => Promise<{
-            name: string;
-            id: string;
-            createdAt: Date;
-            logoUrl: string | null;
-            logoPublicId: string | null;
-        }>;
+        createBrand: (_: any, args: any, context: any) => Promise<any>;
+        updateBrand: (_: any, { id, ...args }: any, context: any) => Promise<any>;
         deleteBrand: (_: any, { id }: any, context: any) => Promise<boolean>;
-        createModel: (_: any, args: any, context: any) => Promise<{
-            name: string;
-            id: string;
-            createdAt: Date;
-            brandId: string;
-        }>;
+        createModel: (_: any, args: any, context: any) => Promise<any>;
         createCar: (_: any, { input }: any, context: any) => Promise<{
             model: {
                 name: string;
@@ -216,6 +217,9 @@ export declare const carResolvers: {
             transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             mileage: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number | null;
+            currentMileage: number;
             pricePerHour: number | null;
             pricePerKm: number | null;
             pricePerDay: number | null;
@@ -251,6 +255,9 @@ export declare const carResolvers: {
             transmission: import(".prisma/client").$Enums.TransmissionType;
             seats: number;
             mileage: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number | null;
+            currentMileage: number;
             pricePerHour: number | null;
             pricePerKm: number | null;
             pricePerDay: number | null;

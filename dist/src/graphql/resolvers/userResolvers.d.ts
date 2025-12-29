@@ -1,3 +1,4 @@
+import { ExtractedDocumentData } from '../../services/ocrService';
 export declare const userResolvers: {
     Query: {
         me: (_: any, __: any, context: any) => Promise<({
@@ -32,14 +33,23 @@ export declare const userResolvers: {
                 startDate: Date;
                 endDate: Date;
                 carId: string;
+                extraKmCharge: number;
                 depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
+                startMeter: number | null;
+                endMeter: number | null;
+                allowedKm: number | null;
+                extraKmUsed: number;
                 totalPrice: number;
+                totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
+                repairOrderId: string | null;
+                expiresAt: Date | null;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -89,14 +99,23 @@ export declare const userResolvers: {
                 startDate: Date;
                 endDate: Date;
                 carId: string;
+                extraKmCharge: number;
                 depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
+                startMeter: number | null;
+                endMeter: number | null;
+                allowedKm: number | null;
+                extraKmUsed: number;
                 totalPrice: number;
+                totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
+                repairOrderId: string | null;
+                expiresAt: Date | null;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -144,14 +163,23 @@ export declare const userResolvers: {
                 startDate: Date;
                 endDate: Date;
                 carId: string;
+                extraKmCharge: number;
                 depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
+                startMeter: number | null;
+                endMeter: number | null;
+                allowedKm: number | null;
+                extraKmUsed: number;
                 totalPrice: number;
+                totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
+                bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
+                repairOrderId: string | null;
+                expiresAt: Date | null;
             }[];
         } & {
             role: import(".prisma/client").$Enums.Role;
@@ -326,6 +354,9 @@ export declare const userResolvers: {
             addressProofPublicId: string | null;
             verificationNote: string | null;
         }>;
+        processDocumentOCR: (_: any, { file }: {
+            file: any;
+        }, context: any) => Promise<ExtractedDocumentData>;
         updateUser: (_: any, { input }: {
             input: any;
         }, context: any) => Promise<{

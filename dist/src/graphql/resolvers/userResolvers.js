@@ -10,6 +10,8 @@ const auth_1 = require("../../utils/auth");
 const sendEmail_1 = require("../../utils/sendEmail");
 const validation_1 = require("../../utils/validation");
 const authguard_1 = require("../../utils/authguard");
+const cloudinary_1 = require("../../utils/cloudinary");
+const ocrService_1 = require("../../services/ocrService");
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 exports.userResolvers = {
     Query: {
@@ -195,6 +197,53 @@ exports.userResolvers = {
                 }
             });
             return profile;
+        },
+        // OCR Document Processing for Auto-fill
+        processDocumentOCR: async (_, { file }, context) => {
+            (0, authguard_1.isAuthenticated)(context);
+            try {
+                // Convert GraphQL Upload to Buffer
+                const { createReadStream, filename, mimetype } = await file;
+                const stream = createReadStream();
+                const chunks = [];
+                for await (const chunk of stream) {
+                    chunks.push(chunk);
+                }
+                const fileBuffer = Buffer.concat(chunks);
+                // Validate file type
+                if (!mimetype.startsWith('image/')) {
+                    throw new Error('Only image files are supported for OCR processing');
+                }
+                // Upload to Cloudinary for storage (following existing pattern)
+                const cloudinaryResult = await (0, cloudinary_1.uploadToCloudinary)(fileBuffer, 'documents', filename);
+                // Process with Mindee OCR
+                const extractedData = await ocrService_1.ocrService.extractDocumentData(fileBuffer);
+                // Log the OCR processing
+                await database_1.default.auditLog.create({
+                    data: {
+                        userId: context.userId,
+                        action: 'DOCUMENT_OCR_PROCESSED',
+                        details: {
+                            filename,
+                            cloudinaryUrl: cloudinaryResult.secure_url,
+                            extractedFields: Object.keys(extractedData)
+                        }
+                    }
+                });
+                return extractedData;
+            }
+            catch (error) {
+                console.error('OCR Processing Error:', error);
+                // Log the error
+                await database_1.default.auditLog.create({
+                    data: {
+                        userId: context.userId,
+                        action: 'DOCUMENT_OCR_FAILED',
+                        details: { error: error instanceof Error ? error.message : 'Unknown OCR error' }
+                    }
+                });
+                throw new Error('Unable to read the document. Please upload a clearer photo.');
+            }
         },
         updateUser: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);

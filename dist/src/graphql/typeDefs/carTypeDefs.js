@@ -56,6 +56,12 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     transmission: TransmissionType!
     seats: Int!
     mileage: Float!
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float!
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
@@ -66,7 +72,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     descriptionFr: String
     createdAt: String!
     updatedAt: String!
-    images: [CarImage!]!    
+    images: [CarImage!]!
     bookings: [Booking!]!
   }
 
@@ -80,6 +86,12 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     transmission: TransmissionType!
     seats: Int!
     mileage: Float
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float
@@ -99,6 +111,12 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     transmission: TransmissionType
     seats: Int
     mileage: Float
+
+    # KM Limits & Meter Tracking
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentMileage: Float
+
     pricePerHour: Float
     pricePerKm: Float
     pricePerDay: Float

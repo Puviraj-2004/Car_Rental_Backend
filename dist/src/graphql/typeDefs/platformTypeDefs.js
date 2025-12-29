@@ -49,6 +49,32 @@ exports.platformTypeDefs = (0, graphql_tag_1.gql) `
     createdAt: String!
   }
 
+  type CleanupResult {
+    success: Boolean!
+    message: String!
+    deletedCount: Int!
+  }
+
+  type CleanupStats {
+    expiredVerificationTokens: Int!
+    bookingsWithoutValidVerification: Int!
+    oldCompletedBookings: Int!
+    totalPendingCleanup: Int!
+  }
+
+  type ExpirationStats {
+    expiredAwaitingVerification: Int!
+    expiredAwaitingPayment: Int!
+    totalExpired: Int!
+    nextCheckIn: String!
+  }
+
+  type ExpirationCheckResult {
+    success: Boolean!
+    message: String!
+    details: JSON
+  }
+
   # --- Inputs ---
   input UpdatePlatformSettingsInput {
     companyName: String
@@ -88,6 +114,15 @@ exports.platformTypeDefs = (0, graphql_tag_1.gql) `
   type Mutation {
     # Admin Only: Update settings
     updatePlatformSettings(input: UpdatePlatformSettingsInput!): PlatformSettings!
+
+    # Admin Only: Database cleanup operations
+    cleanupExpiredVerifications: CleanupResult!
+    cleanupOldCompletedBookings(daysOld: Int): CleanupResult!
+    getCleanupStats: CleanupStats!
+
+    # Admin Only: Booking expiration management
+    triggerExpirationCheck: ExpirationCheckResult!
+    getExpirationStats: ExpirationStats!
   }
 `;
 //# sourceMappingURL=platformTypeDefs.js.map

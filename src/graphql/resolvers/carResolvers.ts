@@ -1,6 +1,81 @@
 import prisma from '../../utils/database';
 import { isAdmin } from '../../utils/authguard';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../utils/cloudinary';
+import { BookingStatus } from '@prisma/client';
+
+// 🔍 Helper function to build booking availability filter for car listings
+const buildBookingAvailabilityFilter = (startDateTime: Date, endDateTime: Date, includeBuffer: boolean = false) => {
+  const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0; // 24 Hours buffer if enabled
+
+  // For car listings, only consider CONFIRMED, ONGOING, and AWAITING_PAYMENT as conflicts
+  // DRAFT and AWAITING_VERIFICATION bookings don't prevent cars from being shown as available
+  const conflictStatuses: BookingStatus[] = ['CONFIRMED', 'ONGOING', 'AWAITING_PAYMENT'];
+
+  const dateOverlapConditions = includeBuffer ? [
+    // 1. Direct Overlap
+    {
+      AND: [
+        { startDate: { lt: endDateTime } },
+        { endDate: { gt: startDateTime } }
+      ]
+    },
+    // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
+    {
+      AND: [
+        { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
+        { endDate: { lt: startDateTime } }
+      ]
+    },
+    // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
+    {
+      AND: [
+        { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
+        { startDate: { gt: endDateTime } }
+      ]
+    }
+  ] : [
+    // Simple overlap check without buffer
+    {
+      AND: [
+        { startDate: { lt: endDateTime } },
+        { endDate: { gt: startDateTime } }
+      ]
+    }
+  ];
+
+  return {
+    none: {
+      AND: [
+        { status: { in: conflictStatuses } }, // Only these statuses create conflicts
+        {
+          OR: dateOverlapConditions
+        }
+      ]
+    }
+  };
+};
+
+// 📊 Helper function to build status filter
+const buildStatusFilter = (includeOutOfService: boolean = false) => {
+  return includeOutOfService ? {} : { status: { not: 'OUT_OF_SERVICE' } };
+};
+
+// 🔧 Admin CRUD helper functions
+const createEntity = async (model: any, data: any, context: any) => {
+  isAdmin(context);
+  return await model.create({ data });
+};
+
+const updateEntity = async (model: any, id: string, data: any, context: any) => {
+  isAdmin(context);
+  return await model.update({ where: { id }, data });
+};
+
+const deleteEntity = async (model: any, id: string, context: any) => {
+  isAdmin(context);
+  await model.delete({ where: { id } });
+  return true;
+};
 
 export const carResolvers = {
   Query: {
@@ -17,51 +92,16 @@ export const carResolvers = {
         if (filter.startDate && filter.endDate) {
           const startDateTime = new Date(filter.startDate);
           const endDateTime = new Date(filter.endDate);
-          const bufferMs = 24 * 60 * 60 * 1000; // 24 Hours
 
           where.status = 'AVAILABLE';
-
-          // 🚀 The Logic: Exclude cars that meet ANY of these conflict conditions
-          where.bookings = {
-            none: {
-              OR: [
-                // 1. Direct Overlap
-                {
-                  AND: [
-                    { startDate: { lt: endDateTime } },
-                    { endDate: { gt: startDateTime } }
-                  ]
-                },
-                // 2. Post-Booking Buffer Violation (Existing Return + 24h > New Pickup)
-                {
-                  AND: [
-                    { endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } },
-                    { endDate: { lt: startDateTime } }
-                  ]
-                },
-                // 3. Pre-Booking Buffer Violation (Existing Pickup - 24h < New Return)
-                {
-                  AND: [
-                    { startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } },
-                    { startDate: { gt: endDateTime } }
-                  ]
-                }
-              ]
-            }
-          };
+          where.bookings = buildBookingAvailabilityFilter(startDateTime, endDateTime, true); // Include buffer
         } else {
           // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
-          if (!filter.includeOutOfService) {
-            where.status = { not: 'OUT_OF_SERVICE' };
-          }
-          // If includeOutOfService is true, show all cars regardless of status
+          Object.assign(where, buildStatusFilter(filter.includeOutOfService));
         }
       } else {
         // No filter provided - default behavior
-        if (!filter.includeOutOfService) {
-          where.status = { not: 'OUT_OF_SERVICE' };
-        }
-        // If includeOutOfService is true, show all cars regardless of status
+        Object.assign(where, buildStatusFilter(filter?.includeOutOfService));
       }
 
       return await prisma.car.findMany({
@@ -94,22 +134,11 @@ export const carResolvers = {
     availableCars: async (_: any, { startDate, endDate }: any) => {
       const startDateTime = new Date(startDate);
       const endDateTime = new Date(endDate);
-      
+
       return await prisma.car.findMany({
         where: {
           status: 'AVAILABLE',
-          bookings: {
-            none: {
-              OR: [
-                {
-                   AND: [
-                     { startDate: { lt: endDateTime } },
-                     { endDate: { gt: startDateTime } }
-                   ]
-                }
-              ]
-            }
-          }
+          bookings: buildBookingAvailabilityFilter(startDateTime, endDateTime, false) // No buffer
         },
         include: { brand: true, model: true, images: true }
       });
@@ -119,39 +148,30 @@ export const carResolvers = {
   Mutation: {
     // 🛠️ --- ADMIN ONLY OPERATIONS ---
     
-    createBrand: async (_: any, args: any, context: any) => {
-      isAdmin(context);
-      return await prisma.brand.create({ data: args });
-    },
-    
-    updateBrand: async (_: any, { id, ...args }: any, context: any) => {
-      isAdmin(context);
-      return await prisma.brand.update({ where: { id }, data: args });
-    },
-    
-    deleteBrand: async (_: any, { id }: any, context: any) => {
-      isAdmin(context);
-      await prisma.brand.delete({ where: { id } });
-      return true;
-    },
+    createBrand: async (_: any, args: any, context: any) =>
+      createEntity(prisma.brand, args, context),
 
-    createModel: async (_: any, args: any, context: any) => {
-      isAdmin(context);
-      return await prisma.model.create({ data: args });
-    },
+    updateBrand: async (_: any, { id, ...args }: any, context: any) =>
+      updateEntity(prisma.brand, id, args, context),
+
+    deleteBrand: async (_: any, { id }: any, context: any) =>
+      deleteEntity(prisma.brand, id, context),
+
+    createModel: async (_: any, args: any, context: any) =>
+      createEntity(prisma.model, args, context),
 
     createCar: async (_: any, { input }: any, context: any) => {
       isAdmin(context);
-      return await prisma.car.create({ 
+      return await prisma.car.create({
         data: { ...input, status: input.status || 'AVAILABLE' },
-        include: { brand: true, model: true } 
+        include: { brand: true, model: true }
       });
     },
-    
+
     updateCar: async (_: any, { id, input }: any, context: any) => {
       isAdmin(context);
-      return await prisma.car.update({ 
-        where: { id }, 
+      return await prisma.car.update({
+        where: { id },
         data: input,
         include: { brand: true, model: true }
       });

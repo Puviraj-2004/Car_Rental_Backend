@@ -7,6 +7,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.platformResolvers = void 0;
 const database_1 = __importDefault(require("../../utils/database"));
 const authguard_1 = require("../../utils/authguard");
+const cleanupService_1 = require("../../services/cleanupService");
+const expirationService_1 = require("../../services/expirationService");
 exports.platformResolvers = {
     Query: {
         // 🌍 Public: Header, Footer, matrum Booking page-kaaga settings-ai yaaru venaalum paarkkalaam
@@ -100,6 +102,43 @@ exports.platformResolvers = {
                     data: input
                 });
             }
+        },
+        // 🔒 Admin Only: Database cleanup operations
+        cleanupExpiredVerifications: async (_, __, context) => {
+            (0, authguard_1.isAdmin)(context); // Security Check
+            const result = await cleanupService_1.cleanupService.cleanupExpiredVerifications();
+            return {
+                success: true,
+                message: `Cleaned up ${result.deletedCount} expired verification bookings`,
+                deletedCount: result.deletedCount
+            };
+        },
+        cleanupOldCompletedBookings: async (_, { daysOld }, context) => {
+            (0, authguard_1.isAdmin)(context); // Security Check
+            const result = await cleanupService_1.cleanupService.cleanupOldCompletedBookings(daysOld || 90);
+            return {
+                success: true,
+                message: `Cleaned up ${result.deletedCount} old completed bookings (older than ${daysOld || 90} days)`,
+                deletedCount: result.deletedCount
+            };
+        },
+        getCleanupStats: async (_, __, context) => {
+            (0, authguard_1.isAdmin)(context); // Security Check
+            return await cleanupService_1.cleanupService.getCleanupStats();
+        },
+        // Admin Only: Manual expiration check
+        triggerExpirationCheck: async (_, __, context) => {
+            (0, authguard_1.isAdmin)(context); // Security Check
+            const result = await expirationService_1.expirationService.triggerExpirationCheck();
+            return {
+                success: true,
+                message: `Expiration check completed`,
+                details: result
+            };
+        },
+        getExpirationStats: async (_, __, context) => {
+            (0, authguard_1.isAdmin)(context); // Security Check
+            return await expirationService_1.expirationService.getExpirationStats();
         }
     }
 };

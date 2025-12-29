@@ -16,6 +16,7 @@ import prisma from './utils/database';
 import typeDefs from './graphql/typeDefs';
 import resolvers from './graphql/resolvers';
 import { verifyToken } from './utils/auth';
+import { expirationService } from './services/expirationService';
 
 async function startServer() {
   const app = express();
@@ -96,8 +97,11 @@ async function startServer() {
 
   const PORT = process.env.PORT || 4000;
   await new Promise<void>((resolve) => httpServer.listen({ port: parseInt(PORT.toString()) }, resolve));
-  
+
   console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+
+  // Start the expiration service for automatic booking cancellation
+  expirationService.startExpirationService();
 }
 
 startServer().catch(error => {

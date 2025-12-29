@@ -65,6 +65,37 @@ export declare const platformResolvers: {
             privacyPolicy: string | null;
             taxPercentage: number;
         }>;
+        cleanupExpiredVerifications: (_: any, __: any, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            deletedCount: number;
+        }>;
+        cleanupOldCompletedBookings: (_: any, { daysOld }: {
+            daysOld?: number;
+        }, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            deletedCount: number;
+        }>;
+        getCleanupStats: (_: any, __: any, context: any) => Promise<{
+            expiredVerificationTokens: number;
+            bookingsWithoutValidVerification: number;
+            oldCompletedBookings: number;
+            totalPendingCleanup: number;
+        }>;
+        triggerExpirationCheck: (_: any, __: any, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            details: {
+                cancelledCount: number;
+            };
+        }>;
+        getExpirationStats: (_: any, __: any, context: any) => Promise<{
+            expiredAwaitingVerification: number;
+            expiredAwaitingPayment: number;
+            totalExpired: number;
+            nextCheckIn: string;
+        }>;
     };
 };
 //# sourceMappingURL=platformResolvers.d.ts.map

@@ -6,8 +6,12 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
   # --- Enums ---
   enum RentalType {
     HOUR
-    KM
     DAY
+  }
+
+  enum BookingType {
+    RENTAL
+    REPLACEMENT
   }
 
   enum BookingStatus {
@@ -28,26 +32,49 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     user: User!
     carId: ID!
     car: Car!
-    
+
     startDate: String
     endDate: String
-    
+
+    pickupLocation: String
+    dropoffLocation: String
+
+    # Meter Tracking & KM Management
+    startMeter: Float
+    endMeter: Float
+    allowedKm: Float
+    extraKmUsed: Float!
+    extraKmCharge: Float!
+
     # Financials
     totalPrice: Float!
+    totalFinalPrice: Float
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
     surchargeAmount: Float!
     rentalType: RentalType!
-    
+    bookingType: BookingType!
+    repairOrderId: String
+
     status: BookingStatus!
-    pickupLocation: String
-    dropoffLocation: String
-    
+
     createdAt: String!
     updatedAt: String!
-    
+
     payment: Payment
+    verification: BookingVerification
+  }
+
+  type BookingVerification {
+    id: ID!
+    bookingId: ID!
+    booking: Booking!
+    token: String!
+    expiresAt: String!
+    isVerified: Boolean!
+    verifiedAt: String
+    createdAt: String!
   }
 
   type BookingLinkResponse {
@@ -56,22 +83,44 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     bookingId: ID!
   }
 
+  type ConfirmBookingResponse {
+    success: Boolean!
+    message: String!
+    booking: Booking!
+  }
+
+  type ResendVerificationResponse {
+    success: Boolean!
+    message: String!
+    expiresAt: String!
+  }
+
   # --- Inputs ---
   input CreateBookingInput {
-    userId: ID! 
     carId: ID!
     startDate: String!
     endDate: String!
-    
+
+    # KM Management
+    allowedKm: Float
+
     totalPrice: Float!
     basePrice: Float!
     taxAmount: Float!
     depositAmount: Float!
     surchargeAmount: Float!
     rentalType: RentalType!
-    
+    bookingType: BookingType
+    repairOrderId: String
+
     pickupLocation: String
     dropoffLocation: String
+  }
+
+  # --- Additional Types ---
+  type CarAvailabilityCheck {
+    available: Boolean!
+    conflictingBookings: [Booking!]!
   }
 
   # --- Queries ---
@@ -81,22 +130,39 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
     myBookings: [Booking!]!
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailabilityCheck!
+  }
+
+  # --- Inputs ---
+  input UpdateMeterReadingInput {
+    startMeter: Float
+    endMeter: Float
   }
 
   # --- Mutations ---
   type Mutation {
     # Step 1: User creates a draft booking
     createBooking(input: CreateBookingInput!): Booking!
-    
-    # Step 2: System sends the verification link (email)
+
+    # Step 2: Confirm DRAFT booking and send verification
+    confirmBooking(bookingId: ID!): ConfirmBookingResponse!
+
+    # Resend verification link if previous one expired
+    resendVerificationLink(bookingId: ID!): ResendVerificationResponse!
+
+    # Legacy: System sends the verification link (email) for existing bookings
     sendBookingVerificationLink(bookingId: ID!): BookingLinkResponse!
-    
+
     # Step 3: Verify the token from email (User clicks the link)
     verifyBookingToken(token: String!): BookingLinkResponse!
-    
+
+    # Meter Tracking & KM Management
+    updateMeterReadings(bookingId: ID!, input: UpdateMeterReadingInput!): Booking!
+    finalizeBookingReturn(bookingId: ID!): Booking!
+
     # Admin or System updates status
     updateBookingStatus(id: ID!, status: BookingStatus!): Booking!
-    
+
     cancelBooking(id: ID!): Boolean!
     deleteBooking(id: ID!): Boolean!
   }

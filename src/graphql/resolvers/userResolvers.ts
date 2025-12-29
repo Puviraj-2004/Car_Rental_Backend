@@ -4,6 +4,8 @@ import { generateToken, hashPassword, comparePasswords } from '../../utils/auth'
 import { sendVerificationEmail } from '../../utils/sendEmail';
 import { validatePassword } from '../../utils/validation';
 import { isAuthenticated, isAdmin } from '../../utils/authguard';
+import { uploadToCloudinary } from '../../utils/cloudinary';
+import { ocrService, ExtractedDocumentData } from '../../services/ocrService';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -219,6 +221,64 @@ export const userResolvers = {
       });
 
       return profile;
+    },
+
+    // OCR Document Processing for Auto-fill
+    processDocumentOCR: async (_: any, { file }: { file: any }, context: any): Promise<ExtractedDocumentData> => {
+      isAuthenticated(context);
+
+      try {
+        // Convert GraphQL Upload to Buffer
+        const { createReadStream, filename, mimetype } = await file;
+        const stream = createReadStream();
+        const chunks: Buffer[] = [];
+
+        for await (const chunk of stream) {
+          chunks.push(chunk);
+        }
+
+        const fileBuffer = Buffer.concat(chunks);
+
+        // Validate file type
+        if (!mimetype.startsWith('image/')) {
+          throw new Error('Only image files are supported for OCR processing');
+        }
+
+        // Upload to Cloudinary for storage (following existing pattern)
+        const cloudinaryResult = await uploadToCloudinary(fileBuffer, 'documents', filename);
+
+        // Process with Mindee OCR
+        const extractedData = await ocrService.extractDocumentData(fileBuffer);
+
+        // Log the OCR processing
+        await prisma.auditLog.create({
+          data: {
+            userId: context.userId,
+            action: 'DOCUMENT_OCR_PROCESSED',
+            details: {
+              filename,
+              cloudinaryUrl: cloudinaryResult.secure_url,
+              extractedFields: Object.keys(extractedData)
+            }
+          }
+        });
+
+        return extractedData;
+
+      } catch (error) {
+        console.error('OCR Processing Error:', error);
+
+        // Log the error
+        await prisma.auditLog.create({
+          data: {
+            userId: context.userId,
+            action: 'DOCUMENT_OCR_FAILED',
+            details: { error: error instanceof Error ? error.message : 'Unknown OCR error' }
+          }
+        });
+
+        throw new Error('Unable to read the document. Please upload a clearer photo.');
+      }
     },
 
     updateUser: async (_: any, { input }: { input: any }, context: any) => {

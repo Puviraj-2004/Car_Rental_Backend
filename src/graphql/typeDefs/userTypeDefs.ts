@@ -68,6 +68,14 @@ export const userTypeDefs = gql`
     message: String!
   }
 
+  type ExtractedDocumentData {
+    fullName: String
+    documentId: String
+    expiryDate: String
+    birthDate: String
+    address: String
+  }
+
   # --- Inputs ---
   # ✅ RegisterInput simplified as per your request
   input RegisterInput {
@@ -132,5 +140,8 @@ export const userTypeDefs = gql`
     # Driver Profile & KYC
     createOrUpdateDriverProfile(input: DriverProfileInput!): DriverProfile!
     verifyDriverProfile(userId: ID!, status: VerificationStatus!, note: String): DriverProfile!
+
+    # OCR Document Processing
+    processDocumentOCR(file: Upload!): ExtractedDocumentData!
   }
 `;

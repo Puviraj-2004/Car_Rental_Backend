@@ -19,6 +19,7 @@ const database_1 = __importDefault(require("./utils/database"));
 const typeDefs_1 = __importDefault(require("./graphql/typeDefs"));
 const resolvers_1 = __importDefault(require("./graphql/resolvers"));
 const auth_1 = require("./utils/auth");
+const expirationService_1 = require("./services/expirationService");
 async function startServer() {
     const app = (0, express_1.default)();
     const httpServer = http_1.default.createServer(app);
@@ -90,6 +91,8 @@ async function startServer() {
     const PORT = process.env.PORT || 4000;
     await new Promise((resolve) => httpServer.listen({ port: parseInt(PORT.toString()) }, resolve));
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+    // Start the expiration service for automatic booking cancellation
+    expirationService_1.expirationService.startExpirationService();
 }
 startServer().catch(error => {
     console.error('Error starting server:', error);

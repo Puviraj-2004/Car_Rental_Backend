@@ -70,6 +70,14 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     message: String!
   }
 
+  type ExtractedDocumentData {
+    fullName: String
+    documentId: String
+    expiryDate: String
+    birthDate: String
+    address: String
+  }
+
   # --- Inputs ---
   # ✅ RegisterInput simplified as per your request
   input RegisterInput {
@@ -134,6 +142,9 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     # Driver Profile & KYC
     createOrUpdateDriverProfile(input: DriverProfileInput!): DriverProfile!
     verifyDriverProfile(userId: ID!, status: VerificationStatus!, note: String): DriverProfile!
+
+    # OCR Document Processing
+    processDocumentOCR(file: Upload!): ExtractedDocumentData!
   }
 `;
 //# sourceMappingURL=userTypeDefs.js.map
