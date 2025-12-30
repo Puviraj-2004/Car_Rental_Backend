@@ -7,6 +7,7 @@ import prisma from '../../utils/database';
 // Temporary fix: cast to any to bypass TypeScript issue with bookingVerification
 const prismaClient = prisma as any;
 import { isAuthenticated, isAdmin, isOwnerOrAdmin } from '../../utils/authguard';
+import { deleteFromCloudinary } from '../../utils/cloudinary';
 
 // 🔍 Helper function to check car availability
 const checkCarAvailabilityForBooking = async (carId: string, startDate: Date, endDate: Date): Promise<{ available: boolean, conflictingBookings?: any[] }> => {
@@ -75,6 +76,95 @@ const getBookingById = async (id: string) => {
   return booking;
 };
 
+// Cleanup orphaned verification documents from Cloudinary
+const cleanupVerificationDocuments = async (userId: string) => {
+  try {
+    const driverProfile = await prisma.driverProfile.findUnique({
+      where: { userId },
+      select: {
+        licenseFrontPublicId: true,
+        licenseBackPublicId: true,
+        idProofPublicId: true,
+        addressProofPublicId: true
+      }
+    });
+
+    if (driverProfile) {
+      const publicIds = [
+        driverProfile.licenseFrontPublicId,
+        driverProfile.licenseBackPublicId,
+        driverProfile.idProofPublicId,
+        driverProfile.addressProofPublicId
+      ].filter(Boolean);
+
+      // Delete images from Cloudinary
+      for (const publicId of publicIds) {
+        if (publicId) {
+          await deleteFromCloudinary(publicId);
+        }
+      }
+
+      // Clear URLs from driver profile
+      await prisma.driverProfile.update({
+        where: { userId },
+        data: {
+          licenseFrontUrl: null,
+          licenseFrontPublicId: null,
+          licenseBackUrl: null,
+          licenseBackPublicId: null,
+          idProofUrl: null,
+          idProofPublicId: null,
+          addressProofUrl: null,
+          addressProofPublicId: null,
+          status: 'NOT_UPLOADED'
+        }
+      });
+
+      console.log(`🧹 Cleaned up verification documents for user ${userId}`);
+    }
+  } catch (error) {
+    console.error('Error cleaning up verification documents:', error);
+  }
+};
+
+// Calculate younger driver surcharge based on platform settings
+const calculateYoungerDriverSurcharge = async (booking: any): Promise<number> => {
+  try {
+    // Get platform settings for younger driver configuration
+    const platformSettings = await prisma.platformSettings.findFirst();
+    const minAge = platformSettings?.youngDriverMinAge || 25;
+    const fee = platformSettings?.youngDriverFee || 30.0;
+
+    // Check if driver has date of birth
+    const driverProfile = booking.user?.driverProfile;
+    if (!driverProfile?.dateOfBirth) {
+      return 0; // No DOB available, no surcharge
+    }
+
+    // Calculate driver's age
+    const today = new Date();
+    const birthDate = new Date(driverProfile.dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+
+    // Adjust age if birthday hasn't occurred this year
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+
+    // Apply surcharge if driver is younger than minimum age
+    if (age < minAge) {
+      console.log(`Younger driver surcharge applied: Age ${age} < ${minAge}, fee: €${fee}`);
+      return fee;
+    }
+
+    return 0; // No surcharge for older drivers
+  } catch (error) {
+    console.error('Error calculating younger driver surcharge:', error);
+    return 0; // Return 0 on error to avoid blocking booking
+  }
+};
+
 // 🔄 Status update helper
 const updateBookingStatus = async (id: string, status: any) => {
   return await prisma.booking.update({
@@ -90,7 +180,7 @@ const BOOKING_INCLUDES = {
     payment: true
   },
   detailed: {
-    user: true,
+    user: { include: { driverProfile: true } },
     car: { include: { brand: true, model: true, images: true } },
     payment: true,
     verification: true
@@ -134,10 +224,31 @@ export const bookingResolvers = {
       const booking = await getBookingById(id);
       isOwnerOrAdmin(context, booking.userId);
 
-      return await prisma.booking.findUnique({
+      const detailedBooking = await prisma.booking.findUnique({
         where: { id },
         include: BOOKING_INCLUDES.detailed,
       });
+
+      // Calculate younger driver surcharge if booking is AWAITING_PAYMENT and surcharge not set
+      if (detailedBooking && detailedBooking.status === 'AWAITING_PAYMENT' && detailedBooking.surchargeAmount === 0) {
+        const surcharge = await calculateYoungerDriverSurcharge(detailedBooking);
+        if (surcharge > 0) {
+          // Update booking with surcharge
+          await prisma.booking.update({
+            where: { id },
+            data: {
+              surchargeAmount: surcharge,
+              totalFinalPrice: (detailedBooking.totalFinalPrice || detailedBooking.totalPrice) + surcharge
+            }
+          });
+
+          // Update the returned booking object
+          detailedBooking.surchargeAmount = surcharge;
+          detailedBooking.totalFinalPrice = (detailedBooking.totalFinalPrice || detailedBooking.totalPrice) + surcharge;
+        }
+      }
+
+      return detailedBooking;
     },
 
     // 📊 Admin: Oru specific user-oda bookings-ai paarkka
@@ -466,6 +577,11 @@ export const bookingResolvers = {
               }
             });
           });
+
+          // Cleanup orphaned verification documents
+          if (verification.booking?.userId) {
+            await cleanupVerificationDocuments(verification.booking.userId);
+          }
 
           console.log(`✅ ===== BOOKING AUTO-CANCELLED =====`);
           throw new Error("Verification link has expired. This booking has been cancelled for security reasons.");

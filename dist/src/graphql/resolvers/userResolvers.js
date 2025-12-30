@@ -158,25 +158,82 @@ exports.userResolvers = {
         // 5. KYC Profile Update - Using proper DateTime conversion
         createOrUpdateDriverProfile: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);
+            // Get existing profile to preserve Cloudinary URLs
+            const existingProfile = await database_1.default.driverProfile.findUnique({
+                where: { userId: context.userId },
+                select: {
+                    licenseFrontUrl: true,
+                    licenseFrontPublicId: true,
+                    licenseBackUrl: true,
+                    licenseBackPublicId: true,
+                    idProofUrl: true,
+                    idProofPublicId: true,
+                    addressProofUrl: true,
+                    addressProofPublicId: true
+                }
+            });
             // Industrial Logic: Convert string dates to actual Date objects for DB
             const dataToSave = {
                 ...input,
                 licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : null,
                 licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : null,
                 dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
-                status: 'PENDING_REVIEW'
+                // Preserve existing Cloudinary URLs
+                licenseFrontUrl: existingProfile?.licenseFrontUrl,
+                licenseFrontPublicId: existingProfile?.licenseFrontPublicId,
+                licenseBackUrl: existingProfile?.licenseBackUrl,
+                licenseBackPublicId: existingProfile?.licenseBackPublicId,
+                idProofUrl: existingProfile?.idProofUrl,
+                idProofPublicId: existingProfile?.idProofPublicId,
+                addressProofUrl: existingProfile?.addressProofUrl,
+                addressProofPublicId: existingProfile?.addressProofPublicId
+                // Don't set status here - it will be updated to VERIFIED_BY_AI below
             };
             const profile = await database_1.default.driverProfile.upsert({
                 where: { userId: context.userId },
                 update: dataToSave,
                 create: { userId: context.userId, ...dataToSave }
             });
+            // Update verification status to VERIFIED_BY_AI since user has completed verification
+            await database_1.default.driverProfile.update({
+                where: { id: profile.id },
+                data: { status: 'VERIFIED_BY_AI' }
+            });
+            // Find and update the user's AWAITING_VERIFICATION booking to AWAITING_PAYMENT
+            const pendingBooking = await database_1.default.booking.findFirst({
+                where: {
+                    userId: context.userId,
+                    status: 'AWAITING_VERIFICATION'
+                }
+            });
+            if (pendingBooking) {
+                await database_1.default.booking.update({
+                    where: { id: pendingBooking.id },
+                    data: { status: 'AWAITING_PAYMENT' }
+                });
+                // Log the booking status change
+                await database_1.default.auditLog.create({
+                    data: {
+                        userId: context.userId,
+                        action: 'BOOKING_STATUS_UPDATED',
+                        details: {
+                            bookingId: pendingBooking.id,
+                            previousStatus: 'AWAITING_VERIFICATION',
+                            newStatus: 'AWAITING_PAYMENT',
+                            reason: 'Driver verification completed'
+                        }
+                    }
+                });
+            }
             // Log the profile upload
             await database_1.default.auditLog.create({
                 data: {
                     userId: context.userId,
-                    action: 'DRIVER_PROFILE_UPLOADED',
-                    details: { profileId: profile.id }
+                    action: 'DRIVER_PROFILE_VERIFIED',
+                    details: {
+                        profileId: profile.id,
+                        bookingId: pendingBooking?.id
+                    }
                 }
             });
             return profile;
@@ -199,7 +256,7 @@ exports.userResolvers = {
             return profile;
         },
         // OCR Document Processing for Auto-fill
-        processDocumentOCR: async (_, { file }, context) => {
+        processDocumentOCR: async (_, { file, documentType, side }, context) => {
             (0, authguard_1.isAuthenticated)(context);
             try {
                 // Convert GraphQL Upload to Buffer
@@ -217,7 +274,41 @@ exports.userResolvers = {
                 // Upload to Cloudinary for storage (following existing pattern)
                 const cloudinaryResult = await (0, cloudinary_1.uploadToCloudinary)(fileBuffer, 'documents', filename);
                 // Process with Mindee OCR
-                const extractedData = await ocrService_1.ocrService.extractDocumentData(fileBuffer);
+                const extractedData = await ocrService_1.ocrService.extractDocumentData(fileBuffer, documentType);
+                // Store Cloudinary URL in driver profile based on document type and side
+                const urlUpdateData = {
+                    status: 'PENDING_REVIEW'
+                };
+                switch (documentType) {
+                    case 'license':
+                        if (side === 'back') {
+                            urlUpdateData.licenseBackUrl = cloudinaryResult.secure_url;
+                            urlUpdateData.licenseBackPublicId = cloudinaryResult.public_id;
+                        }
+                        else {
+                            // Default to front for license
+                            urlUpdateData.licenseFrontUrl = cloudinaryResult.secure_url;
+                            urlUpdateData.licenseFrontPublicId = cloudinaryResult.public_id;
+                        }
+                        break;
+                    case 'id':
+                        urlUpdateData.idProofUrl = cloudinaryResult.secure_url;
+                        urlUpdateData.idProofPublicId = cloudinaryResult.public_id;
+                        break;
+                    case 'address':
+                        urlUpdateData.addressProofUrl = cloudinaryResult.secure_url;
+                        urlUpdateData.addressProofPublicId = cloudinaryResult.public_id;
+                        break;
+                }
+                // Update or create driver profile with URL and status
+                await database_1.default.driverProfile.upsert({
+                    where: { userId: context.userId },
+                    update: urlUpdateData,
+                    create: {
+                        userId: context.userId,
+                        ...urlUpdateData
+                    }
+                });
                 // Log the OCR processing
                 await database_1.default.auditLog.create({
                     data: {
@@ -226,7 +317,9 @@ exports.userResolvers = {
                         details: {
                             filename,
                             cloudinaryUrl: cloudinaryResult.secure_url,
-                            extractedFields: Object.keys(extractedData)
+                            extractedFields: Object.keys(extractedData),
+                            documentType,
+                            ocrSuccess: Object.keys(extractedData).length > 0
                         }
                     }
                 });

@@ -43,15 +43,30 @@ export const paymentResolvers = {
       const payment = await prisma.payment.create({
         data: {
           ...input,
-          status: input.status || 'PENDING',
+          status: input.status || 'COMPLETED', // Default to COMPLETED for basic implementation
         },
         include: { booking: true }
       });
 
+      // Update booking status to CONFIRMED when payment is created
       if (payment.status === 'COMPLETED') {
         await prisma.booking.update({
           where: { id: input.bookingId },
           data: { status: 'CONFIRMED' }
+        });
+
+        // Log the payment and booking confirmation
+        await prisma.auditLog.create({
+          data: {
+            userId: context.userId,
+            action: 'PAYMENT_COMPLETED_BOOKING_CONFIRMED',
+            details: {
+              paymentId: payment.id,
+              bookingId: input.bookingId,
+              amount: input.amount,
+              transactionId: input.transactionId
+            }
+          }
         });
       }
 

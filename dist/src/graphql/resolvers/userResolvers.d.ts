@@ -5,6 +5,7 @@ export declare const userResolvers: {
             driverProfile: {
                 userId: string;
                 id: string;
+                address: string | null;
                 status: import(".prisma/client").$Enums.VerificationStatus;
                 createdAt: Date;
                 updatedAt: Date;
@@ -12,7 +13,6 @@ export declare const userResolvers: {
                 licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
-                address: string | null;
                 dateOfBirth: Date | null;
                 licenseFrontUrl: string | null;
                 licenseBackUrl: string | null;
@@ -30,21 +30,21 @@ export declare const userResolvers: {
                 status: import(".prisma/client").$Enums.BookingStatus;
                 createdAt: Date;
                 updatedAt: Date;
+                carId: string;
                 startDate: Date;
                 endDate: Date;
-                carId: string;
-                extraKmCharge: number;
-                depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
                 startMeter: number | null;
                 endMeter: number | null;
                 allowedKm: number | null;
                 extraKmUsed: number;
+                extraKmCharge: number;
                 totalPrice: number;
                 totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
+                depositAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
                 bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
@@ -71,6 +71,7 @@ export declare const userResolvers: {
             driverProfile: {
                 userId: string;
                 id: string;
+                address: string | null;
                 status: import(".prisma/client").$Enums.VerificationStatus;
                 createdAt: Date;
                 updatedAt: Date;
@@ -78,7 +79,6 @@ export declare const userResolvers: {
                 licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
-                address: string | null;
                 dateOfBirth: Date | null;
                 licenseFrontUrl: string | null;
                 licenseBackUrl: string | null;
@@ -96,21 +96,21 @@ export declare const userResolvers: {
                 status: import(".prisma/client").$Enums.BookingStatus;
                 createdAt: Date;
                 updatedAt: Date;
+                carId: string;
                 startDate: Date;
                 endDate: Date;
-                carId: string;
-                extraKmCharge: number;
-                depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
                 startMeter: number | null;
                 endMeter: number | null;
                 allowedKm: number | null;
                 extraKmUsed: number;
+                extraKmCharge: number;
                 totalPrice: number;
                 totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
+                depositAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
                 bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
@@ -135,6 +135,7 @@ export declare const userResolvers: {
             driverProfile: {
                 userId: string;
                 id: string;
+                address: string | null;
                 status: import(".prisma/client").$Enums.VerificationStatus;
                 createdAt: Date;
                 updatedAt: Date;
@@ -142,7 +143,6 @@ export declare const userResolvers: {
                 licenseIssueDate: Date | null;
                 licenseExpiry: Date | null;
                 idProofNumber: string | null;
-                address: string | null;
                 dateOfBirth: Date | null;
                 licenseFrontUrl: string | null;
                 licenseBackUrl: string | null;
@@ -160,21 +160,21 @@ export declare const userResolvers: {
                 status: import(".prisma/client").$Enums.BookingStatus;
                 createdAt: Date;
                 updatedAt: Date;
+                carId: string;
                 startDate: Date;
                 endDate: Date;
-                carId: string;
-                extraKmCharge: number;
-                depositAmount: number;
                 pickupLocation: string | null;
                 dropoffLocation: string | null;
                 startMeter: number | null;
                 endMeter: number | null;
                 allowedKm: number | null;
                 extraKmUsed: number;
+                extraKmCharge: number;
                 totalPrice: number;
                 totalFinalPrice: number | null;
                 basePrice: number;
                 taxAmount: number;
+                depositAmount: number;
                 rentalType: import(".prisma/client").$Enums.RentalType;
                 bookingType: import(".prisma/client").$Enums.BookingType;
                 surchargeAmount: number;
@@ -198,6 +198,7 @@ export declare const userResolvers: {
         myDriverProfile: (_: any, __: any, context: any) => Promise<{
             userId: string;
             id: string;
+            address: string | null;
             status: import(".prisma/client").$Enums.VerificationStatus;
             createdAt: Date;
             updatedAt: Date;
@@ -205,7 +206,6 @@ export declare const userResolvers: {
             licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
-            address: string | null;
             dateOfBirth: Date | null;
             licenseFrontUrl: string | null;
             licenseBackUrl: string | null;
@@ -247,6 +247,7 @@ export declare const userResolvers: {
                 driverProfile: {
                     userId: string;
                     id: string;
+                    address: string | null;
                     status: import(".prisma/client").$Enums.VerificationStatus;
                     createdAt: Date;
                     updatedAt: Date;
@@ -254,7 +255,6 @@ export declare const userResolvers: {
                     licenseIssueDate: Date | null;
                     licenseExpiry: Date | null;
                     idProofNumber: string | null;
-                    address: string | null;
                     dateOfBirth: Date | null;
                     licenseFrontUrl: string | null;
                     licenseBackUrl: string | null;
@@ -313,6 +313,7 @@ export declare const userResolvers: {
         }, context: any) => Promise<{
             userId: string;
             id: string;
+            address: string | null;
             status: import(".prisma/client").$Enums.VerificationStatus;
             createdAt: Date;
             updatedAt: Date;
@@ -320,7 +321,6 @@ export declare const userResolvers: {
             licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
-            address: string | null;
             dateOfBirth: Date | null;
             licenseFrontUrl: string | null;
             licenseBackUrl: string | null;
@@ -335,6 +335,7 @@ export declare const userResolvers: {
         verifyDriverProfile: (_: any, { userId, status, note }: any, context: any) => Promise<{
             userId: string;
             id: string;
+            address: string | null;
             status: import(".prisma/client").$Enums.VerificationStatus;
             createdAt: Date;
             updatedAt: Date;
@@ -342,7 +343,6 @@ export declare const userResolvers: {
             licenseIssueDate: Date | null;
             licenseExpiry: Date | null;
             idProofNumber: string | null;
-            address: string | null;
             dateOfBirth: Date | null;
             licenseFrontUrl: string | null;
             licenseBackUrl: string | null;
@@ -354,8 +354,10 @@ export declare const userResolvers: {
             addressProofPublicId: string | null;
             verificationNote: string | null;
         }>;
-        processDocumentOCR: (_: any, { file }: {
+        processDocumentOCR: (_: any, { file, documentType, side }: {
             file: any;
+            documentType?: string;
+            side?: string;
         }, context: any) => Promise<ExtractedDocumentData>;
         updateUser: (_: any, { input }: {
             input: any;

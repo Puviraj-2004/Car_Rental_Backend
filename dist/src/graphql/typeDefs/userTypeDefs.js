@@ -144,7 +144,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     verifyDriverProfile(userId: ID!, status: VerificationStatus!, note: String): DriverProfile!
 
     # OCR Document Processing
-    processDocumentOCR(file: Upload!): ExtractedDocumentData!
+    processDocumentOCR(file: Upload!, documentType: String, side: String): ExtractedDocumentData!
   }
 `;
 //# sourceMappingURL=userTypeDefs.js.map

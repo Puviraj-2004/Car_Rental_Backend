@@ -11,6 +11,7 @@ const database_1 = __importDefault(require("../../utils/database"));
 // Temporary fix: cast to any to bypass TypeScript issue with bookingVerification
 const prismaClient = database_1.default;
 const authguard_1 = require("../../utils/authguard");
+const cloudinary_1 = require("../../utils/cloudinary");
 // 🔍 Helper function to check car availability
 const checkCarAvailabilityForBooking = async (carId, startDate, endDate) => {
     const conflictingBookings = await database_1.default.booking.findMany({
@@ -75,6 +76,86 @@ const getBookingById = async (id) => {
         throw new Error('Booking not found');
     return booking;
 };
+// Cleanup orphaned verification documents from Cloudinary
+const cleanupVerificationDocuments = async (userId) => {
+    try {
+        const driverProfile = await database_1.default.driverProfile.findUnique({
+            where: { userId },
+            select: {
+                licenseFrontPublicId: true,
+                licenseBackPublicId: true,
+                idProofPublicId: true,
+                addressProofPublicId: true
+            }
+        });
+        if (driverProfile) {
+            const publicIds = [
+                driverProfile.licenseFrontPublicId,
+                driverProfile.licenseBackPublicId,
+                driverProfile.idProofPublicId,
+                driverProfile.addressProofPublicId
+            ].filter(Boolean);
+            // Delete images from Cloudinary
+            for (const publicId of publicIds) {
+                if (publicId) {
+                    await (0, cloudinary_1.deleteFromCloudinary)(publicId);
+                }
+            }
+            // Clear URLs from driver profile
+            await database_1.default.driverProfile.update({
+                where: { userId },
+                data: {
+                    licenseFrontUrl: null,
+                    licenseFrontPublicId: null,
+                    licenseBackUrl: null,
+                    licenseBackPublicId: null,
+                    idProofUrl: null,
+                    idProofPublicId: null,
+                    addressProofUrl: null,
+                    addressProofPublicId: null,
+                    status: 'NOT_UPLOADED'
+                }
+            });
+            console.log(`🧹 Cleaned up verification documents for user ${userId}`);
+        }
+    }
+    catch (error) {
+        console.error('Error cleaning up verification documents:', error);
+    }
+};
+// Calculate younger driver surcharge based on platform settings
+const calculateYoungerDriverSurcharge = async (booking) => {
+    try {
+        // Get platform settings for younger driver configuration
+        const platformSettings = await database_1.default.platformSettings.findFirst();
+        const minAge = platformSettings?.youngDriverMinAge || 25;
+        const fee = platformSettings?.youngDriverFee || 30.0;
+        // Check if driver has date of birth
+        const driverProfile = booking.user?.driverProfile;
+        if (!driverProfile?.dateOfBirth) {
+            return 0; // No DOB available, no surcharge
+        }
+        // Calculate driver's age
+        const today = new Date();
+        const birthDate = new Date(driverProfile.dateOfBirth);
+        let age = today.getFullYear() - birthDate.getFullYear();
+        // Adjust age if birthday hasn't occurred this year
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        // Apply surcharge if driver is younger than minimum age
+        if (age < minAge) {
+            console.log(`Younger driver surcharge applied: Age ${age} < ${minAge}, fee: €${fee}`);
+            return fee;
+        }
+        return 0; // No surcharge for older drivers
+    }
+    catch (error) {
+        console.error('Error calculating younger driver surcharge:', error);
+        return 0; // Return 0 on error to avoid blocking booking
+    }
+};
 // 🔄 Status update helper
 const updateBookingStatus = async (id, status) => {
     return await database_1.default.booking.update({
@@ -89,7 +170,7 @@ const BOOKING_INCLUDES = {
         payment: true
     },
     detailed: {
-        user: true,
+        user: { include: { driverProfile: true } },
         car: { include: { brand: true, model: true, images: true } },
         payment: true,
         verification: true
@@ -128,10 +209,28 @@ exports.bookingResolvers = {
         booking: async (_, { id }, context) => {
             const booking = await getBookingById(id);
             (0, authguard_1.isOwnerOrAdmin)(context, booking.userId);
-            return await database_1.default.booking.findUnique({
+            const detailedBooking = await database_1.default.booking.findUnique({
                 where: { id },
                 include: BOOKING_INCLUDES.detailed,
             });
+            // Calculate younger driver surcharge if booking is AWAITING_PAYMENT and surcharge not set
+            if (detailedBooking && detailedBooking.status === 'AWAITING_PAYMENT' && detailedBooking.surchargeAmount === 0) {
+                const surcharge = await calculateYoungerDriverSurcharge(detailedBooking);
+                if (surcharge > 0) {
+                    // Update booking with surcharge
+                    await database_1.default.booking.update({
+                        where: { id },
+                        data: {
+                            surchargeAmount: surcharge,
+                            totalFinalPrice: (detailedBooking.totalFinalPrice || detailedBooking.totalPrice) + surcharge
+                        }
+                    });
+                    // Update the returned booking object
+                    detailedBooking.surchargeAmount = surcharge;
+                    detailedBooking.totalFinalPrice = (detailedBooking.totalFinalPrice || detailedBooking.totalPrice) + surcharge;
+                }
+            }
+            return detailedBooking;
         },
         // 📊 Admin: Oru specific user-oda bookings-ai paarkka
         userBookings: async (_, { userId }, context) => {
@@ -154,8 +253,9 @@ exports.bookingResolvers = {
             const { startDate, endDate } = parseBookingDates(input);
             // ⏰ Validate booking dates
             const now = new Date();
-            if (startDate <= now) {
-                throw new Error('Pickup date must be in the future');
+            const minPickupTime = new Date(now.getTime() + (2 * 60 * 60 * 1000)); // At least 2 hours from now
+            if (startDate <= minPickupTime) {
+                throw new Error('Pickup date must be at least 2 hours in the future');
             }
             const minEndDate = new Date(startDate.getTime() + (1 * 60 * 60 * 1000)); // At least 1 hour after pickup
             if (endDate <= minEndDate) {
@@ -276,16 +376,19 @@ exports.bookingResolvers = {
             }
             const token = (0, uuid_1.v4)(); // Unique token generation
             const expiresAt = new Date(Date.now() + 1 * 60 * 60 * 1000); // 1 hour expiry
+            console.log(`🎫 Generated verification token for booking ${bookingId}:`, {
+                token: token.substring(0, 8) + '...',
+                expiresAt: expiresAt.toISOString()
+            });
             // Use transaction to update booking and create verification in one go
-            const result = await database_1.default.$transaction(async (tx) => {
+            await database_1.default.$transaction(async (tx) => {
                 // Update booking status and set expiration
-                const updatedBooking = await tx.booking.update({
+                await tx.booking.update({
                     where: { id: bookingId },
                     data: {
                         status: 'AWAITING_VERIFICATION',
                         expiresAt: expiresAt // Set 1-hour expiration on booking
-                    },
-                    include: BOOKING_INCLUDES.detailed
+                    }
                 });
                 // Create or update verification token
                 await tx.bookingVerification.upsert({
@@ -293,7 +396,11 @@ exports.bookingResolvers = {
                     update: { token, expiresAt, isVerified: false },
                     create: { bookingId, token, expiresAt }
                 });
-                return updatedBooking;
+            });
+            // Fetch the updated booking with verification data
+            const result = await database_1.default.booking.findUnique({
+                where: { id: bookingId },
+                include: BOOKING_INCLUDES.detailed
             });
             return {
                 success: true,
@@ -334,16 +441,94 @@ exports.bookingResolvers = {
         },
         // 🔗 Step 3: Magic link token-ai verify seiyyal (Public Route)
         verifyBookingToken: async (_, { token }) => {
+            console.log(`🔍 ===== VERIFICATION ATTEMPT =====`);
+            console.log(`🔍 Received token:`, {
+                value: token,
+                length: token?.length,
+                type: typeof token,
+                isValid: token && token.length > 10
+            });
             const verification = await prismaClient.bookingVerification.findUnique({
                 where: { token },
                 include: {
                     booking: {
-                        select: { status: true, id: true }
+                        select: { status: true, id: true, expiresAt: true }
                     }
                 }
             });
-            if (!verification)
+            console.log(`📊 Database lookup:`, {
+                found: !!verification,
+                verificationId: verification?.id,
+                tokenMatches: verification?.token === token,
+                bookingId: verification?.bookingId,
+                bookingStatus: verification?.booking?.status,
+                expiresAt: verification?.expiresAt,
+                currentTime: new Date().toISOString(),
+                isExpired: verification?.expiresAt ? new Date() > new Date(verification.expiresAt) : null
+            });
+            if (!verification) {
+                console.log(`❌ ===== TOKEN NOT FOUND IN DATABASE =====`);
+                // Check total tokens in DB for debugging
+                const totalTokens = await prismaClient.bookingVerification.count();
+                console.log(`📊 Total verification tokens in database: ${totalTokens}`);
+                // Show a sample of existing tokens (first few chars)
+                const sampleTokens = await prismaClient.bookingVerification.findMany({
+                    take: 3,
+                    select: { token: true }
+                });
+                console.log(`📊 Sample tokens in DB:`, sampleTokens.map((t) => t.token.substring(0, 8) + '...'));
                 throw new Error("Invalid or broken verification link.");
+            }
+            // 🚨 IMMEDIATE EXPIRY CHECK: If token is expired, cancel booking immediately
+            const now = new Date();
+            const expiresAt = new Date(verification.expiresAt);
+            if (now > expiresAt) {
+                console.log(`⏰ ===== TOKEN EXPIRED - AUTO CANCELLING BOOKING =====`);
+                console.log(`⏰ Token expired at: ${expiresAt.toISOString()}`);
+                console.log(`⏰ Current time: ${now.toISOString()}`);
+                console.log(`⏰ Booking ID to cancel: ${verification.bookingId}`);
+                try {
+                    // Auto-cancel the expired booking
+                    await prismaClient.$transaction(async (tx) => {
+                        // Update booking status to CANCELLED
+                        await tx.booking.update({
+                            where: { id: verification.bookingId },
+                            data: {
+                                status: 'CANCELLED',
+                                updatedAt: now
+                            }
+                        });
+                        // Delete the expired verification token
+                        await tx.bookingVerification.delete({
+                            where: { id: verification.id }
+                        });
+                        // Log the auto-cancellation
+                        await tx.auditLog.create({
+                            data: {
+                                userId: verification.booking?.userId || 'system-expiration-service',
+                                action: 'AUTO_BOOKING_EXPIRATION_ON_VERIFY',
+                                details: {
+                                    bookingId: verification.bookingId,
+                                    previousStatus: verification.booking?.status,
+                                    tokenExpiredAt: expiresAt.toISOString(),
+                                    verifiedAt: now.toISOString(),
+                                    reason: 'Token expired when user tried to verify'
+                                }
+                            }
+                        });
+                    });
+                    // Cleanup orphaned verification documents
+                    if (verification.booking?.userId) {
+                        await cleanupVerificationDocuments(verification.booking.userId);
+                    }
+                    console.log(`✅ ===== BOOKING AUTO-CANCELLED =====`);
+                    throw new Error("Verification link has expired. This booking has been cancelled for security reasons.");
+                }
+                catch (error) {
+                    console.error(`❌ Failed to auto-cancel expired booking:`, error);
+                    throw new Error("Verification link has expired. Please contact support if you believe this is an error.");
+                }
+            }
             // Check if booking is cancelled (read-only restriction)
             if (verification.booking?.status === 'CANCELLED') {
                 throw new Error("This booking session has expired and is now cancelled. You can only view the details.");

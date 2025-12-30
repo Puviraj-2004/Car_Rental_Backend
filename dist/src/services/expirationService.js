@@ -39,6 +39,52 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.expirationService = void 0;
 const cron = __importStar(require("node-cron"));
 const database_1 = __importDefault(require("../utils/database"));
+// Cleanup orphaned verification documents from Cloudinary
+const cleanupVerificationDocuments = async (userId) => {
+    try {
+        const driverProfile = await database_1.default.driverProfile.findUnique({
+            where: { userId },
+            select: {
+                licenseFrontPublicId: true,
+                licenseBackPublicId: true,
+                idProofPublicId: true,
+                addressProofPublicId: true
+            }
+        });
+        if (driverProfile) {
+            // Note: Images are kept in Cloudinary for admin review
+            // If deletion is needed in the future, uncomment and implement:
+            // const publicIds = [
+            //   driverProfile.licenseFrontPublicId,
+            //   driverProfile.licenseBackPublicId,
+            //   driverProfile.idProofPublicId,
+            //   driverProfile.addressProofPublicId
+            // ].filter(Boolean);
+            // for (const publicId of publicIds) {
+            //   if (publicId) await deleteFromCloudinary(publicId);
+            // }
+            // Clear URLs from driver profile
+            await database_1.default.driverProfile.update({
+                where: { userId },
+                data: {
+                    licenseFrontUrl: null,
+                    licenseFrontPublicId: null,
+                    licenseBackUrl: null,
+                    licenseBackPublicId: null,
+                    idProofUrl: null,
+                    idProofPublicId: null,
+                    addressProofUrl: null,
+                    addressProofPublicId: null,
+                    status: 'NOT_UPLOADED'
+                }
+            });
+            console.log(`🧹 Cleaned up verification documents for user ${userId}`);
+        }
+    }
+    catch (error) {
+        console.error('Error cleaning up verification documents:', error);
+    }
+};
 class ExpirationService {
     isRunning = false;
     /**
@@ -114,6 +160,7 @@ class ExpirationService {
                             await tx.bookingVerification.deleteMany({
                                 where: { bookingId: booking.id }
                             });
+                            // Note: cleanupVerificationDocuments will be called after the transaction
                         }
                         // Log the cancellation
                         await tx.auditLog.create({
@@ -130,6 +177,10 @@ class ExpirationService {
                             }
                         });
                     });
+                    // Cleanup orphaned verification documents
+                    if (booking.status === 'AWAITING_VERIFICATION') {
+                        await cleanupVerificationDocuments(booking.userId);
+                    }
                     console.log(`❌ Auto-cancelled expired booking ${booking.id} for user ${booking.user.email}`);
                 }
                 catch (error) {

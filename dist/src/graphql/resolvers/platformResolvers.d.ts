@@ -2,11 +2,10 @@ export declare const platformResolvers: {
     Query: {
         platformSettings: () => Promise<{
             id: string;
-            updatedAt: Date;
             address: string | null;
+            updatedAt: Date;
             logoUrl: string | null;
             logoPublicId: string | null;
-            currency: string;
             companyName: string;
             description: string | null;
             supportEmail: string | null;
@@ -20,6 +19,7 @@ export declare const platformResolvers: {
             noviceLicenseYears: number | null;
             termsAndConditions: string | null;
             privacyPolicy: string | null;
+            currency: string;
             taxPercentage: number;
         }>;
         auditLogs: (_: any, { limit, offset }: {
@@ -45,11 +45,10 @@ export declare const platformResolvers: {
             input: any;
         }, context: any) => Promise<{
             id: string;
-            updatedAt: Date;
             address: string | null;
+            updatedAt: Date;
             logoUrl: string | null;
             logoPublicId: string | null;
-            currency: string;
             companyName: string;
             description: string | null;
             supportEmail: string | null;
@@ -63,6 +62,7 @@ export declare const platformResolvers: {
             noviceLicenseYears: number | null;
             termsAndConditions: string | null;
             privacyPolicy: string | null;
+            currency: string;
             taxPercentage: number;
         }>;
         cleanupExpiredVerifications: (_: any, __: any, context: any) => Promise<{
