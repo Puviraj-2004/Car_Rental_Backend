@@ -5,6 +5,7 @@ export const carTypeDefs = gql`
   scalar Upload
 
   # --- Enums ---
+  enum LicenseCategory { AM A B C D }
   enum CritAirCategory { CRIT_AIR_0 CRIT_AIR_1 CRIT_AIR_2 CRIT_AIR_3 CRIT_AIR_4 CRIT_AIR_5 CRIT_AIR_6 NO_STICKER }
   enum FuelType { PETROL DIESEL ELECTRIC HYBRID }
   enum TransmissionType { MANUAL AUTOMATIC }
@@ -64,6 +65,7 @@ export const carTypeDefs = gql`
     pricePerKm: Float
     pricePerDay: Float
     depositAmount: Float!
+    requiredLicenseCategory: LicenseCategory!
     critAirRating: CritAirCategory!
     status: CarStatus!
     descriptionEn: String
@@ -94,6 +96,7 @@ export const carTypeDefs = gql`
     pricePerKm: Float
     pricePerDay: Float
     depositAmount: Float!
+    requiredLicenseCategory: LicenseCategory
     critAirRating: CritAirCategory!
     status: CarStatus
     descriptionEn: String
@@ -119,6 +122,7 @@ export const carTypeDefs = gql`
     pricePerKm: Float
     pricePerDay: Float
     depositAmount: Float
+    requiredLicenseCategory: LicenseCategory
     critAirRating: CritAirCategory
     status: CarStatus
     descriptionEn: String

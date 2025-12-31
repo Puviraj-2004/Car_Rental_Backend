@@ -163,7 +163,7 @@ export const carResolvers = {
     createCar: async (_: any, { input }: any, context: any) => {
       isAdmin(context);
       return await prisma.car.create({
-        data: { ...input, status: input.status || 'AVAILABLE' },
+        data: { ...input, requiredLicenseCategory: input.requiredLicenseCategory || 'B', status: input.status || 'AVAILABLE' },
         include: { brand: true, model: true }
       });
     },

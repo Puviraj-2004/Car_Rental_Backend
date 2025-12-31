@@ -259,10 +259,11 @@ exports.userResolvers = {
         processDocumentOCR: async (_, { file, documentType, side }, context) => {
             (0, authguard_1.isAuthenticated)(context);
             try {
-                // Convert GraphQL Upload to Buffer
+                // Convert GraphQL Upload to Buffer and Stream
                 const { createReadStream, filename, mimetype } = await file;
                 const stream = createReadStream();
                 const chunks = [];
+                // Read all chunks to create buffer for OCR
                 for await (const chunk of stream) {
                     chunks.push(chunk);
                 }
@@ -271,8 +272,8 @@ exports.userResolvers = {
                 if (!mimetype.startsWith('image/')) {
                     throw new Error('Only image files are supported for OCR processing');
                 }
-                // Upload to Cloudinary for storage (following existing pattern)
-                const cloudinaryResult = await (0, cloudinary_1.uploadToCloudinary)(fileBuffer, 'documents', filename);
+                // Upload to Cloudinary for storage (pass buffer, function now handles it)
+                const cloudinaryResult = await (0, cloudinary_1.uploadToCloudinary)(fileBuffer, 'documents', false, filename);
                 // Process with Mindee OCR
                 const extractedData = await ocrService_1.ocrService.extractDocumentData(fileBuffer, documentType);
                 // Store Cloudinary URL in driver profile based on document type and side

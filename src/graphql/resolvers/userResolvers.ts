@@ -191,11 +191,27 @@ export const userResolvers = {
       });
 
       // Industrial Logic: Convert string dates to actual Date objects for DB
+      // Note: GraphQL accepts birthDate as an alias for dateOfBirth. Prisma model uses dateOfBirth.
+      // Also ensure we don't pass birthDate down to Prisma (unknown field).
+      const { birthDate, ...inputWithoutBirthDate } = input;
+      const birthDateString = inputWithoutBirthDate.dateOfBirth || birthDate;
+
+      const licenseCategoryUpdate = inputWithoutBirthDate.licenseCategory
+        ? { licenseCategory: inputWithoutBirthDate.licenseCategory }
+        : {};
+
+      const parsedLicenseExpiry = input.licenseExpiry ? new Date(input.licenseExpiry) : null;
+      const parsedLicenseIssueDate = input.licenseIssueDate ? new Date(input.licenseIssueDate) : null;
+      const parsedDob = birthDateString ? new Date(birthDateString) : null;
+
       const dataToSave = {
-        ...input,
-        licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : null,
-        licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : null,
-        dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
+        ...inputWithoutBirthDate,
+        ...licenseCategoryUpdate,
+        licenseExpiry: parsedLicenseExpiry,
+        licenseIssueDate: parsedLicenseIssueDate,
+        dateOfBirth: parsedDob,
+        restrictsToAutomatic: typeof inputWithoutBirthDate.restrictsToAutomatic === 'boolean' ? inputWithoutBirthDate.restrictsToAutomatic : false,
+        licenseCategories: Array.isArray(inputWithoutBirthDate.licenseCategories) ? inputWithoutBirthDate.licenseCategories : undefined,
         // Preserve existing Cloudinary URLs
         licenseFrontUrl: existingProfile?.licenseFrontUrl,
         licenseFrontPublicId: existingProfile?.licenseFrontPublicId,
@@ -214,46 +230,64 @@ export const userResolvers = {
         create: { userId: context.userId, ...dataToSave }
       });
 
-      // Update verification status to VERIFIED_BY_AI since user has completed verification
+      // Submission is admin-gated: mark profile as pending review
       await prisma.driverProfile.update({
         where: { id: profile.id },
-        data: { status: 'VERIFIED_BY_AI' }
+        data: { status: 'PENDING_REVIEW' }
       });
 
-      // Find and update the user's AWAITING_VERIFICATION booking to AWAITING_PAYMENT
+      // Find the user's AWAITING_VERIFICATION booking (if any) so we can validate policies.
       const pendingBooking = await prisma.booking.findFirst({
         where: {
           userId: context.userId,
           status: 'AWAITING_VERIFICATION'
+        },
+        include: {
+          car: { select: { transmission: true } }
         }
       });
 
+      // Policy validations that depend on booking context
       if (pendingBooking) {
-        await prisma.booking.update({
-          where: { id: pendingBooking.id },
-          data: { status: 'AWAITING_PAYMENT' }
-        });
+        // Block manual transmission cars if driver is restricted to automatic
+        if (dataToSave.restrictsToAutomatic === true && pendingBooking.car?.transmission === 'MANUAL') {
+          throw new Error('Your driving license indicates Code 78 (automatic only). You cannot rent a manual transmission car.');
+        }
 
-        // Log the booking status change
-        await prisma.auditLog.create({
-          data: {
-            userId: context.userId,
-            action: 'BOOKING_STATUS_UPDATED',
-            details: {
-              bookingId: pendingBooking.id,
-              previousStatus: 'AWAITING_VERIFICATION',
-              newStatus: 'AWAITING_PAYMENT',
-              reason: 'Driver verification completed'
-            }
-          }
-        });
+        // Block if license expires before booking end date
+        if (parsedLicenseExpiry && pendingBooking.endDate && parsedLicenseExpiry < new Date(pendingBooking.endDate)) {
+          throw new Error('Your driving license expires before the end of this booking. Please upload a valid license.');
+        }
       }
+
+      // Compute young driver flag for profile only (booking surcharge is applied at admin approval time)
+      let computedIsYoungDriver = false;
+      if (parsedDob && !Number.isNaN(parsedDob.getTime())) {
+        const platformSettings = await prisma.platformSettings.findFirst();
+        const minAge = platformSettings?.youngDriverMinAge || 25;
+
+        const today = new Date();
+        let age = today.getFullYear() - parsedDob.getFullYear();
+        const monthDiff = today.getMonth() - parsedDob.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < parsedDob.getDate())) {
+          age--;
+        }
+
+        if (age < minAge) {
+          computedIsYoungDriver = true;
+        }
+      }
+
+      await prisma.driverProfile.update({
+        where: { id: profile.id },
+        data: { isYoungDriver: computedIsYoungDriver }
+      });
 
       // Log the profile upload
       await prisma.auditLog.create({
         data: {
           userId: context.userId,
-          action: 'DRIVER_PROFILE_VERIFIED',
+          action: 'DRIVER_PROFILE_SUBMITTED',
           details: {
             profileId: profile.id,
             bookingId: pendingBooking?.id
@@ -273,6 +307,44 @@ export const userResolvers = {
         data: { status, verificationNote: note }
       });
 
+      // When admin approves, transition booking to payment stage and apply young driver surcharge.
+      if (status === 'VERIFIED_BY_ADMIN') {
+        const booking = await prisma.booking.findFirst({
+          where: { userId, status: 'AWAITING_VERIFICATION' },
+          include: { user: { include: { driverProfile: true } } }
+        });
+
+        if (booking) {
+          const platformSettings = await prisma.platformSettings.findFirst();
+          const minAge = platformSettings?.youngDriverMinAge || 25;
+          const fee = platformSettings?.youngDriverFee || 30.0;
+
+          let surcharge = 0;
+          const dob = booking.user?.driverProfile?.dateOfBirth ? new Date(booking.user.driverProfile.dateOfBirth) : null;
+          if (dob && !Number.isNaN(dob.getTime())) {
+            const today = new Date();
+            let age = today.getFullYear() - dob.getFullYear();
+            const monthDiff = today.getMonth() - dob.getMonth();
+            if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+              age--;
+            }
+            if (age < minAge) {
+              surcharge = fee;
+            }
+          }
+
+          const baseTotal = booking.totalFinalPrice || booking.totalPrice;
+          await prisma.booking.update({
+            where: { id: booking.id },
+            data: {
+              status: 'AWAITING_PAYMENT',
+              surchargeAmount: surcharge,
+              totalFinalPrice: baseTotal + surcharge
+            }
+          });
+        }
+      }
+
       // Log Admin Action
       await prisma.auditLog.create({
         data: { 
@@ -290,11 +362,12 @@ export const userResolvers = {
       isAuthenticated(context);
 
       try {
-        // Convert GraphQL Upload to Buffer
+        // Convert GraphQL Upload to Buffer and Stream
         const { createReadStream, filename, mimetype } = await file;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
 
+        // Read all chunks to create buffer for OCR
         for await (const chunk of stream) {
           chunks.push(chunk);
         }
@@ -306,13 +379,17 @@ export const userResolvers = {
           throw new Error('Only image files are supported for OCR processing');
         }
 
-        // Upload to Cloudinary for storage (following existing pattern)
-        const cloudinaryResult = await uploadToCloudinary(fileBuffer, 'documents', filename);
+        // Upload to Cloudinary for storage (pass buffer, function now handles it)
+        const cloudinaryResult = await uploadToCloudinary(fileBuffer, 'documents', false, filename);
 
-        // Process with Mindee OCR
+        // Normalize documentType coming from frontend
+        const normalizedDocumentType = documentType === 'cni' ? 'id' : documentType;
+
+        // Process with Gemini OCR
         const extractedData = await ocrService.extractDocumentData(
           fileBuffer,
-          documentType as 'license' | 'id' | 'address' | undefined
+          normalizedDocumentType as 'license' | 'id' | 'address' | undefined,
+          (side as 'front' | 'back' | undefined)
         );
 
         // Store Cloudinary URL in driver profile based on document type and side
@@ -320,7 +397,7 @@ export const userResolvers = {
           status: 'PENDING_REVIEW'
         };
 
-        switch (documentType) {
+        switch (normalizedDocumentType) {
           case 'license':
             if (side === 'back') {
               urlUpdateData.licenseBackUrl = cloudinaryResult.secure_url;
@@ -329,6 +406,19 @@ export const userResolvers = {
               // Default to front for license
               urlUpdateData.licenseFrontUrl = cloudinaryResult.secure_url;
               urlUpdateData.licenseFrontPublicId = cloudinaryResult.public_id;
+            }
+
+            if (extractedData.licenseNumber) {
+              urlUpdateData.licenseNumber = extractedData.licenseNumber;
+            }
+            if (extractedData.licenseCategory) {
+              urlUpdateData.licenseCategory = extractedData.licenseCategory;
+            }
+            if (Array.isArray(extractedData.licenseCategories) && extractedData.licenseCategories.length) {
+              urlUpdateData.licenseCategories = extractedData.licenseCategories;
+            }
+            if (typeof extractedData.restrictsToAutomatic === 'boolean') {
+              urlUpdateData.restrictsToAutomatic = extractedData.restrictsToAutomatic;
             }
             break;
           case 'id':
@@ -366,7 +456,11 @@ export const userResolvers = {
           }
         });
 
-        return extractedData;
+        const safeExtractedData: any = { ...extractedData };
+        if (!safeExtractedData.licenseCategory) {
+          delete safeExtractedData.licenseCategory;
+        }
+        return safeExtractedData;
 
       } catch (error) {
         console.error('OCR Processing Error:', error);

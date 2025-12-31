@@ -89,6 +89,14 @@ enum VerificationStatus {
   REJECTED
 }
 
+ enum LicenseCategory {
+   AM
+   A
+   B
+   C
+   D
+ }
+
 enum BookingType {
   RENTAL      // Paid rental
   REPLACEMENT // Free courtesy car
@@ -170,10 +178,13 @@ model DriverProfile {
   licenseNumber        String?            @unique
   licenseIssueDate     DateTime?
   licenseExpiry        DateTime?
+  licenseCategory      LicenseCategory?
+  licenseCategories    LicenseCategory[]
+  restrictsToAutomatic Boolean            @default(false)
   idProofNumber        String?
   address              String?
   dateOfBirth          DateTime?
-  
+  isYoungDriver        Boolean           @default(false)
   
   // Cloudinary URLs (Private/Authenticated)
   licenseFrontUrl      String?
@@ -252,6 +263,8 @@ model Car {
   pricePerKm      Float?
   pricePerDay     Float?
   depositAmount   Float            @default(0) // Security Deposit
+
+  requiredLicenseCategory LicenseCategory @default(B)
 
   critAirRating   CritAirCategory
   status          CarStatus        @default(AVAILABLE)

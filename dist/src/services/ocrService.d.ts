@@ -8,17 +8,21 @@ interface ExtractedDocumentData {
 declare class OCRService {
     private client;
     constructor();
+    private extractNameFromReceipt;
     extractDocumentData(fileBuffer: Buffer, documentType?: 'license' | 'id' | 'address'): Promise<ExtractedDocumentData>;
+    private extractLicenseNumberFromText;
+    private extractDateFromText;
+    private isValidDateFormat;
+    private extractIdNumberFromText;
+    private extractExpiryDateFromText;
+    private extractBirthDateFromText;
     private extractDriverLicenseData;
     private extractIdCardData;
     private extractAddressData;
     private extractGenericData;
     private extractNameFromText;
     private extractDocumentIdFromText;
-    private extractDateFromText;
     private extractAddressFromText;
-    private isValidDate;
-    private formatDate;
 }
 export declare const ocrService: OCRService;
 export { ExtractedDocumentData };

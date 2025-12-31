@@ -9,6 +9,14 @@ export const userTypeDefs = gql`
     SUPPORT
   }
 
+  enum LicenseCategory {
+    AM
+    A
+    B
+    C
+    D
+  }
+
   enum VerificationStatus {
     NOT_UPLOADED
     PENDING_REVIEW
@@ -24,9 +32,13 @@ export const userTypeDefs = gql`
     licenseNumber: String
     licenseIssueDate: String
     licenseExpiry: String
+    licenseCategory: LicenseCategory
+    licenseCategories: [LicenseCategory!]
+    restrictsToAutomatic: Boolean
     idProofNumber: String
     address: String
     dateOfBirth: String
+    isYoungDriver: Boolean
     licenseFrontUrl: String
     licenseBackUrl: String
     idProofUrl: String
@@ -43,9 +55,9 @@ export const userTypeDefs = gql`
 
   type User {
     id: ID!
-    username: String!      # ✅ Added username
+    username: String!      # 
     email: String!
-    phoneNumber: String!   # ✅ Changed to Required (!)
+    phoneNumber: String!   # 
     role: Role!
     isEmailVerified: Boolean!
     googleId: String
@@ -69,20 +81,30 @@ export const userTypeDefs = gql`
   }
 
   type ExtractedDocumentData {
+    firstName: String
+    lastName: String
     fullName: String
     documentId: String
+    licenseNumber: String
     expiryDate: String
+    documentDate: String
+    issueDate: String
     birthDate: String
     address: String
+    licenseCategory: LicenseCategory
+    licenseCategories: [LicenseCategory!]
+    restrictsToAutomatic: Boolean
+    fallbackUsed: Boolean
+    isQuotaExceeded: Boolean
   }
 
   # --- Inputs ---
-  # ✅ RegisterInput simplified as per your request
+  # 
   input RegisterInput {
-    username: String!      # ✅ Added
+    username: String!      # 
     email: String!
     password: String!
-    phoneNumber: String!   # ✅ Required
+    phoneNumber: String!   # 
   }
 
   input LoginInput {
@@ -91,7 +113,7 @@ export const userTypeDefs = gql`
   }
 
   input UpdateUserInput {
-    username: String       # ✅ Updated
+    username: String       # 
     phoneNumber: String
   }
 
@@ -99,9 +121,14 @@ export const userTypeDefs = gql`
     licenseNumber: String
     licenseIssueDate: String
     licenseExpiry: String
+    licenseCategory: LicenseCategory
+    licenseCategories: [LicenseCategory!]
+    restrictsToAutomatic: Boolean
     idProofNumber: String
     address: String
     dateOfBirth: String
+    birthDate: String
+    isYoungDriver: Boolean
     licenseFrontUrl: String
     licenseFrontPublicId: String
     licenseBackUrl: String

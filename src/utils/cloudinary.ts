@@ -102,7 +102,7 @@ export function getCloudinaryDiagnostics() {
  * Upload with fallback to local disk when Cloudinary is unavailable
  */
 export const uploadToCloudinary = async (
-  fileStream: any, 
+  fileInput: Buffer | any,
   folder: string,
   isPrivate: boolean = false,
   originalFilename?: string
@@ -116,12 +116,20 @@ export const uploadToCloudinary = async (
     const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
     const fullPath = path.join(uploadsDir, safeName);
 
-    await new Promise((resolve, reject) => {
-      const ws = fs.createWriteStream(fullPath);
-      fileStream.pipe(ws);
-      ws.on('finish', resolve);
-      ws.on('error', reject);
-    });
+    if (Buffer.isBuffer(fileInput)) {
+      // If input is a Buffer, write it directly
+      fs.writeFileSync(fullPath, fileInput);
+    } else if (fileInput && typeof fileInput.pipe === 'function') {
+      // If input is a Stream, pipe it
+      await new Promise((resolve, reject) => {
+        const ws = fs.createWriteStream(fullPath);
+        fileInput.pipe(ws);
+        ws.on('finish', resolve);
+        ws.on('error', reject);
+      });
+    } else {
+      throw new Error('Unsupported file input type');
+    }
 
     const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
     const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
@@ -133,7 +141,7 @@ export const uploadToCloudinary = async (
     const stream = cloudinary.uploader.upload_stream(
       {
         folder: `car_rental_industrial/${folder}`,
-        type: isPrivate ? 'authenticated' : 'upload', 
+        type: isPrivate ? 'authenticated' : 'upload',
         resource_type: 'auto',
       },
       async (error, result) => {
@@ -153,20 +161,36 @@ export const uploadToCloudinary = async (
             const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
             const fullPath = path.join(uploadsDir, safeName);
 
-            // We need to pipe the original stream again - if the stream has been consumed by Cloudinary upload_stream, we cannot re-use it.
-            // In most upload libraries, the fileStream is a fresh stream from createReadStream(), so callers should pass a new stream on fallback.
-            // As a safety, reject when stream is already consumed and tell caller to retry the upload.
-            if (!fileStream.readable) {
-              console.error('Original file stream is not readable for local fallback. Please retry the upload.');
-              return reject(new Error('Upload failed and fallback is not available; retry the upload.'));
-            }
+            // Handle both Buffer and Stream for fallback
+            if (Buffer.isBuffer(fileInput)) {
+              // If input was a Buffer, write it directly
+              fs.writeFileSync(fullPath, fileInput);
+            } else if (fileInput && typeof fileInput.pipe === 'function') {
+              // If input was a Stream, check if it's still readable
+              if (!fileInput.readable) {
+                console.error('Original file stream is not readable for local fallback. Please retry the upload.');
+                return reject(new Error('Upload failed and fallback is not available; retry the upload.'));
+              }
 
-            await new Promise((res, rej) => {
-              const ws = fs.createWriteStream(fullPath);
-              fileStream.pipe(ws);
-              ws.on('finish', res);
-              ws.on('error', rej);
-            });
+              if (Buffer.isBuffer(fileInput)) {
+                // If input was a Buffer, write it directly
+                fs.writeFileSync(fullPath, fileInput);
+              } else if (fileInput && typeof fileInput.pipe === 'function') {
+                // If input was a Stream, pipe it
+                await new Promise((res, rej) => {
+                  const ws = fs.createWriteStream(fullPath);
+                  fileInput.pipe(ws);
+                  ws.on('finish', res);
+                  ws.on('error', rej);
+                });
+              } else {
+                console.error('Unsupported file input type for fallback');
+                return reject(new Error('Unsupported file input type'));
+              }
+            } else {
+              console.error('Unsupported file input type for fallback');
+              return reject(new Error('Unsupported file input type'));
+            }
 
             const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
             const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
@@ -181,7 +205,18 @@ export const uploadToCloudinary = async (
       }
     );
 
-    fileStream.pipe(stream); 
+    // Handle both Buffer and Stream inputs
+    if (Buffer.isBuffer(fileInput)) {
+      // If input is a Buffer, create a readable stream from it
+      const { Readable } = require('stream');
+      const readableStream = Readable.from(fileInput);
+      readableStream.pipe(stream);
+    } else if (fileInput && typeof fileInput.pipe === 'function') {
+      // If input is a Stream, pipe it directly
+      fileInput.pipe(stream);
+    } else {
+      reject(new Error('Unsupported file input type'));
+    }
   });
 };
 
