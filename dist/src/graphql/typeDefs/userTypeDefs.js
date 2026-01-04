@@ -8,55 +8,103 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   enum Role {
     USER
     ADMIN
-    SUPPORT
   }
 
   enum VerificationStatus {
     NOT_UPLOADED
-    PENDING_REVIEW
-    VERIFIED_BY_AI
-    VERIFIED_BY_ADMIN
+    PENDING
+    APPROVED
     REJECTED
   }
 
+  enum LicenseCategory {
+    AM
+    A
+    B
+    C
+    D
+  }
+
+  enum DocumentType {
+    LICENSE
+    ID_CARD
+    ADDRESS_PROOF
+  }
+
+  enum DocumentSide {
+    FRONT
+    BACK
+  }
+
   # --- Types ---
-  type DriverProfile {
+  type CarAvailability {
+    available: Boolean!
+    conflictingBookings: [Booking!]
+  }
+  type DocumentVerification {
     id: ID!
     userId: ID!
-    licenseNumber: String
-    licenseIssueDate: String
-    licenseExpiry: String
-    idProofNumber: String
-    address: String
-    dateOfBirth: String
+    user: User!
+
+    # Documents
     licenseFrontUrl: String
     licenseBackUrl: String
-    idProofUrl: String
+    idCardUrl: String
     addressProofUrl: String
-    licenseFrontPublicId: String
-    licenseBackPublicId: String
-    idProofPublicId: String
-    addressProofPublicId: String
+
+    # Extracted Data
+    licenseNumber: String
+    licenseExpiry: String
+    licenseCategory: LicenseCategory
+    idNumber: String
+    idExpiry: String
+
     status: VerificationStatus!
-    verificationNote: String
+    aiMetadata: JSON
+    rejectionReason: String
+    verifiedAt: String
     createdAt: String!
     updatedAt: String!
+  }
+
+  type OCRResult {
+    firstName: String
+    lastName: String
+    fullName: String
+    documentId: String
+    licenseNumber: String
+    expiryDate: String
+    documentDate: String
+    issueDate: String
+    birthDate: String
+    address: String
+    licenseCategory: LicenseCategory
+    licenseCategories: [LicenseCategory!]
+    restrictsToAutomatic: Boolean
+    fallbackUsed: Boolean
+    isQuotaExceeded: Boolean
   }
 
   type User {
     id: ID!
-    username: String!      # ✅ Added username
     email: String!
-    phoneNumber: String!   # ✅ Changed to Required (!)
+    fullName: String
+    password: String
+    phoneNumber: String
+    avatarUrl: String
+    
+    # Personal Info
+    dateOfBirth: String
+    fullAddress: String
+
     role: Role!
-    isEmailVerified: Boolean!
+    facebookId: String
+    appleId: String
     googleId: String
+    verification: DocumentVerification
+    bookings: [Booking!]
     createdAt: String!
     updatedAt: String!
-    
-    # Relations
-    driverProfile: DriverProfile
-    bookings: [Booking!]
   }
 
   type AuthPayload {
@@ -65,26 +113,12 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     message: String
   }
 
-  type VerifyResponse {
-    success: Boolean!
-    message: String!
-  }
-
-  type ExtractedDocumentData {
-    fullName: String
-    documentId: String
-    expiryDate: String
-    birthDate: String
-    address: String
-  }
-
   # --- Inputs ---
-  # ✅ RegisterInput simplified as per your request
   input RegisterInput {
-    username: String!      # ✅ Added
     email: String!
+    fullName: String
     password: String!
-    phoneNumber: String!   # ✅ Required
+    phoneNumber: String
   }
 
   input LoginInput {
@@ -93,25 +127,24 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   }
 
   input UpdateUserInput {
-    username: String       # ✅ Updated
+    fullName: String
     phoneNumber: String
+    avatarUrl: String
+    dateOfBirth: String
+    fullAddress: String
   }
 
-  input DriverProfileInput {
-    licenseNumber: String
-    licenseIssueDate: String
-    licenseExpiry: String
-    idProofNumber: String
-    address: String
-    dateOfBirth: String
+  input DocumentVerificationInput {
     licenseFrontUrl: String
-    licenseFrontPublicId: String
     licenseBackUrl: String
-    licenseBackPublicId: String
-    idProofUrl: String
-    idProofPublicId: String
+    idCardUrl: String
     addressProofUrl: String
-    addressProofPublicId: String
+    
+    licenseNumber: String
+    licenseExpiry: String
+    licenseCategory: LicenseCategory
+    idNumber: String
+    idExpiry: String
   }
 
   # --- Queries ---
@@ -119,7 +152,10 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     me: User
     user(id: ID!): User
     users: [User!]!
-    myDriverProfile: DriverProfile
+    myVerification: DocumentVerification
+    availableCars(startDate: String!, endDate: String!): [Car!]!
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailability!
+    bookingPayment(bookingId: ID!): JSON
   }
 
   # --- Mutations ---
@@ -127,11 +163,6 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     # Authentication
     register(input: RegisterInput!): AuthPayload!
     login(input: LoginInput!): AuthPayload!
-    
-    # OTP Verification
-    verifyOTP(email: String!, otp: String!): VerifyResponse!
-    
-    # Google Auth (NextAuth Bridge)
     googleLogin(idToken: String!): AuthPayload!
     
     # User Management
@@ -139,12 +170,15 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     updateUserRole(id: ID!, role: Role!): User!
     deleteUser(id: ID!): Boolean!
     
-    # Driver Profile & KYC
-    createOrUpdateDriverProfile(input: DriverProfileInput!): DriverProfile!
-    verifyDriverProfile(userId: ID!, status: VerificationStatus!, note: String): DriverProfile!
+    # Document Verification
+    createOrUpdateVerification(input: DocumentVerificationInput!): DocumentVerification!
+    verifyDocument(userId: ID!, status: VerificationStatus!, reason: String): DocumentVerification!
 
-    # OCR Document Processing
-    processDocumentOCR(file: Upload!, documentType: String, side: String): ExtractedDocumentData!
+    # OCR Processing
+    processDocumentOCR(file: Upload!, documentType: DocumentType, side: DocumentSide): OCRResult!
+
+    # Payment Processing
+    updatePaymentStatus(bookingId: ID!, status: String!): JSON
   }
 `;
 //# sourceMappingURL=userTypeDefs.js.map

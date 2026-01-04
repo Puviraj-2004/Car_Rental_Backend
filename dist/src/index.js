@@ -3,7 +3,6 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// backend/src/index.ts
 const server_1 = require("@apollo/server");
 const express4_1 = require("@apollo/server/express4");
 const drainHttpServer_1 = require("@apollo/server/plugin/drainHttpServer");
@@ -14,6 +13,7 @@ const body_parser_1 = __importDefault(require("body-parser"));
 const graphql_upload_ts_1 = require("graphql-upload-ts");
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+// Load env before imports
 dotenv_1.default.config();
 const database_1 = __importDefault(require("./utils/database"));
 const typeDefs_1 = __importDefault(require("./graphql/typeDefs"));
@@ -30,46 +30,53 @@ async function startServer() {
         introspection: true,
     });
     await server.start();
-    // ✅ முக்கியமான வரிசை: CORS மற்றும் Upload முதலில் வர வேண்டும்
-    app.use((0, cors_1.default)());
-    // 📸 இமேஜ் அப்லோடுக்கு இது மிக அவசியம்
+    // 1. Middleware Order: CORS & Uploads first
+    app.use((0, cors_1.default)({
+        origin: [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://127.0.0.1:3000',
+            process.env.FRONTEND_URL || ''
+        ].filter(Boolean),
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Apollo-Require-Preflight']
+    }));
     app.use((0, graphql_upload_ts_1.graphqlUploadExpress)({ maxFileSize: 10000000, maxFiles: 10 }));
+    // 2. Body Parsing & Static Files
     app.use(body_parser_1.default.json());
     app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
-    // Diagnostic HTTP routes to confirm Cloudinary env at runtime (non-sensitive values only)
+    // 3. Diagnostics (Cloudinary)
     app.get('/diag/cloudinary', (_req, res) => {
         try {
             const raw = process.env.CLOUDINARY_CLOUD_NAME;
             const cloudLib = require('./utils/cloudinary');
-            const effective = (cloudLib && cloudLib.default && cloudLib.default.config && cloudLib.default.config().cloud_name) || null;
+            const effective = (cloudLib?.default?.config?.().cloud_name) || null;
             res.json({ rawCloudName: raw || null, effectiveCloudName: effective });
         }
         catch (e) {
-            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostic info', detail: e.message });
+            res.status(500).json({ error: 'Failed to fetch cloudinary info', detail: e.message });
         }
     });
-    // Full diagnostics including ready state and last error
     app.get('/diag/cloudinary/full', (_req, res) => {
         try {
             const { getCloudinaryDiagnostics } = require('./utils/cloudinary');
-            const diag = getCloudinaryDiagnostics();
-            res.json(diag);
+            res.json(getCloudinaryDiagnostics());
         }
         catch (e) {
-            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostics', detail: e.message });
+            res.status(500).json({ error: 'Diagnostic failed', detail: e.message });
         }
     });
-    // Trigger an immediate revalidation of Cloudinary credentials (useful after updating .env and restarting)
     app.post('/diag/cloudinary/validate', async (_req, res) => {
         try {
             const { revalidateCloudinaryCredentials } = require('./utils/cloudinary');
-            const diag = await revalidateCloudinaryCredentials();
-            res.json(diag);
+            res.json(await revalidateCloudinaryCredentials());
         }
         catch (e) {
-            res.status(500).json({ error: 'Failed to revalidate Cloudinary credentials', detail: e.message });
+            res.status(500).json({ error: 'Validation failed', detail: e.message });
         }
     });
+    // 4. GraphQL Endpoint
     app.use('/graphql', (0, express4_1.expressMiddleware)(server, {
         context: async ({ req }) => {
             const context = { prisma: database_1.default };
@@ -82,7 +89,6 @@ async function startServer() {
                     context.role = decoded.role;
                 }
                 catch (error) {
-                    // Token verification failed
                 }
             }
             return context;
@@ -91,10 +97,10 @@ async function startServer() {
     const PORT = process.env.PORT || 4000;
     await new Promise((resolve) => httpServer.listen({ port: parseInt(PORT.toString()) }, resolve));
     console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
-    // Start the expiration service for automatic booking cancellation
+    // 5. Start Background Services
     expirationService_1.expirationService.startExpirationService();
 }
 startServer().catch(error => {
-    console.error('Error starting server:', error);
+    console.error('❌ Error starting server:', error);
 });
 //# sourceMappingURL=index.js.map

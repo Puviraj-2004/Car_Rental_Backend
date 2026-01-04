@@ -1,4 +1,3 @@
-// backend/src/index.ts
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
 import { ApolloServerPluginDrainHttpServer } from '@apollo/server/plugin/drainHttpServer';
@@ -10,6 +9,7 @@ import { graphqlUploadExpress } from 'graphql-upload-ts';
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Load env before imports
 dotenv.config();
 
 import prisma from './utils/database';
@@ -31,49 +31,56 @@ async function startServer() {
 
   await server.start();
 
-  // ✅ முக்கியமான வரிசை: CORS மற்றும் Upload முதலில் வர வேண்டும்
-  app.use(cors<cors.CorsRequest>());
+  // 1. Middleware Order: CORS & Uploads first
+  app.use(cors<cors.CorsRequest>({
+    origin: [
+      'http://localhost:3000', 
+      'http://localhost:3001', 
+      'http://127.0.0.1:3000',
+      process.env.FRONTEND_URL || ''
+    ].filter(Boolean),
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Apollo-Require-Preflight']
+  }));
   
-  // 📸 இமேஜ் அப்லோடுக்கு இது மிக அவசியம்
   app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
 
+  // 2. Body Parsing & Static Files
   app.use(bodyParser.json());
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
-  // Diagnostic HTTP routes to confirm Cloudinary env at runtime (non-sensitive values only)
+  // 3. Diagnostics (Cloudinary)
   app.get('/diag/cloudinary', (_req, res) => {
     try {
       const raw = process.env.CLOUDINARY_CLOUD_NAME;
       const cloudLib = require('./utils/cloudinary');
-      const effective = (cloudLib && cloudLib.default && cloudLib.default.config && cloudLib.default.config().cloud_name) || null;
+      const effective = (cloudLib?.default?.config?.().cloud_name) || null;
       res.json({ rawCloudName: raw || null, effectiveCloudName: effective });
     } catch (e: any) {
-      res.status(500).json({ error: 'Failed to fetch cloudinary diagnostic info', detail: e.message });
+      res.status(500).json({ error: 'Failed to fetch cloudinary info', detail: e.message });
     }
   });
 
-  // Full diagnostics including ready state and last error
   app.get('/diag/cloudinary/full', (_req, res) => {
     try {
       const { getCloudinaryDiagnostics } = require('./utils/cloudinary');
-      const diag = getCloudinaryDiagnostics();
-      res.json(diag);
+      res.json(getCloudinaryDiagnostics());
     } catch (e: any) {
-      res.status(500).json({ error: 'Failed to fetch cloudinary diagnostics', detail: e.message });
+      res.status(500).json({ error: 'Diagnostic failed', detail: e.message });
     }
   });
 
-  // Trigger an immediate revalidation of Cloudinary credentials (useful after updating .env and restarting)
   app.post('/diag/cloudinary/validate', async (_req, res) => {
     try {
       const { revalidateCloudinaryCredentials } = require('./utils/cloudinary');
-      const diag = await revalidateCloudinaryCredentials();
-      res.json(diag);
+      res.json(await revalidateCloudinaryCredentials());
     } catch (e: any) {
-      res.status(500).json({ error: 'Failed to revalidate Cloudinary credentials', detail: e.message });
+      res.status(500).json({ error: 'Validation failed', detail: e.message });
     }
   });
 
+  // 4. GraphQL Endpoint
   app.use('/graphql',
     expressMiddleware(server, {
       context: async ({ req }) => {
@@ -87,7 +94,6 @@ async function startServer() {
             context.userId = decoded.userId;
             context.role = decoded.role;
           } catch (error) {
-            // Token verification failed
           }
         }
         return context;
@@ -100,10 +106,10 @@ async function startServer() {
 
   console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
 
-  // Start the expiration service for automatic booking cancellation
+  // 5. Start Background Services
   expirationService.startExpirationService();
 }
 
 startServer().catch(error => {
-  console.error('Error starting server:', error);
+  console.error('❌ Error starting server:', error);
 });

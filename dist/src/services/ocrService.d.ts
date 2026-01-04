@@ -1,29 +1,42 @@
-interface ExtractedDocumentData {
+export interface ExtractedDocumentData {
+    firstName?: string;
+    lastName?: string;
     fullName?: string;
     documentId?: string;
+    licenseNumber?: string;
     expiryDate?: string;
     birthDate?: string;
     address?: string;
+    licenseCategory?: string;
+    licenseCategories?: string[];
+    restrictsToAutomatic?: boolean;
+    documentDate?: string;
+    issueDate?: string;
+    fallbackUsed?: boolean;
+    isQuotaExceeded?: boolean;
 }
-declare class OCRService {
-    private client;
+export declare class OCRService {
+    private genAI;
+    private model;
     constructor();
-    private extractNameFromReceipt;
-    extractDocumentData(fileBuffer: Buffer, documentType?: 'license' | 'id' | 'address'): Promise<ExtractedDocumentData>;
-    private extractLicenseNumberFromText;
-    private extractDateFromText;
-    private isValidDateFormat;
-    private extractIdNumberFromText;
-    private extractExpiryDateFromText;
-    private extractBirthDateFromText;
-    private extractDriverLicenseData;
-    private extractIdCardData;
-    private extractAddressData;
-    private extractGenericData;
+    extractDocumentData(fileBuffer: Buffer, documentType?: 'license' | 'id' | 'address', side?: 'front' | 'back'): Promise<ExtractedDocumentData>;
+    private createGeminiPrompt;
+    private sanitizeExtractedData;
+    private normalizeLicenseCategories;
+    private pickHighestCategory;
+    private normalizeLicenseCategory;
+    private normalizeDateToIso;
+    private fixOcrYear;
+    private combineGeminiNameFields;
+    private extractLicenseDataWithFallback;
+    private extractIdCardDataWithFallback;
+    private extractAddressDataWithFallback;
+    private fallbackRegexExtraction;
     private extractNameFromText;
-    private extractDocumentIdFromText;
+    private extractDocumentNumberFromText;
+    private extractDateFromText;
+    private extractBirthDateFromText;
     private extractAddressFromText;
 }
 export declare const ocrService: OCRService;
-export { ExtractedDocumentData };
 //# sourceMappingURL=ocrService.d.ts.map

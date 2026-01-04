@@ -1,2 +1,0 @@
--- CreateEnum
-CREATE TYPE "CritAirCategory" AS ENUM ('CRIT_AIR_0', 'CRIT_AIR_1', 'CRIT_AIR_2', 'CRIT_AIR_3', 'CRIT_AIR_4', 'CRIT_AIR_5', 'NO_STICKER');

@@ -7,108 +7,54 @@ exports.userResolvers = void 0;
 const google_auth_library_1 = require("google-auth-library");
 const database_1 = __importDefault(require("../../utils/database"));
 const auth_1 = require("../../utils/auth");
-const sendEmail_1 = require("../../utils/sendEmail");
-const validation_1 = require("../../utils/validation");
 const authguard_1 = require("../../utils/authguard");
-const cloudinary_1 = require("../../utils/cloudinary");
 const ocrService_1 = require("../../services/ocrService");
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+const USER_INCLUDES = { verification: true, bookings: true };
 exports.userResolvers = {
     Query: {
         me: async (_, __, context) => {
             (0, authguard_1.isAuthenticated)(context);
             return await database_1.default.user.findUnique({
                 where: { id: context.userId },
-                include: { driverProfile: true, bookings: true }
+                include: USER_INCLUDES
             });
         },
         user: async (_, { id }, context) => {
-            (0, authguard_1.isAdmin)(context); // பொதுவாக அட்மின் மட்டுமே பிற யூசர்களைப் பார்க்க வேண்டும்
-            return await database_1.default.user.findUnique({
-                where: { id },
-                include: { driverProfile: true, bookings: true }
-            });
+            (0, authguard_1.isAdmin)(context);
+            return await database_1.default.user.findUnique({ where: { id }, include: USER_INCLUDES });
         },
         users: async (_, __, context) => {
             (0, authguard_1.isAdmin)(context);
-            return await database_1.default.user.findMany({
-                include: { driverProfile: true, bookings: true }
-            });
+            return await database_1.default.user.findMany({ include: USER_INCLUDES });
         },
-        myDriverProfile: async (_, __, context) => {
+        myVerification: async (_, __, context) => {
             (0, authguard_1.isAuthenticated)(context);
-            return await database_1.default.driverProfile.findUnique({
-                where: { userId: context.userId }
-            });
+            return await database_1.default.documentVerification.findUnique({ where: { userId: context.userId } });
         }
     },
     Mutation: {
-        // 1. Register: simplified & added Audit Log
         register: async (_, { input }) => {
-            const { email, username, password, phoneNumber } = input;
-            const existingUser = await database_1.default.user.findFirst({
-                where: { OR: [{ email }, { username }] }
-            });
-            if (existingUser) {
-                throw new Error('User already exists with this email or username');
-            }
-            const passwordValidation = (0, validation_1.validatePassword)(password);
-            if (!passwordValidation.isValid) {
-                throw new Error(`Password weak: ${passwordValidation.errors.join(', ')}`);
-            }
+            const { email, password, phoneNumber, fullName } = input;
+            const existingUser = await database_1.default.user.findUnique({ where: { email } });
+            if (existingUser)
+                throw new Error('User already exists');
             const hashedPassword = await (0, auth_1.hashPassword)(password);
-            const generatedOTP = Math.floor(100000 + Math.random() * 900000).toString();
-            const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
             const user = await database_1.default.user.create({
-                data: {
-                    username,
-                    email,
-                    password: hashedPassword,
-                    phoneNumber,
-                    isEmailVerified: false,
-                    otp: generatedOTP,
-                    otpExpires: otpExpiry,
-                    role: 'USER'
-                }
+                data: { email, password: hashedPassword, phoneNumber, fullName, role: 'USER' }
             });
-            // Send OTP Email
-            await (0, sendEmail_1.sendVerificationEmail)(user.email, generatedOTP).catch(console.error);
-            // Industrial standard: Log the registration
-            await database_1.default.auditLog.create({
-                data: {
-                    userId: user.id,
-                    action: 'USER_REGISTERED',
-                    details: { email: user.email }
-                }
-            });
-            return {
-                token: "", // லாகின் செய்யும் போது மட்டும் டோக்கன் கொடுக்கலாம்
-                user,
-                message: "Registration successful. Please check your email for OTP."
-            };
+            return { token: (0, auth_1.generateToken)(user.id, user.role), user, message: "Registration successful." };
         },
-        // 2. Login: added login check
         login: async (_, { input }) => {
             const { email, password } = input;
-            const user = await database_1.default.user.findUnique({
-                where: { email },
-                include: { driverProfile: true }
-            });
+            const user = await database_1.default.user.findUnique({ where: { email } });
             if (!user || !user.password)
-                throw new Error('Invalid email or password');
-            const isValidPassword = await (0, auth_1.comparePasswords)(password, user.password);
-            if (!isValidPassword)
-                throw new Error('Invalid email or password');
-            if (!user.isEmailVerified)
-                throw new Error('Please verify your email first.');
-            const token = (0, auth_1.generateToken)(user.id, user.role);
-            // Log Login action
-            await database_1.default.auditLog.create({
-                data: { userId: user.id, action: 'USER_LOGIN' }
-            });
-            return { token, user };
+                throw new Error('Invalid credentials');
+            const isValid = await (0, auth_1.comparePasswords)(password, user.password);
+            if (!isValid)
+                throw new Error('Invalid credentials');
+            return { token: (0, auth_1.generateToken)(user.id, user.role), user };
         },
-        // 3. Google Login with Required Field handling
         googleLogin: async (_, { idToken }) => {
             try {
                 const ticket = await googleClient.verifyIdToken({
@@ -118,232 +64,120 @@ exports.userResolvers = {
                 const payload = ticket.getPayload();
                 if (!payload || !payload.email)
                     throw new Error('Invalid Google token');
-                const { email, sub: googleId } = payload;
+                const { email, sub: googleId, name } = payload;
                 let user = await database_1.default.user.findUnique({ where: { email } });
                 if (!user) {
-                    const baseUsername = email.split('@')[0];
                     user = await database_1.default.user.create({
-                        data: {
-                            email,
-                            googleId,
-                            username: `${baseUsername}_${Math.floor(1000 + Math.random() * 9000)}`,
-                            phoneNumber: '0000000000', // Placeholder as it's required!
-                            isEmailVerified: true,
-                            role: 'USER'
-                        }
+                        data: { email, googleId, fullName: name, role: 'USER' }
                     });
                 }
-                const token = (0, auth_1.generateToken)(user.id, user.role);
-                return { token, user, message: "Google login successful" };
+                else if (!user.googleId) {
+                    user = await database_1.default.user.update({
+                        where: { id: user.id },
+                        data: { googleId }
+                    });
+                }
+                return { token: (0, auth_1.generateToken)(user.id, user.role), user, message: "Google login successful" };
             }
             catch (error) {
                 throw new Error('Google authentication failed');
             }
         },
-        // 4. Verify OTP
-        verifyOTP: async (_, { email, otp }) => {
-            const user = await database_1.default.user.findUnique({ where: { email } });
-            if (!user)
-                throw new Error('User not found');
-            if (user.otp !== otp)
-                throw new Error('Invalid OTP');
-            if (user.otpExpires && new Date() > user.otpExpires)
-                throw new Error('OTP expired');
-            await database_1.default.user.update({
-                where: { id: user.id },
-                data: { isEmailVerified: true, otp: null, otpExpires: null }
-            });
-            return { success: true, message: "Email verified successfully." };
-        },
-        // 5. KYC Profile Update - Using proper DateTime conversion
-        createOrUpdateDriverProfile: async (_, { input }, context) => {
+        // 🔥 MAIN LOGIC: AI Verification & Auto Booking Update
+        createOrUpdateVerification: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);
-            // Get existing profile to preserve Cloudinary URLs
-            const existingProfile = await database_1.default.driverProfile.findUnique({
-                where: { userId: context.userId },
-                select: {
-                    licenseFrontUrl: true,
-                    licenseFrontPublicId: true,
-                    licenseBackUrl: true,
-                    licenseBackPublicId: true,
-                    idProofUrl: true,
-                    idProofPublicId: true,
-                    addressProofUrl: true,
-                    addressProofPublicId: true
-                }
+            const existingVerification = await database_1.default.documentVerification.findUnique({
+                where: { userId: context.userId }
             });
-            // Industrial Logic: Convert string dates to actual Date objects for DB
+            // 1. Save Document Data (from Manual or AI input)
             const dataToSave = {
-                ...input,
-                licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : null,
-                licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : null,
-                dateOfBirth: input.dateOfBirth ? new Date(input.dateOfBirth) : null,
-                // Preserve existing Cloudinary URLs
-                licenseFrontUrl: existingProfile?.licenseFrontUrl,
-                licenseFrontPublicId: existingProfile?.licenseFrontPublicId,
-                licenseBackUrl: existingProfile?.licenseBackUrl,
-                licenseBackPublicId: existingProfile?.licenseBackPublicId,
-                idProofUrl: existingProfile?.idProofUrl,
-                idProofPublicId: existingProfile?.idProofPublicId,
-                addressProofUrl: existingProfile?.addressProofUrl,
-                addressProofPublicId: existingProfile?.addressProofPublicId
-                // Don't set status here - it will be updated to VERIFIED_BY_AI below
+                licenseCategory: input.licenseCategory || 'B',
+                licenseFrontUrl: input.licenseFrontUrl || existingVerification?.licenseFrontUrl,
+                licenseBackUrl: input.licenseBackUrl || existingVerification?.licenseBackUrl,
+                idCardUrl: input.idCardUrl || existingVerification?.idCardUrl,
+                addressProofUrl: input.addressProofUrl || existingVerification?.addressProofUrl,
+                licenseNumber: input.licenseNumber || existingVerification?.licenseNumber,
+                licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : existingVerification?.licenseExpiry,
+                idNumber: input.idNumber || existingVerification?.idNumber,
+                idExpiry: input.idExpiry ? new Date(input.idExpiry) : existingVerification?.idExpiry,
+                status: 'PENDING'
             };
-            const profile = await database_1.default.driverProfile.upsert({
+            const verification = await database_1.default.documentVerification.upsert({
                 where: { userId: context.userId },
                 update: dataToSave,
-                create: { userId: context.userId, ...dataToSave }
+                create: { user: { connect: { id: context.userId } }, ...dataToSave }
             });
-            // Update verification status to VERIFIED_BY_AI since user has completed verification
-            await database_1.default.driverProfile.update({
-                where: { id: profile.id },
-                data: { status: 'VERIFIED_BY_AI' }
-            });
-            // Find and update the user's AWAITING_VERIFICATION booking to AWAITING_PAYMENT
-            const pendingBooking = await database_1.default.booking.findFirst({
-                where: {
-                    userId: context.userId,
-                    status: 'AWAITING_VERIFICATION'
-                }
-            });
-            if (pendingBooking) {
-                await database_1.default.booking.update({
-                    where: { id: pendingBooking.id },
-                    data: { status: 'AWAITING_PAYMENT' }
-                });
-                // Log the booking status change
-                await database_1.default.auditLog.create({
+            // 🚀 LOGIC START: If AI/User provided critical info, Auto-Approve & Update Bookings
+            // Minimum Requirement: License Number + License Front Image
+            if (verification.licenseNumber && verification.licenseFrontUrl) {
+                // A. Auto Approve Profile
+                await database_1.default.documentVerification.update({
+                    where: { userId: context.userId },
                     data: {
-                        userId: context.userId,
-                        action: 'BOOKING_STATUS_UPDATED',
-                        details: {
-                            bookingId: pendingBooking.id,
-                            previousStatus: 'AWAITING_VERIFICATION',
-                            newStatus: 'AWAITING_PAYMENT',
-                            reason: 'Driver verification completed'
-                        }
+                        status: 'APPROVED',
+                        verifiedAt: new Date()
                     }
                 });
+                // B. Find "PENDING" bookings for this user
+                const pendingBookings = await database_1.default.booking.findMany({
+                    where: { userId: context.userId, status: 'PENDING' }
+                });
+                // C. Update Booking Status to VERIFIED
+                // Important: Update `updatedAt` to reset the 15-minute payment timer
+                if (pendingBookings.length > 0) {
+                    await database_1.default.booking.updateMany({
+                        where: { userId: context.userId, status: 'PENDING' },
+                        data: { status: 'VERIFIED', updatedAt: new Date() }
+                    });
+                    console.log(`✅ Auto-verified ${pendingBookings.length} bookings for user ${context.userId}`);
+                }
             }
-            // Log the profile upload
-            await database_1.default.auditLog.create({
-                data: {
-                    userId: context.userId,
-                    action: 'DRIVER_PROFILE_VERIFIED',
-                    details: {
-                        profileId: profile.id,
-                        bookingId: pendingBooking?.id
-                    }
-                }
-            });
-            return profile;
+            // 🚀 LOGIC END
+            return verification;
         },
-        // 6. Admin Verification
-        verifyDriverProfile: async (_, { userId, status, note }, context) => {
+        verifyDocument: async (_, { userId, status, reason }, context) => {
             (0, authguard_1.isAdmin)(context);
-            const profile = await database_1.default.driverProfile.update({
+            return await database_1.default.documentVerification.update({
                 where: { userId },
-                data: { status, verificationNote: note }
-            });
-            // Log Admin Action
-            await database_1.default.auditLog.create({
                 data: {
-                    userId: context.userId,
-                    action: `DRIVER_VERIFICATION_${status}`,
-                    details: { targetUserId: userId, note }
+                    status,
+                    rejectionReason: reason,
+                    verifiedAt: status === 'APPROVED' ? new Date() : null
                 }
             });
-            return profile;
         },
-        // OCR Document Processing for Auto-fill
         processDocumentOCR: async (_, { file, documentType, side }, context) => {
             (0, authguard_1.isAuthenticated)(context);
             try {
-                // Convert GraphQL Upload to Buffer and Stream
-                const { createReadStream, filename, mimetype } = await file;
+                const { createReadStream } = await file;
                 const stream = createReadStream();
                 const chunks = [];
-                // Read all chunks to create buffer for OCR
-                for await (const chunk of stream) {
-                    chunks.push(chunk);
-                }
-                const fileBuffer = Buffer.concat(chunks);
-                // Validate file type
-                if (!mimetype.startsWith('image/')) {
-                    throw new Error('Only image files are supported for OCR processing');
-                }
-                // Upload to Cloudinary for storage (pass buffer, function now handles it)
-                const cloudinaryResult = await (0, cloudinary_1.uploadToCloudinary)(fileBuffer, 'documents', false, filename);
-                // Process with Mindee OCR
-                const extractedData = await ocrService_1.ocrService.extractDocumentData(fileBuffer, documentType);
-                // Store Cloudinary URL in driver profile based on document type and side
-                const urlUpdateData = {
-                    status: 'PENDING_REVIEW'
-                };
-                switch (documentType) {
-                    case 'license':
-                        if (side === 'back') {
-                            urlUpdateData.licenseBackUrl = cloudinaryResult.secure_url;
-                            urlUpdateData.licenseBackPublicId = cloudinaryResult.public_id;
-                        }
-                        else {
-                            // Default to front for license
-                            urlUpdateData.licenseFrontUrl = cloudinaryResult.secure_url;
-                            urlUpdateData.licenseFrontPublicId = cloudinaryResult.public_id;
-                        }
-                        break;
-                    case 'id':
-                        urlUpdateData.idProofUrl = cloudinaryResult.secure_url;
-                        urlUpdateData.idProofPublicId = cloudinaryResult.public_id;
-                        break;
-                    case 'address':
-                        urlUpdateData.addressProofUrl = cloudinaryResult.secure_url;
-                        urlUpdateData.addressProofPublicId = cloudinaryResult.public_id;
-                        break;
-                }
-                // Update or create driver profile with URL and status
-                await database_1.default.driverProfile.upsert({
-                    where: { userId: context.userId },
-                    update: urlUpdateData,
-                    create: {
-                        userId: context.userId,
-                        ...urlUpdateData
-                    }
+                const buffer = await new Promise((resolve, reject) => {
+                    stream.on('data', (chunk) => chunks.push(chunk));
+                    stream.on('end', () => resolve(Buffer.concat(chunks)));
+                    stream.on('error', reject);
                 });
-                // Log the OCR processing
-                await database_1.default.auditLog.create({
-                    data: {
-                        userId: context.userId,
-                        action: 'DOCUMENT_OCR_PROCESSED',
-                        details: {
-                            filename,
-                            cloudinaryUrl: cloudinaryResult.secure_url,
-                            extractedFields: Object.keys(extractedData),
-                            documentType,
-                            ocrSuccess: Object.keys(extractedData).length > 0
-                        }
-                    }
-                });
-                return extractedData;
+                const ocrService = new ocrService_1.OCRService();
+                const serviceDocType = documentType?.toLowerCase().replace('_', '');
+                const serviceSide = side?.toLowerCase();
+                const ocrResult = await ocrService.extractDocumentData(buffer, serviceDocType, serviceSide);
+                if (ocrResult.isQuotaExceeded)
+                    return { isQuotaExceeded: true, fallbackUsed: false };
+                return ocrResult;
             }
             catch (error) {
                 console.error('OCR Processing Error:', error);
-                // Log the error
-                await database_1.default.auditLog.create({
-                    data: {
-                        userId: context.userId,
-                        action: 'DOCUMENT_OCR_FAILED',
-                        details: { error: error instanceof Error ? error.message : 'Unknown OCR error' }
-                    }
-                });
-                throw new Error('Unable to read the document. Please upload a clearer photo.');
+                return { fallbackUsed: true, isQuotaExceeded: false };
             }
         },
         updateUser: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);
+            const dataToUpdate = { ...input };
+            if (input.dateOfBirth)
+                dataToUpdate.dateOfBirth = new Date(input.dateOfBirth);
             return await database_1.default.user.update({
                 where: { id: context.userId },
-                data: input
+                data: dataToUpdate
             });
         },
         deleteUser: async (_, { id }, context) => {

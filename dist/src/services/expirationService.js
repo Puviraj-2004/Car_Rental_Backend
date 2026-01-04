@@ -1,265 +1,92 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.expirationService = void 0;
-const cron = __importStar(require("node-cron"));
+const node_cron_1 = __importDefault(require("node-cron"));
 const database_1 = __importDefault(require("../utils/database"));
-// Cleanup orphaned verification documents from Cloudinary
-const cleanupVerificationDocuments = async (userId) => {
-    try {
-        const driverProfile = await database_1.default.driverProfile.findUnique({
-            where: { userId },
-            select: {
-                licenseFrontPublicId: true,
-                licenseBackPublicId: true,
-                idProofPublicId: true,
-                addressProofPublicId: true
-            }
-        });
-        if (driverProfile) {
-            // Note: Images are kept in Cloudinary for admin review
-            // If deletion is needed in the future, uncomment and implement:
-            // const publicIds = [
-            //   driverProfile.licenseFrontPublicId,
-            //   driverProfile.licenseBackPublicId,
-            //   driverProfile.idProofPublicId,
-            //   driverProfile.addressProofPublicId
-            // ].filter(Boolean);
-            // for (const publicId of publicIds) {
-            //   if (publicId) await deleteFromCloudinary(publicId);
-            // }
-            // Clear URLs from driver profile
-            await database_1.default.driverProfile.update({
-                where: { userId },
-                data: {
-                    licenseFrontUrl: null,
-                    licenseFrontPublicId: null,
-                    licenseBackUrl: null,
-                    licenseBackPublicId: null,
-                    idProofUrl: null,
-                    idProofPublicId: null,
-                    addressProofUrl: null,
-                    addressProofPublicId: null,
-                    status: 'NOT_UPLOADED'
-                }
-            });
-            console.log(`🧹 Cleaned up verification documents for user ${userId}`);
-        }
-    }
-    catch (error) {
-        console.error('Error cleaning up verification documents:', error);
-    }
-};
 class ExpirationService {
-    isRunning = false;
     /**
-     * Start the background expiration service
-     * Runs every 10 minutes to cancel expired bookings
+     * Starts the cron job to check for expired bookings every 1 minute.
+     * Industrial Standard: High frequency check for precise inventory release.
      */
     startExpirationService() {
-        if (this.isRunning) {
-            console.log('🕒 Expiration service is already running');
-            return;
-        }
-        console.log('🕒 Starting booking expiration service...');
-        // Run every 10 minutes
-        cron.schedule('*/10 * * * *', async () => {
-            try {
-                await this.cancelExpiredBookings();
-            }
-            catch (error) {
-                console.error('❌ Error in expiration service:', error);
-            }
+        console.log('⏳ Expiration Service Started: Monitoring Booking Lifecycle...');
+        // Run every minute
+        node_cron_1.default.schedule('*/1 * * * *', async () => {
+            await this.handleBookingExpirations();
         });
-        this.isRunning = true;
-        console.log('✅ Booking expiration service started - runs every 10 minutes');
     }
-    /**
-     * Cancel all bookings that have expired
-     * Bookings in AWAITING_VERIFICATION or AWAITING_PAYMENT status
-     * that have passed their expiresAt time
-     */
-    async cancelExpiredBookings() {
+    async handleBookingExpirations() {
+        const now = new Date();
+        // Time thresholds
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const fifteenMinsAgo = new Date(now.getTime() - 15 * 60 * 1000);
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
         try {
-            const now = new Date();
-            // Find expired bookings
-            const expiredBookings = await database_1.default.booking.findMany({
+            // ---------------------------------------------------------
+            // SCENARIO 1: Verification Timeout (Activity Based)
+            // ---------------------------------------------------------
+            // Rule: Booking is PENDING (waiting for docs).
+            // Condition: Created > 1 hour ago AND User hasn't uploaded anything for 15 mins.
+            const stalePendingBookings = await database_1.default.booking.findMany({
                 where: {
-                    OR: [
-                        { status: 'AWAITING_VERIFICATION' },
-                        { status: 'AWAITING_PAYMENT' }
-                    ],
-                    expiresAt: {
-                        lt: now
-                    }
+                    status: 'PENDING',
+                    createdAt: { lt: oneHourAgo },
+                    updatedAt: { lt: fifteenMinsAgo }
                 },
-                include: {
-                    car: {
-                        select: { id: true, brand: { select: { name: true } }, model: { select: { name: true } } }
-                    },
-                    user: {
-                        select: { id: true, email: true, username: true }
-                    }
+                select: { id: true }
+            });
+            if (stalePendingBookings.length > 0) {
+                console.log(`❌ Auto-cancelling ${stalePendingBookings.length} stale PENDING bookings...`);
+                await database_1.default.booking.updateMany({
+                    where: { id: { in: stalePendingBookings.map(b => b.id) } },
+                    data: { status: 'CANCELLED', updatedAt: now }
+                });
+            }
+            // ---------------------------------------------------------
+            // SCENARIO 2: Payment Timeout (15 Minute Window)
+            // ---------------------------------------------------------
+            // Rule: AI Verified the docs (Status: VERIFIED).
+            // Condition: User hasn't paid within 15 minutes of verification.
+            const unpaidVerifiedBookings = await database_1.default.booking.findMany({
+                where: {
+                    status: 'VERIFIED',
+                    payment: null, // No payment record exists
+                    updatedAt: { lt: fifteenMinsAgo }
+                },
+                select: { id: true }
+            });
+            if (unpaidVerifiedBookings.length > 0) {
+                console.log(`⚠️ Releasing inventory for ${unpaidVerifiedBookings.length} unpaid VERIFIED bookings...`);
+                await database_1.default.booking.updateMany({
+                    where: { id: { in: unpaidVerifiedBookings.map(b => b.id) } },
+                    data: { status: 'CANCELLED', updatedAt: now }
+                });
+            }
+            // ---------------------------------------------------------
+            // SCENARIO 3: Draft Cleanup
+            // ---------------------------------------------------------
+            // Remove Drafts older than 24 hours to keep DB clean
+            await database_1.default.booking.deleteMany({
+                where: {
+                    status: 'DRAFT',
+                    createdAt: { lt: twentyFourHoursAgo }
                 }
             });
-            if (expiredBookings.length === 0) {
-                return; // No expired bookings
-            }
-            console.log(`⏰ Found ${expiredBookings.length} expired bookings to cancel`);
-            // Cancel each booking in a transaction
-            for (const booking of expiredBookings) {
-                // Temporary UTC logging for verification
-                console.log(`⏰ UTC Check: Current time: ${now.toISOString()} | Booking ${booking.id} expires at: ${booking.expiresAt?.toISOString()}`);
-                try {
-                    await database_1.default.$transaction(async (tx) => {
-                        // Update booking status to CANCELLED
-                        await tx.booking.update({
-                            where: { id: booking.id },
-                            data: {
-                                status: 'CANCELLED',
-                                updatedAt: now
-                            }
-                        });
-                        // Delete any associated verification token
-                        if (booking.status === 'AWAITING_VERIFICATION') {
-                            await tx.bookingVerification.deleteMany({
-                                where: { bookingId: booking.id }
-                            });
-                            // Note: cleanupVerificationDocuments will be called after the transaction
-                        }
-                        // Log the cancellation
-                        await tx.auditLog.create({
-                            data: {
-                                userId: booking.userId,
-                                action: 'AUTO_BOOKING_EXPIRATION',
-                                details: {
-                                    bookingId: booking.id,
-                                    previousStatus: booking.status,
-                                    carInfo: `${booking.car.brand.name} ${booking.car.model.name}`,
-                                    expiredAt: booking.expiresAt,
-                                    cancelledAt: now
-                                }
-                            }
-                        });
-                    });
-                    // Cleanup orphaned verification documents
-                    if (booking.status === 'AWAITING_VERIFICATION') {
-                        await cleanupVerificationDocuments(booking.userId);
-                    }
-                    console.log(`❌ Auto-cancelled expired booking ${booking.id} for user ${booking.user.email}`);
-                }
-                catch (error) {
-                    console.error(`❌ Failed to cancel expired booking ${booking.id}:`, error);
-                }
-            }
         }
         catch (error) {
-            console.error('❌ Error in cancelExpiredBookings:', error);
-            throw error;
+            console.error('❌ Error in Expiration Service:', error);
         }
     }
     /**
-     * Manually trigger expiration check (for testing or admin use)
+     * Manually trigger logic (for testing)
      */
     async triggerExpirationCheck() {
-        console.log('🔧 Manually triggering expiration check...');
-        await this.cancelExpiredBookings();
-        return { cancelledCount: 0 }; // This could be improved to return actual count
-    }
-    /**
-     * Get statistics about expired bookings
-     */
-    async getExpirationStats() {
-        try {
-            const now = new Date();
-            const expiredAwaitingVerification = await database_1.default.booking.count({
-                where: {
-                    status: 'AWAITING_VERIFICATION',
-                    expiresAt: { lt: now }
-                }
-            });
-            const expiredAwaitingPayment = await database_1.default.booking.count({
-                where: {
-                    status: 'AWAITING_PAYMENT',
-                    expiresAt: { lt: now }
-                }
-            });
-            const totalExpired = expiredAwaitingVerification + expiredAwaitingPayment;
-            return {
-                expiredAwaitingVerification,
-                expiredAwaitingPayment,
-                totalExpired,
-                nextCheckIn: '10 minutes' // Since cron runs every 10 minutes
-            };
-        }
-        catch (error) {
-            console.error('❌ Error getting expiration stats:', error);
-            throw new Error('Failed to get expiration statistics');
-        }
-    }
-    /**
-     * Check if a specific booking has expired
-     */
-    async isBookingExpired(bookingId) {
-        try {
-            const booking = await database_1.default.booking.findUnique({
-                where: { id: bookingId },
-                select: {
-                    status: true,
-                    expiresAt: true
-                }
-            });
-            if (!booking || !booking.expiresAt) {
-                return false;
-            }
-            // Check if booking is in expirable status and has expired
-            const expirableStatuses = ['AWAITING_VERIFICATION', 'AWAITING_PAYMENT'];
-            if (!expirableStatuses.includes(booking.status)) {
-                return false;
-            }
-            return new Date() > booking.expiresAt;
-        }
-        catch (error) {
-            console.error('❌ Error checking booking expiration:', error);
-            return false;
-        }
+        await this.handleBookingExpirations();
+        return true;
     }
 }
-// Export singleton instance
 exports.expirationService = new ExpirationService();
 //# sourceMappingURL=expirationService.js.map

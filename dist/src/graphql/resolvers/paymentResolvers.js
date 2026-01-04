@@ -40,41 +40,31 @@ exports.paymentResolvers = {
             });
             if (existingPayment)
                 throw new Error('Payment already exists');
+            // input.status should be enum compatible usually, or cast
             const payment = await database_1.default.payment.create({
                 data: {
                     ...input,
-                    status: input.status || 'COMPLETED', // Default to COMPLETED for basic implementation
+                    status: input.status || 'SUCCEEDED', // Default to SUCCEEDED for basic implementation
                 },
                 include: { booking: true }
             });
             // Update booking status to CONFIRMED when payment is created
-            if (payment.status === 'COMPLETED') {
+            if (payment.status === 'SUCCEEDED') {
                 await database_1.default.booking.update({
                     where: { id: input.bookingId },
                     data: { status: 'CONFIRMED' }
                 });
-                // Log the payment and booking confirmation
-                await database_1.default.auditLog.create({
-                    data: {
-                        userId: context.userId,
-                        action: 'PAYMENT_COMPLETED_BOOKING_CONFIRMED',
-                        details: {
-                            paymentId: payment.id,
-                            bookingId: input.bookingId,
-                            amount: input.amount,
-                            transactionId: input.transactionId
-                        }
-                    }
-                });
+                // AuditLog removed
             }
             return payment;
         },
         updatePaymentStatus: async (_, { input }, context) => {
             (0, authguard_1.isAdmin)(context);
-            const { id, status, transactionId } = input;
+            const { id, status } = input;
+            // Removed transactionId as it's not in schema
             return await database_1.default.payment.update({
                 where: { id },
-                data: { status, transactionId },
+                data: { status },
                 include: { booking: true }
             });
         }

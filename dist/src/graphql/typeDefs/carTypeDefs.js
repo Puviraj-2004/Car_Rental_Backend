@@ -7,137 +7,130 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
   scalar Upload
 
   # --- Enums ---
-  enum CritAirCategory { CRIT_AIR_0 CRIT_AIR_1 CRIT_AIR_2 CRIT_AIR_3 CRIT_AIR_4 CRIT_AIR_5 CRIT_AIR_6 NO_STICKER }
-  enum FuelType { PETROL DIESEL ELECTRIC HYBRID }
-  enum TransmissionType { MANUAL AUTOMATIC }
-  enum CarStatus { AVAILABLE BOOKED MAINTENANCE OUT_OF_SERVICE }
+  enum CritAirCategory {
+    CRIT_AIR_0
+    CRIT_AIR_1
+    CRIT_AIR_2
+    CRIT_AIR_3
+    CRIT_AIR_4
+    CRIT_AIR_5
+    NO_STICKER
+  }
+
+  enum FuelType {
+    PETROL
+    DIESEL
+    ELECTRIC
+    HYBRID
+    LPG
+    CNG
+  }
+
+  enum Transmission {
+    MANUAL
+    AUTOMATIC
+    CVT
+    DCT
+  }
+  enum CarStatus { 
+    AVAILABLE 
+    RENTED 
+    MAINTENANCE 
+    OUT_OF_SERVICE 
+  }
 
   # --- Types ---
   type Brand {
     id: ID!
     name: String!
     logoUrl: String
-    logoPublicId: String
-    models: [Model!]
-    cars: [Car!]
-    createdAt: String!
+    models: [VehicleModel!]
   }
 
-  type Model {
+  type VehicleModel {
     id: ID!
     name: String!
     brandId: ID!
     brand: Brand!
     cars: [Car!]
-    createdAt: String!
   }
 
   type CarImage {
     id: ID!
     carId: ID!
-    imagePath: String!
-    publicId: String
-    altText: String
-    isPrimary: Boolean!
-    createdAt: String!
-    updatedAt: String!
     car: Car!
+    url: String!
+    isPrimary: Boolean!
   }
 
   type Car {
     id: ID!
-    brandId: ID!
-    brand: Brand!
     modelId: ID!
-    model: Model!
+    model: VehicleModel!
+    brand: Brand!
     year: Int!
     plateNumber: String!
-    fuelType: FuelType!
-    transmission: TransmissionType!
+    transmission: Transmission!
+    fuelType: FuelType
     seats: Int!
-    mileage: Float!
-
-    # KM Limits & Meter Tracking
+    requiredLicense: LicenseCategory!
+    pricePerDay: Float!
+    depositAmount: Float
     dailyKmLimit: Float
-    extraKmCharge: Float
-    currentMileage: Float!
-
-    pricePerHour: Float
-    pricePerKm: Float
-    pricePerDay: Float
-    depositAmount: Float!
+    extraKmCharge: Float!
+    currentOdometer: Float!
     critAirRating: CritAirCategory!
     status: CarStatus!
-    descriptionEn: String
-    descriptionFr: String
-    createdAt: String!
-    updatedAt: String!
     images: [CarImage!]!
     bookings: [Booking!]!
+    createdAt: String!
+    updatedAt: String!
   }
 
   # --- Inputs ---
   input CreateCarInput {
-    brandId: ID!
     modelId: ID!
     year: Int!
     plateNumber: String!
-    fuelType: FuelType!
-    transmission: TransmissionType!
+    transmission: Transmission!
+    fuelType: FuelType
     seats: Int!
-    mileage: Float
-
-    # KM Limits & Meter Tracking
+    requiredLicense: LicenseCategory
+    pricePerDay: Float!
+    depositAmount: Float
     dailyKmLimit: Float
     extraKmCharge: Float
-    currentMileage: Float
-
-    pricePerHour: Float
-    pricePerKm: Float
-    pricePerDay: Float
-    depositAmount: Float!
+    currentOdometer: Float
     critAirRating: CritAirCategory!
     status: CarStatus
-    descriptionEn: String
-    descriptionFr: String
   }
 
   input UpdateCarInput {
-    brandId: ID
     modelId: ID
     year: Int
     plateNumber: String
+    transmission: Transmission
     fuelType: FuelType
-    transmission: TransmissionType
     seats: Int
-    mileage: Float
-
-    # KM Limits & Meter Tracking
-    dailyKmLimit: Float
-    extraKmCharge: Float
-    currentMileage: Float
-
-    pricePerHour: Float
-    pricePerKm: Float
+    requiredLicense: LicenseCategory
     pricePerDay: Float
     depositAmount: Float
+    dailyKmLimit: Float
+    extraKmCharge: Float
+    currentOdometer: Float
     critAirRating: CritAirCategory
     status: CarStatus
-    descriptionEn: String
-    descriptionFr: String
   }
 
   input CarFilterInput {
-    brandId: ID
-    modelId: ID
-    fuelType: FuelType
-    transmission: TransmissionType
-    status: CarStatus
-    critAirRating: CritAirCategory
-    minPrice: Float
-    maxPrice: Float
-    startDate: String
-    endDate: String
+    brandIds: [ID!]
+    modelIds: [ID!]
+    fuelTypes: [FuelType!]
+    transmissions: [Transmission!]
+    statuses: [CarStatus!]
+    critAirRatings: [CritAirCategory!]
+    startDate: String  # Date only (YYYY-MM-DD format)
+    endDate: String    # Date only (YYYY-MM-DD format)
     includeOutOfService: Boolean
   }
 
@@ -146,8 +139,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     cars(filter: CarFilterInput): [Car!]!
     car(id: ID!): Car
     brands: [Brand!]!
-    models(brandId: ID!): [Model!]!
-    availableCars(startDate: String!, endDate: String!): [Car!]!
+    models(brandId: ID!): [VehicleModel!]!
   }
 
   # --- Mutations ---
@@ -156,16 +148,14 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     updateCar(id: ID!, input: UpdateCarInput!): Car!
     deleteCar(id: ID!): Boolean!
     
-    createBrand(name: String!, logoUrl: String, logoPublicId: String): Brand!
-    updateBrand(id: ID!, name: String!, logoUrl: String, logoPublicId: String): Brand!
+    createBrand(name: String!, logoUrl: String): Brand!
+    updateBrand(id: ID!, name: String!, logoUrl: String): Brand!
     deleteBrand(id: ID!): Boolean!
     
-    createModel(name: String!, brandId: ID!): Model!
-    updateModel(id: ID!, name: String!): Model!
+    createModel(name: String!, brandId: ID!): VehicleModel!
+    updateModel(id: ID!, name: String!): VehicleModel!
     deleteModel(id: ID!): Boolean!
     
-    # ✅ திருத்தப்பட்டது: 'input' நீக்கப்பட்டு நேரடியாக ஆர்குமெண்ட்கள் சேர்க்கப்பட்டுள்ளன
-    # இது உன் 'carResolvers.ts' உடன் மேட்ச் ஆகும்
     addCarImage(carId: ID!, file: Upload!, isPrimary: Boolean): CarImage!
     
     deleteCarImage(imageId: ID!): Boolean!

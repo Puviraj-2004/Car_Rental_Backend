@@ -1,15 +1,20 @@
 import prisma from '../../utils/database';
 import { isAdmin } from '../../utils/authguard';
-import { uploadToCloudinary, deleteFromCloudinary } from '../../utils/cloudinary';
-import { BookingStatus } from '@prisma/client';
+import { uploadToCloudinary } from '../../utils/cloudinary';
+import { validateCarFilterInput } from '../../utils/validation';
 
-// 🔍 Helper function to build booking availability filter for car listings
+// ----------------------------------------------------------------------
+// 🛠️ HELPER FUNCTIONS
+// ----------------------------------------------------------------------
+
+// 🔍 Helper: Build Booking Availability Filter (Industrial Logic)
+// This ensures cars are hidden if they have ANY active booking (Pending/Paid/Ongoing)
 const buildBookingAvailabilityFilter = (startDateTime: Date, endDateTime: Date, includeBuffer: boolean = false) => {
   const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0; // 24 Hours buffer if enabled
 
-  // For car listings, only consider CONFIRMED, ONGOING, and AWAITING_PAYMENT as conflicts
-  // DRAFT and AWAITING_VERIFICATION bookings don't prevent cars from being shown as available
-  const conflictStatuses: BookingStatus[] = ['CONFIRMED', 'ONGOING', 'AWAITING_PAYMENT'];
+  // 🛑 BLOCKING STATUSES:
+  // If a booking is in any of these states, the car is NOT available.
+  const conflictStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING'];
 
   const dateOverlapConditions = includeBuffer ? [
     // 1. Direct Overlap
@@ -46,7 +51,7 @@ const buildBookingAvailabilityFilter = (startDateTime: Date, endDateTime: Date, 
   return {
     none: {
       AND: [
-        { status: { in: conflictStatuses } }, // Only these statuses create conflicts
+        { status: { in: conflictStatuses as any } }, // Cast to avoid TS strictness on enums
         {
           OR: dateOverlapConditions
         }
@@ -55,12 +60,12 @@ const buildBookingAvailabilityFilter = (startDateTime: Date, endDateTime: Date, 
   };
 };
 
-// 📊 Helper function to build status filter
+// 📊 Helper: Build Status Filter
 const buildStatusFilter = (includeOutOfService: boolean = false) => {
   return includeOutOfService ? {} : { status: { not: 'OUT_OF_SERVICE' } };
 };
 
-// 🔧 Admin CRUD helper functions
+// 🔧 Admin CRUD Helpers
 const createEntity = async (model: any, data: any, context: any) => {
   isAdmin(context);
   return await model.create({ data });
@@ -77,26 +82,58 @@ const deleteEntity = async (model: any, id: string, context: any) => {
   return true;
 };
 
+// ----------------------------------------------------------------------
+// 🚀 RESOLVERS
+// ----------------------------------------------------------------------
+
 export const carResolvers = {
   Query: {
+    // 🚙 Search & Filter Cars
     cars: async (_: any, { filter }: any) => {
+      // Validate filter input if dates are provided
+      if (filter && (filter.startDate || filter.endDate)) {
+        const validation = validateCarFilterInput(filter);
+        if (!validation.isValid) {
+          throw new Error(`Filter validation failed: ${validation.errors.join(', ')}`);
+        }
+      }
+
       const where: any = {};
 
       if (filter) {
-        if (filter.brandId) where.brandId = filter.brandId;
-        if (filter.modelId) where.modelId = filter.modelId;
-        if (filter.fuelType) where.fuelType = filter.fuelType;
-        if (filter.transmission) where.transmission = filter.transmission;
-        if (filter.critAirRating) where.critAirRating = filter.critAirRating;
+        if (filter.brandIds && filter.brandIds.length > 0) where.model = { brandId: { in: filter.brandIds } };
+        if (filter.modelIds && filter.modelIds.length > 0) where.modelId = { in: filter.modelIds };
+        if (filter.fuelTypes && filter.fuelTypes.length > 0) where.fuelType = { in: filter.fuelTypes };
+        if (filter.transmissions && filter.transmissions.length > 0) where.transmission = { in: filter.transmissions };
+        if (filter.statuses && filter.statuses.length > 0) where.status = { in: filter.statuses };
+        if (filter.critAirRatings && filter.critAirRatings.length > 0) where.critAirRating = { in: filter.critAirRatings };
 
         if (filter.startDate && filter.endDate) {
-          const startDateTime = new Date(filter.startDate);
-          const endDateTime = new Date(filter.endDate);
+          // Convert date-only strings to date-time with default times
+          let startDateTime: Date, endDateTime: Date;
 
-          where.status = 'AVAILABLE';
-          where.bookings = buildBookingAvailabilityFilter(startDateTime, endDateTime, true); // Include buffer
+          if (filter.startDate.includes('T') || filter.startDate.includes(' ')) {
+            startDateTime = new Date(filter.startDate);
+          } else {
+            startDateTime = new Date(`${filter.startDate}T10:00:00`);
+          }
+
+          if (filter.endDate.includes('T') || filter.endDate.includes(' ')) {
+            endDateTime = new Date(filter.endDate);
+          } else {
+            endDateTime = new Date(`${filter.endDate}T10:00:00`);
+          }
+
+          // ✅ INDUSTRIAL LOGIC CHANGE:
+          // Allow cars that are 'AVAILABLE' OR 'RENTED'.
+          // Even if a car is currently RENTED, it might be free during the requested future dates.
+          // We exclude 'MAINTENANCE' and 'OUT_OF_SERVICE' because we don't know when they will be ready.
+          where.status = { in: ['AVAILABLE', 'RENTED'] };
+          
+          // Apply Booking Calendar Conflict Logic
+          where.bookings = buildBookingAvailabilityFilter(startDateTime, endDateTime, true); // True = Include Buffer
         } else {
-          // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
+          // Date not selected - show cars based on status filter (default hides OUT_OF_SERVICE)
           Object.assign(where, buildStatusFilter(filter.includeOutOfService));
         }
       } else {
@@ -106,65 +143,80 @@ export const carResolvers = {
 
       return await prisma.car.findMany({
         where,
-        include: { brand: true, model: true, images: true },
+        include: { model: { include: { brand: true } }, images: true },
         orderBy: { createdAt: 'desc' }
       });
     },
 
-    // 🔍 ஒரு காரின் முழு விவரங்களை எடுக்க
+    // 🔍 Single Car Details
     car: async (_: any, { id }: any) => {
-      return await prisma.car.findUnique({ 
-        where: { id }, 
-        include: { 
-          brand: true, 
-          model: true, 
+      return await prisma.car.findUnique({
+        where: { id },
+        include: {
+          model: { include: { brand: true } },
           images: { orderBy: { isPrimary: 'desc' } },
-          bookings: true 
-        } 
+          bookings: true
+        }
       });
     },
-    
-    // 🏢 பிராண்டுகள் மற்றும் மாடல்களை எடுக்க
-    brands: async () => await prisma.brand.findMany({ orderBy: { name: 'asc' } }),
-    
-    models: async (_: any, { brandId }: any) => 
-      await prisma.model.findMany({ where: { brandId }, orderBy: { name: 'asc' } }),
 
-    // 🗓️ குறிப்பிட்ட தேதிகளில் கிடைக்கும் கார்களை மட்டும் எடுக்க
+    // 🏢 Brands List
+    brands: async () => await prisma.brand.findMany({ orderBy: { name: 'asc' } }),
+
+    // 🚗 Models List
+    models: async (_: any, { brandId }: any) =>
+      await prisma.vehicleModel.findMany({ where: { brandId }, orderBy: { name: 'asc' } }),
+
+    // 🗓️ Simple Availability Check
     availableCars: async (_: any, { startDate, endDate }: any) => {
-      const startDateTime = new Date(startDate);
-      const endDateTime = new Date(endDate);
+      let startDateTime: Date, endDateTime: Date;
+
+      if (startDate.includes('T') || startDate.includes(' ')) {
+        startDateTime = new Date(startDate);
+      } else {
+        startDateTime = new Date(`${startDate}T10:00:00`);
+      }
+
+      if (endDate.includes('T') || endDate.includes(' ')) {
+        endDateTime = new Date(endDate);
+      } else {
+        endDateTime = new Date(`${endDate}T10:00:00`);
+      }
 
       return await prisma.car.findMany({
         where: {
-          status: 'AVAILABLE',
-          bookings: buildBookingAvailabilityFilter(startDateTime, endDateTime, false) // No buffer
+          // ✅ SAME LOGIC HERE: Check calendar availability for both Available and Rented cars
+          status: { in: ['AVAILABLE', 'RENTED'] },
+          bookings: buildBookingAvailabilityFilter(startDateTime, endDateTime, false) // No buffer for quick check
         },
-        include: { brand: true, model: true, images: true }
+        include: { model: { include: { brand: true } }, images: true }
       });
     },
   },
 
   Mutation: {
     // 🛠️ --- ADMIN ONLY OPERATIONS ---
-    
-    createBrand: async (_: any, args: any, context: any) =>
-      createEntity(prisma.brand, args, context),
 
-    updateBrand: async (_: any, { id, ...args }: any, context: any) =>
-      updateEntity(prisma.brand, id, args, context),
+    // Brands
+    createBrand: async (_: any, args: any, context: any) => createEntity(prisma.brand, args, context),
+    updateBrand: async (_: any, { id, ...args }: any, context: any) => updateEntity(prisma.brand, id, args, context),
+    deleteBrand: async (_: any, { id }: any, context: any) => deleteEntity(prisma.brand, id, context),
 
-    deleteBrand: async (_: any, { id }: any, context: any) =>
-      deleteEntity(prisma.brand, id, context),
+    // Models
+    createModel: async (_: any, args: any, context: any) => createEntity(prisma.vehicleModel, args, context),
+    updateModel: async (_: any, { id, ...args }: any, context: any) => updateEntity(prisma.vehicleModel, id, args, context),
+    deleteModel: async (_: any, { id }: any, context: any) => deleteEntity(prisma.vehicleModel, id, context),
 
-    createModel: async (_: any, args: any, context: any) =>
-      createEntity(prisma.model, args, context),
-
+    // Cars
     createCar: async (_: any, { input }: any, context: any) => {
       isAdmin(context);
       return await prisma.car.create({
-        data: { ...input, requiredLicenseCategory: input.requiredLicenseCategory || 'B', status: input.status || 'AVAILABLE' },
-        include: { brand: true, model: true }
+        data: { 
+          ...input, 
+          requiredLicense: input.requiredLicense || 'B', 
+          status: input.status || 'AVAILABLE' 
+        },
+        include: { model: { include: { brand: true } } }
       });
     },
 
@@ -173,105 +225,67 @@ export const carResolvers = {
       return await prisma.car.update({
         where: { id },
         data: input,
-        include: { brand: true, model: true }
+        include: { model: { include: { brand: true } } }
       });
     },
 
-    // 🗑️ காரை நீக்கும்போது Cloudinary படங்களையும் நீக்குகிறது
     deleteCar: async (_: any, { id }: any, context: any) => {
       isAdmin(context);
+      // Optional: Delete images from Cloudinary before deleting car
+      // const images = await prisma.carImage.findMany({ where: { carId: id } });
+      // for (const img of images) { ...deleteFromCloudinary... }
       
-      // 1. காரின் படங்களை எடுத்து Cloudinary-ல் இருந்து நீக்குதல்
-      const images = await prisma.carImage.findMany({ where: { carId: id } });
-      for (const img of images) {
-        if (img.publicId) await deleteFromCloudinary(img.publicId);
-      }
-
-      // 2. காரை டேட்டாபேஸில் இருந்து நீக்குதல்
       await prisma.car.delete({ where: { id } });
       return true;
     },
 
+    // 📸 Image Management
     addCarImage: async (_: any, { carId, file, isPrimary }: any, context: any) => {
       isAdmin(context);
 
-      // Get upload details and validate
       const uploadObj = await file;
-      const { filename, mimetype, createReadStream } = uploadObj as any;
-      console.log(`addCarImage called for carId=${carId}, filename=${filename}, mimetype=${mimetype}, isPrimary=${isPrimary}`);
+      const { filename, createReadStream } = uploadObj;
 
-      if (!createReadStream || typeof createReadStream !== 'function') {
-        console.error('File upload failed: createReadStream is not available or invalid.');
+      if (!createReadStream) {
         throw new Error("File upload failed: createReadStream is not available.");
       }
 
-      let fileStream = createReadStream();
+      const stream = createReadStream();
       let uploadResult: any;
 
-      // Try upload with one retry: if Cloudinary upload fails and fallback requires a fresh stream,
-      // recreate the stream and attempt fallback again (local save) before giving up.
       try {
-        uploadResult = await uploadToCloudinary(fileStream, 'cars', false, filename);
+        uploadResult = await uploadToCloudinary(stream, 'cars', false, filename);
       } catch (err: any) {
-        console.error('Cloudinary upload failed for file (first attempt)', filename, err);
-        // If the stream was consumed and fallback can't reuse it, recreate the stream and retry once
-        const msg = (err && err.message) || '';
-        if (/fallback is not available|retry the upload/i.test(msg)) {
-          console.log('Retrying upload with a fresh stream for local fallback...');
-          fileStream = createReadStream();
-          try {
-            uploadResult = await uploadToCloudinary(fileStream, 'cars', false, filename);
-          } catch (err2) {
-            console.error('Second upload attempt also failed for file', filename, err2);
-            throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
-          }
-        } else {
-          throw new Error('Image upload failed; please retry. If the problem persists, check Cloudinary credentials.');
-        }
+        console.error('Cloudinary upload failed', err);
+        throw new Error('Image upload failed.');
       }
 
-      try {
-        // Ensure the car exists
-        const car = await prisma.car.findUnique({ where: { id: carId } });
-        if (!car) throw new Error('Car not found for image upload.');
-
-        if (isPrimary) {
-          await prisma.carImage.updateMany({
-            where: { carId },
-            data: { isPrimary: false }
-          });
-        }
-
-        const created = await prisma.carImage.create({
-          data: {
-            carId,
-            imagePath: uploadResult.secure_url,
-            publicId: uploadResult.public_id,
-            isPrimary: isPrimary || false
-          }
+      // Handle Primary Image Logic
+      if (isPrimary) {
+        await prisma.carImage.updateMany({
+          where: { carId },
+          data: { isPrimary: false }
         });
-
-        console.log('addCarImage success', created.id);
-        return created;
-      } catch (error) {
-        // If DB save fails, delete the uploaded image from Cloudinary
-        console.error('Saving image record failed, deleting uploaded image from Cloudinary', error);
-        if (uploadResult?.public_id) {
-          await deleteFromCloudinary(uploadResult.public_id);
-        }
-        throw error;
       }
+
+      const created = await prisma.carImage.create({
+        data: {
+          carId,
+          url: uploadResult.secure_url,
+          isPrimary: isPrimary || false
+        }
+      });
+
+      return created;
     },
 
     deleteCarImage: async (_: any, { imageId }: any, context: any) => {
       isAdmin(context);
       const image = await prisma.carImage.findUnique({ where: { id: imageId } });
       if (!image) throw new Error('Image not found');
-      
-      // Cloudinary-ல் இருந்து நீக்குதல்
-      if (image.publicId) {
-        await deleteFromCloudinary(image.publicId);
-      }
+
+      // Note: We don't have publicId in Schema currently, so we skip Cloudinary delete
+      // if (image.publicId) await deleteFromCloudinary(image.publicId);
 
       await prisma.carImage.delete({ where: { id: imageId } });
       return true;
@@ -284,6 +298,17 @@ export const carResolvers = {
         prisma.carImage.update({ where: { id: imageId }, data: { isPrimary: true } })
       ]);
       return true;
+    }
+  },
+
+  // Field Resolvers
+  Car: {
+    brand: async (parent: any) => {
+      const model = await prisma.vehicleModel.findUnique({
+        where: { id: parent.modelId },
+        include: { brand: true }
+      });
+      return model?.brand;
     }
   }
 };

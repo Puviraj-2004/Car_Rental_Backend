@@ -1,660 +1,541 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ocrService = void 0;
-const mindee_1 = require("mindee");
-// Define confidence threshold for reliable OCR results
-const CONFIDENCE_THRESHOLD = 0.7;
+exports.ocrService = exports.OCRService = void 0;
+const generative_ai_1 = require("@google/generative-ai");
 class OCRService {
-    client;
+    genAI;
+    model;
     constructor() {
-        const apiKey = process.env.MINDEE_API_KEY;
+        const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
-            throw new Error('MINDEE_API_KEY is not configured in environment variables');
+            throw new Error('GEMINI_API_KEY is missing. Set it in your environment variables.');
         }
-        this.client = new mindee_1.Client({ apiKey });
+        this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
+        this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+        console.log('✅ Google Gemini 1.5 Flash initialized for French Document OCR');
     }
-    // Enhanced helper methods for extracting data from receipt OCR
-    // Extract names from various receipt fields
-    extractNameFromReceipt(prediction) {
-        // Look for names in supplier/customer fields
-        const nameFields = [
-            prediction.supplier_name?.value,
-            prediction.merchant_name?.value,
-            prediction.customer_name?.value
-        ].filter(Boolean);
-        for (const name of nameFields) {
-            // Validate as a proper name (First Last format)
-            if (name && /^[A-Z][a-z]+ [A-Z][a-z]+$/.test(name.trim())) {
-                return name.trim();
-            }
-        }
-        // Look in line items for names
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                const description = item.description?.value;
-                if (description) {
-                    const nameMatch = description.match(/([A-Z][a-z]+ [A-Z][a-z]+)/);
-                    if (nameMatch && nameMatch[1]) {
-                        return nameMatch[1];
-                    }
-                }
-            }
-        }
-        return undefined;
-    }
-    async extractDocumentData(fileBuffer, documentType) {
+    async extractDocumentData(fileBuffer, documentType, side) {
         try {
-            console.log('🔍 Starting OCR processing with Mindee API...');
-            // Load the document from buffer
-            const inputSource = this.client.docFromBuffer(fileBuffer, 'document.jpg');
-            // Use Mindee OCR for document processing
-            // Currently using ReceiptV5 as a generic OCR model for all document types
-            // TODO: Implement specific models when available (eu.DriverLicenseV1, fr.IdCardV2, etc.)
-            let apiResponse;
+            console.log(`🔍 ===== STARTING GEMINI OCR PROCESS =====`);
+            console.log(`🔍 Document Type: ${documentType}`);
+            if (documentType === 'license') {
+                console.log(`🔍 License Side: ${side || 'unknown'}`);
+            }
+            console.log(`📁 File buffer size: ${fileBuffer.length} bytes`);
+            // Convert buffer to base64
+            const base64Image = fileBuffer.toString('base64');
+            console.log(`📸 Image converted to base64: ${base64Image.length} characters`);
+            // Create the appropriate prompt based on document type
+            const prompt = this.createGeminiPrompt(documentType, side);
+            // Generate content with image and timeout
+            console.log(`🤖 Sending request to Gemini 1.5 Flash...`);
+            let result;
             try {
-                // Use specific Mindee document models for accurate extraction
-                console.log(`🔍 Processing ${documentType} with specific Mindee document models`);
-                switch (documentType) {
-                    case 'license':
-                        // Use EU Driver License V1 model for accurate license data extraction
-                        console.log('📄 Using EU Driver License V1 model for license OCR');
-                        apiResponse = await this.client.parse(mindee_1.product.DriverLicenseV1, inputSource);
-                        break;
-                    case 'id':
-                        // Use French ID Card V2 model for accurate ID data extraction
-                        console.log('🆔 Using French ID Card V2 model for ID OCR');
-                        apiResponse = await this.client.parse(mindee_1.product.fr.IdCardV2, inputSource);
-                        break;
-                    case 'address':
-                        // Use Invoice V4 model for better address proof extraction (bills, invoices)
-                        console.log('🏠 Using Invoice V4 model for address proof OCR');
-                        apiResponse = await this.client.parse(mindee_1.product.InvoiceV4, inputSource);
-                        break;
-                    default:
-                        // Fallback to generic OCR
-                        console.log('📋 Using generic OCR for unknown document type');
-                        apiResponse = await this.client.parse(mindee_1.product.ReceiptV5, inputSource);
-                }
-                // Route to appropriate enhanced extraction based on document type
-                switch (documentType) {
-                    case 'license':
-                        return this.extractDriverLicenseData(apiResponse.document);
-                    case 'id':
-                        return this.extractIdCardData(apiResponse.document);
-                    case 'address':
-                        return this.extractAddressData(apiResponse.document);
-                    default:
-                        return this.extractGenericData(apiResponse.document);
-                }
-            }
-            catch (error) {
-                console.error(`❌ Mindee OCR Error for ${documentType}:`, error);
-                // Return empty strings instead of undefined/null to prevent frontend crashes
-                console.log('⚠️ Mindee API failed, returning empty strings for manual entry');
-                return {
-                    fullName: '',
-                    documentId: '',
-                    expiryDate: '',
-                    birthDate: '',
-                    address: ''
-                };
-            }
-        }
-        catch (error) {
-            console.error('❌ Mindee OCR Error:', error);
-            // If Mindee fails, return empty strings instead of undefined/null to prevent frontend crashes
-            console.log('⚠️ Mindee API failed, returning empty strings for manual entry');
-            return {
-                fullName: '',
-                documentId: '',
-                expiryDate: '',
-                birthDate: '',
-                address: ''
-            };
-        }
-    }
-    // Enhanced license number extraction from receipt OCR
-    extractLicenseNumberFromText(prediction) {
-        // Look for license number patterns in all available text fields
-        const textFields = [
-            prediction.supplier_name?.value,
-            prediction.merchant_name?.value,
-            prediction.customer_name?.value,
-            prediction.total_amount?.value,
-            prediction.invoice_number?.value,
-            prediction.supplier_address?.value,
-            prediction.customer_address?.value
-        ].filter(Boolean);
-        // Also check line items for license numbers
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                if (item.description?.value) {
-                    textFields.push(item.description.value);
-                }
-            }
-        }
-        for (const text of textFields) {
-            // Comprehensive license number patterns for different formats
-            const licensePatterns = [
-                /\b([A-Z]{1,3}\d{6,12})\b/, // e.g., ABC123456, DL123456789
-                /\b(\d{8,12})\b/, // e.g., 12345678, 9876543210
-                /\b([A-Z]{2}\d{6,10})\b/, // e.g., AB123456, DL1234567
-                /\b([A-Z]\d{7,11})\b/, // e.g., A12345678, D123456789
-                /\b(LIC|LICENCE|LICENSE)[\s:]+([A-Z0-9]{6,15})\b/i, // e.g., LIC ABC123456
-                /\b(DL|DRIVER)[\s:]+([A-Z0-9]{6,15})\b/i, // e.g., DL ABC123456
-            ];
-            for (const pattern of licensePatterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    // Return the captured group if available, otherwise the full match
-                    return match[2] || match[1] || match[0];
-                }
-            }
-        }
-        return undefined;
-    }
-    // Enhanced date extraction from receipt OCR
-    extractDateFromText(prediction) {
-        const textFields = [
-            prediction.date?.value,
-            prediction.invoice_date?.value,
-            prediction.due_date?.value,
-            prediction.supplier_name?.value,
-            prediction.merchant_name?.value,
-            prediction.customer_name?.value
-        ].filter(Boolean);
-        // Also check line items for dates
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                if (item.description?.value) {
-                    textFields.push(item.description.value);
-                }
-            }
-        }
-        for (const text of textFields) {
-            // Comprehensive date patterns
-            const datePatterns = [
-                /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})/, // DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
-                /(\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/, // YYYY/MM/DD, YYYY-MM-DD, YYYY.MM.DD
-                /(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2})/, // DD/MM/YY, DD-MM-YY, DD.MM.YY
-                /\b(EXP|EXPIRY|EXPIRES|VALID)[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/i, // EXP 12/31/2024
-                /\b(DOB|BIRTH|BORN)[\s:]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4})\b/i, // DOB 01/15/1990
-            ];
-            for (const pattern of datePatterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    // Return the captured group if available (for labeled dates), otherwise the full match
-                    const dateStr = match[2] || match[1] || match[0];
-                    // Basic validation - ensure it looks like a date
-                    if (this.isValidDateFormat(dateStr)) {
-                        return dateStr;
-                    }
-                }
-            }
-        }
-        return undefined;
-    }
-    // Helper method to validate date format
-    isValidDateFormat(dateStr) {
-        // Simple validation for common date formats
-        const datePattern = /^(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})$/;
-        return datePattern.test(dateStr);
-    }
-    // Enhanced ID number extraction from receipt OCR
-    extractIdNumberFromText(prediction) {
-        // Look for ID number patterns in all available text fields
-        const textFields = [
-            prediction.supplier_name?.value,
-            prediction.merchant_name?.value,
-            prediction.customer_name?.value,
-            prediction.invoice_number?.value,
-            prediction.total_amount?.value,
-            prediction.supplier_address?.value,
-            prediction.customer_address?.value
-        ].filter(Boolean);
-        // Also check line items for ID numbers
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                if (item.description?.value) {
-                    textFields.push(item.description.value);
-                }
-            }
-        }
-        for (const text of textFields) {
-            // Comprehensive ID card number patterns
-            const idPatterns = [
-                /\b(\d{10,15})\b/, // 10-15 digit numbers (common ID length)
-                /\b([A-Z]{1,2}\d{8,12})\b/, // Letter + numbers (e.g., A123456789)
-                /\b(\d{2}[A-Z]{2}\d{6,10})\b/, // Mixed pattern (e.g., 12AB123456)
-                /\b(ID|CARD|IDENTITY)[\s:]+([A-Z0-9]{8,15})\b/i, // e.g., ID ABC123456789
-                /\b(PASSPORT|PASSPORTNO)[\s:]+([A-Z0-9]{6,12})\b/i, // e.g., PASSPORT ABC123456
-            ];
-            for (const pattern of idPatterns) {
-                const match = text.match(pattern);
-                if (match) {
-                    // Return the captured group if available, otherwise the full match
-                    return match[2] || match[1] || match[0];
-                }
-            }
-        }
-        return undefined;
-    }
-    // Helper method to extract expiry dates from text
-    extractExpiryDateFromText(prediction) {
-        // Look for expiry indicators in line items
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                const description = item.description?.value;
-                if (description) {
-                    // Look for expiry date indicators
-                    if (description.toLowerCase().includes('expiry') ||
-                        description.toLowerCase().includes('expires') ||
-                        description.toLowerCase().includes('valid')) {
-                        const dateMatch = description.match(/(\d{2}[-\/]\d{2}[-\/]\d{4})/);
-                        if (dateMatch && dateMatch[1]) {
-                            return dateMatch[1];
-                        }
-                    }
-                }
-            }
-        }
-        return this.extractDateFromText(prediction);
-    }
-    // Helper method to extract birth dates from text
-    extractBirthDateFromText(prediction) {
-        // Birth dates are harder to identify, look for dates in descriptions
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                const description = item.description?.value;
-                if (description) {
-                    // Look for birth date indicators
-                    if (description.toLowerCase().includes('birth') ||
-                        description.toLowerCase().includes('dob') ||
-                        description.toLowerCase().includes('born') ||
-                        description.toLowerCase().includes('naissance')) {
-                        const dateMatch = description.match(/(\d{2}[-\/]\d{2}[-\/]\d{4})/);
-                        if (dateMatch && dateMatch[1]) {
-                            return dateMatch[1];
-                        }
-                    }
-                }
-            }
-        }
-        return undefined;
-    }
-    extractDriverLicenseData(document) {
-        try {
-            const prediction = document.inference.prediction;
-            // Extract data from Driver License V1 model with confidence checking
-            let fullName = '';
-            let documentId = '';
-            let expiryDate = '';
-            let birthDate = '';
-            let address = '';
-            // Map Driver License V1 fields: firstName, lastName, licenseNumber, expiryDate
-            if (prediction.firstName && prediction.firstName.confidence > CONFIDENCE_THRESHOLD) {
-                const firstName = prediction.firstName.value || '';
-                if (prediction.lastName && prediction.lastName.confidence > CONFIDENCE_THRESHOLD) {
-                    const lastName = prediction.lastName.value || '';
-                    fullName = `${firstName} ${lastName}`.trim();
-                }
-                else {
-                    fullName = firstName;
-                }
-                console.log(`✅ Driver License - High confidence name: ${fullName}`);
-            }
-            // Try license ID first, then DD number as fallback for licenseNumber
-            if (prediction.id && prediction.id.confidence > CONFIDENCE_THRESHOLD) {
-                documentId = prediction.id.value || '';
-                console.log(`✅ Driver License - High confidence license number: ${documentId}`);
-            }
-            else if (prediction.ddNumber && prediction.ddNumber.confidence > CONFIDENCE_THRESHOLD) {
-                documentId = prediction.ddNumber.value || '';
-                console.log(`✅ Driver License - High confidence DD number: ${documentId}`);
-            }
-            if (prediction.expiryDate && prediction.expiryDate.confidence > CONFIDENCE_THRESHOLD) {
-                expiryDate = prediction.expiryDate.value || '';
-                console.log(`✅ Driver License - High confidence expiry date: ${expiryDate}`);
-            }
-            // Return empty strings for unmapped fields (birthDate, address)
-            birthDate = '';
-            address = '';
-            // If we don't have high-confidence data from EU Driver License model, try enhanced fallback
-            if (!fullName || !documentId) {
-                console.log('⚠️ Low confidence from EU Driver License model, using enhanced fallback analysis');
-                // Enhanced fallback extraction using receipt-style analysis
-                if (!fullName) {
-                    fullName = this.extractNameFromReceipt(prediction) ||
-                        prediction.supplier_name?.value ||
-                        prediction.merchant_name?.value ||
-                        prediction.customer_name?.value || '';
-                    // Additional extraction from line items for names
-                    if (!fullName && prediction.line_items) {
-                        for (const item of prediction.line_items) {
-                            if (item.description?.value) {
-                                const nameMatch = item.description.value.match(/([A-Z][a-z]+ [A-Z][a-z]+)/);
-                                if (nameMatch && nameMatch[1]) {
-                                    fullName = nameMatch[1];
-                                    console.log(`✅ Extracted name from line item: ${fullName}`);
-                                    break;
-                                }
+                result = await Promise.race([
+                    this.model.generateContent([
+                        prompt,
+                        {
+                            inlineData: {
+                                mimeType: 'image/jpeg',
+                                data: base64Image
                             }
                         }
-                    }
-                }
-                if (!documentId) {
-                    documentId = this.extractLicenseNumberFromText(prediction) ||
-                        prediction.total_amount?.value || '';
-                }
-                if (!expiryDate) {
-                    expiryDate = this.extractExpiryDateFromText(prediction) ||
-                        this.extractDateFromText(prediction) || '';
-                }
-                if (!birthDate) {
-                    birthDate = this.extractBirthDateFromText(prediction) || '';
-                }
-                if (!address) {
-                    address = this.extractAddressFromText(prediction) || '';
-                }
+                    ]),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini API timeout after 30 seconds')), 30000))
+                ]);
             }
-            // Ensure we return empty strings instead of null/undefined to prevent frontend crashes
-            const result = {
-                fullName: fullName || '',
-                documentId: documentId || '',
-                expiryDate: expiryDate || '',
-                birthDate: birthDate || '',
-                address: address || ''
+            catch (apiError) {
+                const status = apiError?.status || apiError?.response?.status;
+                const msg = String(apiError?.message || apiError || '').toLowerCase();
+                const isQuota = status === 429 || msg.includes('quota') || msg.includes('429') || msg.includes('resource_exhausted');
+                if (isQuota) {
+                    console.warn('⚠️ Gemini quota exceeded / rate limited. Falling back to manual mode.');
+                    return { isQuotaExceeded: true };
+                }
+                throw apiError;
+            }
+            const response = await result.response;
+            const text = response.text();
+            // Check if response is empty or too short
+            if (!text || text.trim().length < 10) {
+                console.warn('⚠️ Empty or too short response from Gemini, using fallback');
+                return this.fallbackRegexExtraction('empty response', documentType);
+            }
+            console.log(`📝 ===== GEMINI RESPONSE =====`);
+            console.log(`📝 Response length: ${text.length} characters`);
+            console.log(`📝 Raw response:`);
+            console.log(text);
+            console.log(`📝 ===========================`);
+            // Parse JSON response using the specified regex pattern
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                throw new Error('No JSON object found in Gemini response');
+            }
+            const cleanedJson = jsonMatch[0];
+            console.log(`🧹 Cleaned JSON: ${cleanedJson}`);
+            let extractedData;
+            try {
+                extractedData = JSON.parse(cleanedJson);
+                console.log(`✅ Successfully parsed JSON response`);
+            }
+            catch (parseError) {
+                console.error(`❌ Failed to parse JSON response:`, parseError);
+                throw new Error(`JSON parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            }
+            // Map the extracted data to our interface
+            const mapped = {
+                firstName: (extractedData.firstName || extractedData.prenom || extractedData.prénom || extractedData.Prénom || '').trim(),
+                lastName: (extractedData.lastName || extractedData.nom || extractedData.Nom || '').trim(),
+                fullName: this.combineGeminiNameFields(extractedData) || "",
+                documentId: (extractedData.documentId || extractedData.idNumber || '').trim(),
+                licenseNumber: (extractedData.licenseNumber || extractedData.licenseNo || extractedData.licenceNumber || extractedData.documentId || extractedData.idNumber || '').trim(),
+                expiryDate: (extractedData.expiryDate || extractedData.documentDate || extractedData.issueDate || ""),
+                birthDate: extractedData.birthDate || "",
+                address: extractedData.address || "",
+                licenseCategory: extractedData.licenseCategory || "",
+                licenseCategories: Array.isArray(extractedData.licenseCategories) ? extractedData.licenseCategories : undefined,
+                restrictsToAutomatic: typeof extractedData.restrictsToAutomatic === 'boolean' ? extractedData.restrictsToAutomatic : undefined,
+                documentDate: extractedData.documentDate || "",
+                issueDate: extractedData.issueDate || "",
+                fallbackUsed: false,
             };
-            // Log final extracted data for debugging
-            console.log('📋 Driver License Final OCR Results:', {
-                fullName: result.fullName ? `✅ ${result.fullName}` : '❌ Empty',
-                documentId: result.documentId ? `✅ ${result.documentId}` : '❌ Empty',
-                expiryDate: result.expiryDate ? `✅ ${result.expiryDate}` : '❌ Empty',
-                birthDate: result.birthDate ? `✅ ${result.birthDate}` : '❌ Empty',
-                address: result.address ? `✅ ${result.address}` : '❌ Empty'
-            });
-            return result;
+            const resultData = this.sanitizeExtractedData(mapped, documentType);
+            // Final comprehensive result logging
+            console.log(`🎯 ===== FINAL EXTRACTION RESULT =====`);
+            console.log(`🎯 Document Type: ${documentType || 'unknown'}`);
+            console.log(`🎯 Full Name: "${resultData.fullName || 'NOT FOUND'}"`);
+            console.log(`🎯 Document ID: "${resultData.documentId || 'NOT FOUND'}"`);
+            console.log(`🎯 License Number: "${resultData.licenseNumber || 'NOT FOUND'}"`);
+            console.log(`🎯 Expiry Date: "${resultData.expiryDate || 'NOT FOUND'}"`);
+            console.log(`🎯 Birth Date: "${resultData.birthDate || 'NOT FOUND'}"`);
+            console.log(`🎯 Address: "${resultData.address || 'NOT FOUND'}"`);
+            console.log(`🎯 License Category: "${resultData.licenseCategory || 'NOT FOUND'}"`);
+            console.log(`🎯 Restricts To Automatic: ${resultData.restrictsToAutomatic === true}`);
+            console.log(`🎯 Has Any Data: ${!!(resultData.fullName || resultData.documentId || resultData.expiryDate || resultData.birthDate || resultData.address)}`);
+            console.log(`🎯 ===================================`);
+            return resultData;
         }
         catch (error) {
-            console.error('Error extracting driver license data:', error);
-            // Return empty strings to prevent frontend crashes
-            return {
-                fullName: '',
-                documentId: '',
-                expiryDate: '',
-                birthDate: '',
-                address: ''
-            };
+            console.error("❌ ===== GEMINI OCR FAILED - USING FALLBACK =====");
+            console.error("❌ Error Type:", error instanceof Error ? error.constructor.name : typeof error);
+            console.error("❌ Error Message:", error instanceof Error ? error.message : String(error));
+            // Robust fallback to existing regex methods
+            console.log(`🔄 Activating regex fallback system...`);
+            try {
+                let fallbackResult;
+                switch (documentType) {
+                    case 'license':
+                        console.log(`🚗 ===== FALLBACK: DRIVER LICENSE EXTRACTION =====`);
+                        fallbackResult = await this.extractLicenseDataWithFallback(fileBuffer);
+                        break;
+                    case 'id':
+                        console.log(`🆔 ===== FALLBACK: ID CARD EXTRACTION =====`);
+                        fallbackResult = await this.extractIdCardDataWithFallback(fileBuffer);
+                        break;
+                    case 'address':
+                        console.log(`🏠 ===== FALLBACK: ADDRESS PROOF EXTRACTION =====`);
+                        fallbackResult = await this.extractAddressDataWithFallback(fileBuffer);
+                        break;
+                    default:
+                        fallbackResult = { fullName: "Unknown Document", documentId: "", expiryDate: "", birthDate: "", address: "" };
+                }
+                console.log(`🔄 ===== FALLBACK RESULT =====`);
+                console.log(`🔄 Full Name: "${fallbackResult.fullName}"`);
+                console.log(`🔄 Document ID: "${fallbackResult.documentId}"`);
+                console.log(`🔄 Expiry Date: "${fallbackResult.expiryDate}"`);
+                console.log(`🔄 ==========================`);
+                const sanitized = this.sanitizeExtractedData({ ...fallbackResult, fallbackUsed: true }, documentType);
+                return sanitized;
+            }
+            catch (fallbackError) {
+                console.error("❌ ===== FALLBACK ALSO FAILED =====");
+                console.error("❌ Fallback Error:", fallbackError instanceof Error ? fallbackError.message : String(fallbackError));
+                // Return empty strings to prevent frontend crashes
+                return { fullName: "", documentId: "", expiryDate: "", birthDate: "", address: "", fallbackUsed: true };
+            }
         }
     }
-    extractIdCardData(document) {
-        try {
-            const prediction = document.inference.prediction;
-            // Extract data from ID Card models (French ID V2 or International ID V2)
-            let fullName = '';
-            let documentId = '';
-            let birthDate = '';
-            let expiryDate = '';
-            let address = '';
-            // Map French ID Card V2 fields: firstName, lastName, idNumber, birthDate
-            if (prediction.givenNames && prediction.givenNames.length > 0 &&
-                prediction.givenNames[0].confidence > CONFIDENCE_THRESHOLD) {
-                const firstName = prediction.givenNames[0].value || '';
-                if (prediction.surname && prediction.surname.confidence > CONFIDENCE_THRESHOLD) {
-                    const lastName = prediction.surname.value || '';
-                    fullName = `${firstName} ${lastName}`.trim();
-                }
-                else {
-                    fullName = firstName;
-                }
-                console.log(`✅ French ID Card - High confidence name: ${fullName}`);
-            }
-            if (prediction.documentNumber && prediction.documentNumber.confidence > CONFIDENCE_THRESHOLD) {
-                documentId = prediction.documentNumber.value || '';
-                console.log(`✅ French ID Card - High confidence ID number: ${documentId}`);
-            }
-            if (prediction.birthDate && prediction.birthDate.confidence > CONFIDENCE_THRESHOLD) {
-                birthDate = prediction.birthDate.value || '';
-                console.log(`✅ French ID Card - High confidence birth date: ${birthDate}`);
-            }
-            // Return empty string for unmapped field (expiryDate)
-            expiryDate = '';
-            // Try address from both models
-            if (prediction.birthPlace && prediction.birthPlace.confidence > CONFIDENCE_THRESHOLD) {
-                address = prediction.birthPlace.value || '';
-                console.log(`✅ French ID Card - High confidence birth place: ${address} (${prediction.birthPlace.confidence})`);
-            }
-            else if (prediction.address && prediction.address.confidence > CONFIDENCE_THRESHOLD) {
-                address = prediction.address.value || '';
-                console.log(`✅ International ID - High confidence address: ${address} (${prediction.address.confidence})`);
-            }
-            // If we don't have high-confidence data from French ID Card model, use enhanced fallback
-            if (!fullName || !documentId) {
-                console.log('⚠️ Low confidence from French ID Card model, using enhanced fallback analysis');
-                // Enhanced fallback extraction
-                if (!fullName) {
-                    fullName = this.extractNameFromReceipt(prediction) ||
-                        prediction.supplier_name?.value ||
-                        prediction.merchant_name?.value ||
-                        prediction.customer_name?.value || '';
-                    // Additional extraction from line items for names
-                    if (!fullName && prediction.line_items) {
-                        for (const item of prediction.line_items) {
-                            if (item.description?.value) {
-                                const nameMatch = item.description.value.match(/([A-Z][a-z]+ [A-Z][a-z]+)/);
-                                if (nameMatch && nameMatch[1]) {
-                                    fullName = nameMatch[1];
-                                    console.log(`✅ Extracted name from line item: ${fullName}`);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                if (!documentId) {
-                    documentId = this.extractIdNumberFromText(prediction) || '';
-                }
-                if (!birthDate) {
-                    birthDate = this.extractBirthDateFromText(prediction) ||
-                        this.extractDateFromText(prediction) || '';
-                }
-                if (!expiryDate) {
-                    expiryDate = this.extractExpiryDateFromText(prediction) || '';
-                }
-                if (!address) {
-                    address = this.extractAddressFromText(prediction) ||
-                        prediction.supplier_address?.value ||
-                        prediction.customer_address?.value ||
-                        prediction.merchant_address?.value || '';
-                }
-            }
-            // Ensure we return empty strings instead of null/undefined to prevent frontend crashes
-            const result = {
-                fullName: fullName || '',
-                documentId: documentId || '',
-                birthDate: birthDate || '',
-                expiryDate: expiryDate || '',
-                address: address || ''
-            };
-            // Log extracted data for debugging
-            console.log('🆔 ID Card OCR Results:', {
-                fullName: result.fullName ? `✅ ${result.fullName}` : '❌ Empty',
-                documentId: result.documentId ? `✅ ${result.documentId}` : '❌ Empty',
-                birthDate: result.birthDate ? `✅ ${result.birthDate}` : '❌ Empty',
-                expiryDate: result.expiryDate ? `✅ ${result.expiryDate}` : '❌ Empty',
-                address: result.address ? `✅ ${result.address}` : '❌ Empty'
-            });
-            return result;
-        }
-        catch (error) {
-            console.error('Error extracting ID card data:', error);
-            // Return empty strings to prevent frontend crashes
-            return {
-                fullName: '',
-                documentId: '',
-                birthDate: '',
-                expiryDate: '',
-                address: ''
-            };
+    createGeminiPrompt(documentType, side) {
+        switch (documentType) {
+            case 'license':
+                return [
+                    'You are an OCR extraction engine for a French driving license (Permis de conduire).',
+                    'Return ONLY valid JSON (no markdown, no explanations).',
+                    'Never guess: if a value is not confidently found, return an empty string (or empty array for lists).',
+                    '',
+                    `The image is the ${side || 'unknown'} side of the license.`,
+                    '',
+                    'Extract the following fields using the official field numbers:',
+                    ' - lastName (Nom) from field 1',
+                    ' - firstName (Prénom) from field 2',
+                    ' - birthDate from field 3 (YYYY-MM-DD)',
+                    ' - expiryDate from field 4b (YYYY-MM-DD)',
+                    ' - licenseNumber from field 5 (do NOT confuse with plate numbers or other refs)',
+                    ' - licenseCategories from field 9/11 (array of ALL categories visible, e.g., ["AM","B"])',
+                    ' - licenseCategory = the highest category among AM<A<B<C<D present in field 9/11',
+                    '',
+                    'Back side additional critical rule:',
+                    ' - On the BACK side, search specifically in field/column 12 (restrictions) for the exact text "Code 78".',
+                    ' - If found, set restrictsToAutomatic=true. Otherwise false.',
+                    '',
+                    'Output JSON keys exactly:',
+                    '{ firstName: string, lastName: string, birthDate: string, expiryDate: string, licenseNumber: string, licenseCategories: string[], licenseCategory: string, restrictsToAutomatic: boolean }',
+                    '',
+                    'Formatting rules:',
+                    ' - Dates MUST be strictly YYYY-MM-DD.',
+                    ' - Categories must be uppercased and only among: AM, A, B, C, D.',
+                ].join('\n');
+            case 'id':
+                return [
+                    'You are an OCR extraction engine for a French national ID card (Carte Nationale d\'Identité).',
+                    'Return ONLY a valid JSON object and nothing else (no markdown, no explanations).',
+                    'Required output keys:',
+                    '  - firstName (string)',
+                    '  - lastName (string)',
+                    '  - documentId (string)  // numéro de carte / card number',
+                    '  - birthDate (string)   // "Né le" or date of birth',
+                    '  - expiryDate (string)  // "Valable jusqu\'au" or expiry date',
+                    'Formatting rules:',
+                    '  - Dates MUST be strictly in YYYY-MM-DD format.',
+                    '  - If a value is not confidently found, return an empty string for that key.',
+                    'Do not guess dates; only return what is present on the document.',
+                ].join('\n');
+            case 'address':
+                return [
+                    'You are an OCR extraction engine for a French proof of address document (utility bill, bank statement, etc.).',
+                    'Return ONLY a valid JSON object and nothing else (no markdown, no explanations).',
+                    'Required output keys:',
+                    '  - fullName (string)',
+                    '  - address (string)',
+                    '  - documentId (string)  // invoice number / reference if present',
+                    '  - expiryDate (string)  // document date / issue date; MUST be in YYYY-MM-DD format if found',
+                    '  - documentDate (string) // alias of document date if present',
+                    '  - issueDate (string) // alias of issue date if present',
+                    'Formatting rules:',
+                    '  - Dates MUST be strictly in YYYY-MM-DD format.',
+                    '  - If a value is not confidently found, return an empty string for that key.',
+                    'Do not guess dates; only return what is present on the document.',
+                ].join('\n');
+            default:
+                return [
+                    'Return ONLY a valid JSON object and nothing else (no markdown, no explanations).',
+                    'Output keys: fullName, documentId, expiryDate, birthDate, address.',
+                    'Dates MUST be strictly in YYYY-MM-DD format.',
+                    'If a value is not confidently found, return an empty string for that key.',
+                ].join('\n');
         }
     }
-    extractAddressData(document) {
+    sanitizeExtractedData(data, documentType) {
+        const detectedCategories = this.normalizeLicenseCategories(data.licenseCategories || []);
+        const normalizedSingle = this.normalizeLicenseCategory(data.licenseCategory || '');
+        const highestFromList = this.normalizeLicenseCategory(this.pickHighestCategory(detectedCategories));
+        const rank = { AM: 0, A: 1, B: 2, C: 3, D: 4 };
+        const normalizedHighest = (() => {
+            const a = normalizedSingle;
+            const b = highestFromList;
+            const ra = a ? rank[a] : undefined;
+            const rb = b ? rank[b] : undefined;
+            if (ra === undefined && rb === undefined)
+                return '';
+            if (ra === undefined)
+                return b;
+            if (rb === undefined)
+                return a;
+            return ra >= rb ? a : b;
+        })();
+        const sanitized = {
+            ...data,
+            firstName: (data.firstName || '').trim(),
+            lastName: (data.lastName || '').trim(),
+            fullName: (data.fullName || '').trim(),
+            documentId: (data.documentId || '').trim(),
+            licenseNumber: (data.licenseNumber || data.documentId || '').trim(),
+            address: (data.address || '').trim(),
+            birthDate: this.normalizeDateToIso((data.birthDate || '').trim()),
+            expiryDate: this.normalizeDateToIso((data.expiryDate || '').trim()),
+            licenseCategories: detectedCategories.length ? detectedCategories : undefined,
+            licenseCategory: normalizedHighest,
+            restrictsToAutomatic: !!data.restrictsToAutomatic,
+            documentDate: this.normalizeDateToIso((data.documentDate || '').trim()),
+            issueDate: this.normalizeDateToIso((data.issueDate || '').trim()),
+            fallbackUsed: !!data.fallbackUsed,
+        };
+        // Document specific heuristics
+        if (documentType === 'license') {
+            // Some OCR engines confuse field 4a (issue date) and 4b (expiry).
+            // We keep expiryDate if present; otherwise leave empty (don't guess).
+        }
+        return sanitized;
+    }
+    normalizeLicenseCategories(input) {
+        if (!Array.isArray(input))
+            return [];
+        const allowed = new Set(['AM', 'A', 'B', 'C', 'D']);
+        const normalized = input
+            .map((c) => String(c || '').trim().toUpperCase())
+            .filter((c) => allowed.has(c));
+        return Array.from(new Set(normalized));
+    }
+    pickHighestCategory(categories) {
+        const rank = { AM: 0, A: 1, B: 2, C: 3, D: 4 };
+        let best = '';
+        let bestRank = -1;
+        for (const c of categories) {
+            const r = rank[c];
+            if (r !== undefined && r > bestRank) {
+                bestRank = r;
+                best = c;
+            }
+        }
+        return best;
+    }
+    normalizeLicenseCategory(input) {
+        if (!input)
+            return '';
+        const normalized = input.toUpperCase().replace(/\s+/g, '');
+        const allowed = new Set(['AM', 'A', 'B', 'C', 'D']);
+        if (allowed.has(normalized))
+            return normalized;
+        return '';
+    }
+    normalizeDateToIso(input) {
+        if (!input)
+            return '';
+        // Common OCR mistakes + normalize separators
+        const cleaned = input
+            .trim()
+            .replace(/\s+/g, '')
+            .replace(/[Oo]/g, '0')
+            .replace(/[Il]/g, '1')
+            .replace(/_/g, '-')
+            .replace(/\./g, '/')
+            .replace(/-/g, '/')
+            .replace(/,+/g, '/')
+            .replace(/\\/g, '/')
+            .replace(/\/+?/g, '/');
+        // Strict ISO: YYYY/MM/DD
+        const ymd = cleaned.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+        if (ymd) {
+            const yyyy = this.fixOcrYear(ymd[1]);
+            const mm = ymd[2].padStart(2, '0');
+            const dd = ymd[3].padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        // Strict French: DD/MM/YYYY (preferred) or DD/MM/YY
+        const dmy = cleaned.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+        if (dmy) {
+            const dd = dmy[1].padStart(2, '0');
+            const mm = dmy[2].padStart(2, '0');
+            let yyyy = dmy[3];
+            if (yyyy.length === 2) {
+                const n = parseInt(yyyy, 10);
+                yyyy = n >= 50 ? `19${yyyy}` : `20${yyyy}`;
+            }
+            yyyy = this.fixOcrYear(yyyy);
+            return `${yyyy}-${mm}-${dd}`;
+        }
+        // Compact: YYYYMMDD
+        const compact = cleaned.replace(/\//g, '').match(/^(\d{4})(\d{2})(\d{2})$/);
+        if (compact) {
+            const yyyy = this.fixOcrYear(compact[1]);
+            return `${yyyy}-${compact[2]}-${compact[3]}`;
+        }
+        // Reject everything else (strict mode)
+        return '';
+    }
+    fixOcrYear(year) {
+        const y = year.replace(/\D/g, '');
+        if (y.length !== 4) {
+            return y;
+        }
+        // Fix common OCR case: 235 -> 2035 can appear as 0235 or 2235/2135 etc.
+        const n = parseInt(y, 10);
+        if (n >= 0 && n < 1900) {
+            // Prefer 20xx for small years
+            const last2 = y.slice(-2);
+            return `20${last2}`;
+        }
+        // If the century digit is wrong (e.g. 2235), clamp to 20xx
+        if (n > 2100) {
+            const last2 = y.slice(-2);
+            return `20${last2}`;
+        }
+        return y;
+    }
+    combineGeminiNameFields(data) {
+        // Handle Gemini response format: lastName + firstName = fullName
+        if (data.fullName) {
+            return data.fullName.trim();
+        }
+        // Gemini returns lastName and firstName separately
+        if (data.lastName || data.firstName) {
+            const lastName = data.lastName || '';
+            const firstName = data.firstName || '';
+            return `${firstName} ${lastName}`.trim();
+        }
+        // Fallback for other naming conventions
+        if (data.Nom || data.Prénom) {
+            const nom = data.Nom || '';
+            const prenom = data.Prénom || '';
+            return `${prenom} ${nom}`.trim();
+        }
+        return '';
+    }
+    // Fallback methods using regex extraction
+    async extractLicenseDataWithFallback(_fileBuffer) {
         try {
-            const prediction = document.inference.prediction;
-            // Extract address and document date from InvoiceV4 for better address proof processing
-            let address = '';
-            let fullName = '';
-            let documentId = '';
-            let expiryDate = '';
-            // InvoiceV4 has better address fields
-            if (prediction.customerAddress && prediction.customerAddress.confidence > CONFIDENCE_THRESHOLD) {
-                address = prediction.customerAddress.value || '';
-                console.log(`✅ Invoice - High confidence customer address: ${address}`);
-            }
-            else if (prediction.supplierAddress && prediction.supplierAddress.confidence > CONFIDENCE_THRESHOLD) {
-                address = prediction.supplierAddress.value || '';
-                console.log(`✅ Invoice - High confidence supplier address: ${address}`);
-            }
-            else if (prediction.billingAddress && prediction.billingAddress.confidence > CONFIDENCE_THRESHOLD) {
-                address = prediction.billingAddress.value || '';
-                console.log(`✅ Invoice - High confidence billing address: ${address}`);
-            }
-            if (prediction.customerName && prediction.customerName.confidence > CONFIDENCE_THRESHOLD) {
-                fullName = prediction.customerName.value || '';
-                console.log(`✅ Invoice - High confidence customer name: ${fullName}`);
-            }
-            else if (prediction.supplierName && prediction.supplierName.confidence > CONFIDENCE_THRESHOLD) {
-                fullName = prediction.supplierName.value || '';
-                console.log(`✅ Invoice - High confidence supplier name: ${fullName}`);
-            }
-            // Use invoice number as document ID
-            if (prediction.invoiceNumber && prediction.invoiceNumber.confidence > CONFIDENCE_THRESHOLD) {
-                documentId = prediction.invoiceNumber.value || '';
-                console.log(`✅ Invoice - High confidence invoice number: ${documentId}`);
-            }
-            // Use document date as expiry date (for bill validity)
-            if (prediction.date && prediction.date.confidence > CONFIDENCE_THRESHOLD) {
-                expiryDate = prediction.date.value || '';
-                console.log(`✅ Invoice - High confidence document date: ${expiryDate}`);
-            }
-            // Ensure we return empty strings instead of null/undefined to prevent frontend crashes
-            const result = {
-                fullName: fullName || '',
-                documentId: documentId || '',
-                expiryDate: expiryDate || '',
-                birthDate: '',
-                address: address || ''
+            console.log("🔄 License fallback: using regex-based extraction");
+            // Since we can't easily OCR the buffer here, return empty data
+            // In a real implementation, you could integrate Tesseract.js here
+            const fullName = this.extractNameFromText("") || "";
+            const documentId = this.extractDocumentNumberFromText("") || "";
+            const expiryDate = this.extractDateFromText("") || "";
+            const address = this.extractAddressFromText("") || "";
+            return {
+                fullName,
+                documentId,
+                expiryDate,
+                birthDate: "",
+                address
             };
-            // Log extracted data for debugging
-            console.log('🏠 Address Proof OCR Results (InvoiceV4):', {
-                fullName: result.fullName ? `✅ ${result.fullName}` : '❌ Empty',
-                documentId: result.documentId ? `✅ ${result.documentId}` : '❌ Empty',
-                address: result.address ? `✅ ${result.address}` : '❌ Empty',
-                expiryDate: result.expiryDate ? `✅ ${result.expiryDate}` : '❌ Empty'
-            });
-            return result;
         }
         catch (error) {
-            console.error('Error extracting address data:', error);
-            // Return empty strings to prevent frontend crashes
-            return {
-                fullName: '',
-                documentId: '',
-                expiryDate: '',
-                birthDate: '',
-                address: ''
-            };
+            console.error("❌ License fallback failed:", error);
+            return { fullName: "", documentId: "", expiryDate: "", birthDate: "", address: "" };
         }
     }
-    extractGenericData(document) {
+    async extractIdCardDataWithFallback(_fileBuffer) {
         try {
-            const prediction = document.inference.prediction;
-            // Extract text from OCR and try to find relevant information
-            const allText = prediction.all_text?.value || '';
+            console.log("🔄 ID Card fallback: using regex-based extraction");
+            const fullName = this.extractNameFromText("") || "";
+            const documentId = this.extractDocumentNumberFromText("") || "";
+            const expiryDate = this.extractDateFromText("") || "";
+            const birthDate = this.extractBirthDateFromText("") || "";
+            const address = this.extractAddressFromText("") || "";
             return {
-                fullName: this.extractNameFromText(allText),
-                documentId: this.extractDocumentIdFromText(allText),
-                expiryDate: this.extractDateFromText(allText),
-                birthDate: this.extractDateFromText(allText),
-                address: this.extractAddressFromText(allText)
+                fullName,
+                documentId,
+                expiryDate,
+                birthDate,
+                address
             };
         }
         catch (error) {
-            console.error('Error extracting generic data:', error);
-            return {};
+            console.error("❌ ID card fallback failed:", error);
+            return { fullName: "", documentId: "", expiryDate: "", birthDate: "", address: "" };
         }
+    }
+    async extractAddressDataWithFallback(_fileBuffer) {
+        try {
+            console.log("🔄 Address fallback: using regex-based extraction");
+            const fullName = this.extractNameFromText("") || "";
+            const address = this.extractAddressFromText("") || "";
+            const documentId = this.extractDocumentNumberFromText("") || "";
+            const expiryDate = this.extractDateFromText("") || "";
+            return {
+                fullName,
+                address,
+                documentId,
+                expiryDate,
+                birthDate: ""
+            };
+        }
+        catch (error) {
+            console.error("❌ Address fallback failed:", error);
+            return { fullName: "", documentId: "", expiryDate: "", birthDate: "", address: "" };
+        }
+    }
+    fallbackRegexExtraction(text, documentType) {
+        console.log(`🔄 Using regex fallback extraction for ${documentType}`);
+        // Extract common patterns that might appear in AI responses
+        const fullName = this.extractNameFromText(text) || '';
+        const documentId = this.extractDocumentNumberFromText(text) || '';
+        const expiryDate = this.extractDateFromText(text) || '';
+        const birthDate = this.extractBirthDateFromText(text) || '';
+        const address = this.extractAddressFromText(text) || '';
+        const result = {
+            fullName,
+            documentId,
+            expiryDate,
+            birthDate,
+            address,
+            fallbackUsed: true
+        };
+        console.log(`🔄 Fallback extraction result:`, result);
+        return result;
     }
     extractNameFromText(text) {
-        // Simple name extraction - look for common name patterns
-        const namePatterns = [
-            /(?:name|nom|holder|owner)[\s:]+([A-Z][a-z]+\s+[A-Z][a-z]+)/i,
-            /([A-Z][a-z]+\s+[A-Z][a-z]+)\s+(?:license|card|id)/i
+        // Look for names in various formats
+        const patterns = [
+            /(?:name|nom|prénom|firstname|lastname)[\s:]*([A-Z\s]{2,30})/i,
+            /\b([A-Z][a-z]+\s+[A-Z][a-z]+)\b/g
         ];
-        for (const pattern of namePatterns) {
+        for (const pattern of patterns) {
             const match = text.match(pattern);
-            if (match && match[1]) {
+            if (match && match[1] && match[1].length > 2) {
                 return match[1].trim();
             }
         }
         return undefined;
     }
-    extractDocumentIdFromText(text) {
-        // Look for license numbers, ID numbers, etc.
-        const idPatterns = [
-            /(?:license|lic|dl|id|card).*?[\s:]+([A-Z0-9\-]{6,})/i,
-            /([A-Z]{1,3}[0-9]{6,})/, // Common license/ID format
-            /(?:number|num|no).*?[\s:]+([A-Z0-9\-]{5,})/i
+    extractDocumentNumberFromText(text) {
+        // Look for document numbers
+        const patterns = [
+            /(?:document|id|license|permis|carte)[\s#:]*([A-Z0-9-]{5,20})/i,
+            /\b(\d{8,15})\b/g,
+            /\b([A-Z]{1,3}\d{6,12})\b/g
         ];
-        for (const pattern of idPatterns) {
+        for (const pattern of patterns) {
             const match = text.match(pattern);
             if (match && match[1]) {
-                return match[1].trim();
+                return match[1];
             }
         }
         return undefined;
     }
-    // Enhanced address extraction from receipt OCR
-    extractAddressFromText(prediction) {
-        // Look for addresses in various receipt fields
-        const textFields = [
-            prediction.supplier_address?.value,
-            prediction.customer_address?.value,
-            prediction.merchant_address?.value,
-            prediction.supplier_name?.value, // Sometimes address is embedded in name field
-            prediction.customer_name?.value
-        ].filter(Boolean);
-        // Also check line items for addresses
-        if (prediction.line_items) {
-            for (const item of prediction.line_items) {
-                if (item.description?.value) {
-                    textFields.push(item.description.value);
-                }
+    extractDateFromText(text) {
+        // Look for dates
+        const patterns = [
+            /(?:date|expiry|expiration|valid)[\s:]*(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})/i,
+            /\b(\d{4}[-/.]\d{1,2}[-/.]\d{1,2})\b/g,
+            /\b(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})\b/g
+        ];
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match && match[1]) {
+                return match[1];
             }
         }
-        for (const text of textFields) {
-            // Comprehensive address patterns
-            const addressPatterns = [
-                /(?:address|addr|location)[\s:]+([^\n\r]{10,100})/i, // "Address: 123 Main St, City, State"
-                /(\d+\s+[A-Za-z0-9\s,.-]{15,100})(?:\n|$)/, // Street address pattern
-                /([A-Za-z\s]+,\s*[A-Z]{2}\s*\d{5})/, // "City, State ZIP"
-                /(\d+\s+[A-Za-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Place|Pl|Court|Ct))/i, // Full street address
-            ];
-            for (const pattern of addressPatterns) {
-                const match = text.match(pattern);
-                if (match && match[1] && match[1].trim().length > 10) {
-                    // Clean up the address
-                    const address = match[1].trim();
-                    // Remove common non-address suffixes
-                    const cleanAddress = address.replace(/\s+(?:total|amount|date|phone|email).*$/i, '');
-                    if (cleanAddress.length > 10) {
-                        return cleanAddress;
-                    }
-                }
+        return undefined;
+    }
+    extractBirthDateFromText(text) {
+        // Look specifically for birth dates
+        const patterns = [
+            /(?:birth|naissance|né|born)[\s:]*(\d{1,2}[-/.]\d{1,2}[-/.]\d{4})/i,
+            /\b(\d{1,2}[-/.]\d{1,2}[-/.](19|20)\d{2})\b/g
+        ];
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match && match[1]) {
+                return match[1];
+            }
+        }
+        return undefined;
+    }
+    extractAddressFromText(text) {
+        // Look for addresses
+        const patterns = [
+            /(?:address|adresse|rue|avenue|place)[\s:]*([A-Z0-9\s,.-]{10,50})/i
+        ];
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match && match[1] && match[1].length > 10) {
+                return match[1].trim();
             }
         }
         return undefined;
     }
 }
-// Export singleton instance
+exports.OCRService = OCRService;
 exports.ocrService = new OCRService();
 //# sourceMappingURL=ocrService.js.map

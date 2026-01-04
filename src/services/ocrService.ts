@@ -18,7 +18,7 @@ export interface ExtractedDocumentData {
   isQuotaExceeded?: boolean;
 }
 
-class OCRService {
+export class OCRService {
   private genAI: GoogleGenerativeAI;
   private model: GenerativeModel;
 
