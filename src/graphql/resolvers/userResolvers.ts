@@ -81,7 +81,7 @@ export const userResolvers = {
       }
     },
 
-    // 🔥 MAIN LOGIC: AI Verification & Auto Booking Update
+    // 🔥 UPDATED: AI Verification & Auto Booking Update
     createOrUpdateVerification: async (_: any, { input }: { input: any }, context: any) => {
       isAuthenticated(context);
 
@@ -89,7 +89,6 @@ export const userResolvers = {
         where: { userId: context.userId }
       });
 
-      // 1. Save Document Data (from Manual or AI input)
       const dataToSave = {
         licenseCategory: input.licenseCategory || 'B',
         licenseFrontUrl: input.licenseFrontUrl || existingVerification?.licenseFrontUrl,
@@ -100,7 +99,7 @@ export const userResolvers = {
         licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : existingVerification?.licenseExpiry,
         idNumber: input.idNumber || existingVerification?.idNumber,
         idExpiry: input.idExpiry ? new Date(input.idExpiry) : existingVerification?.idExpiry,
-        status: 'PENDING' as const
+        status: 'PENDING' as const // Initially pending during update
       };
 
       const verification = await prisma.documentVerification.upsert({
@@ -109,42 +108,36 @@ export const userResolvers = {
         create: { user: { connect: { id: context.userId } }, ...dataToSave }
       });
 
-      // 🚀 LOGIC START: If AI/User provided critical info, Auto-Approve & Update Bookings
-      // Minimum Requirement: License Number + License Front Image
+      // 🚀 LOGIC: If AI extraction or Manual entry is successful (License Number exists)
       if (verification.licenseNumber && verification.licenseFrontUrl) {
         
-        // A. Auto Approve Profile
+        // 1. Auto Approve Verification
         await prisma.documentVerification.update({
           where: { userId: context.userId },
+          data: { status: 'APPROVED', verifiedAt: new Date() }
+        });
+
+        // 2. Move PENDING bookings to VERIFIED (Ready for Payment)
+        await prisma.booking.updateMany({
+          where: { 
+            userId: context.userId, 
+            status: 'PENDING' 
+          },
           data: { 
-            status: 'APPROVED', 
-            verifiedAt: new Date() 
+            status: 'VERIFIED',
+            updatedAt: new Date() // Reset 15-min payment timer
           }
         });
-
-        // B. Find "PENDING" bookings for this user
-        const pendingBookings = await prisma.booking.findMany({
-          where: { userId: context.userId, status: 'PENDING' }
-        });
-
-        // C. Update Booking Status to VERIFIED
-        // Important: Update `updatedAt` to reset the 15-minute payment timer
-        if (pendingBookings.length > 0) {
-            await prisma.booking.updateMany({
-                where: { userId: context.userId, status: 'PENDING' },
-                data: { status: 'VERIFIED', updatedAt: new Date() }
-            });
-            console.log(`✅ Auto-verified ${pendingBookings.length} bookings for user ${context.userId}`);
-        }
       }
-      // 🚀 LOGIC END
 
       return verification;
     },
 
+    // 🔥 UPDATED: Admin Manual Verification
     verifyDocument: async (_: any, { userId, status, reason }: any, context: any) => {
       isAdmin(context);
-      return await prisma.documentVerification.update({
+
+      const verification = await prisma.documentVerification.update({
         where: { userId },
         data: {
           status,
@@ -152,6 +145,22 @@ export const userResolvers = {
           verifiedAt: status === 'APPROVED' ? new Date() : null
         }
       });
+
+      // 🚀 LOGIC: If Admin manual approves, Move all pending/verified to CONFIRMED
+      if (status === 'APPROVED') {
+        await prisma.booking.updateMany({
+          where: { 
+            userId, 
+            status: { in: ['PENDING', 'VERIFIED'] } 
+          },
+          data: { 
+            status: 'CONFIRMED', 
+            updatedAt: new Date() 
+          }
+        });
+      }
+
+      return verification;
     },
 
     processDocumentOCR: async (_: any, { file, documentType, side }: any, context: any) => {

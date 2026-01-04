@@ -23,7 +23,7 @@ const checkCarAvailabilityForBooking = async (carId, startDate, endDate) => {
     // - CONFIRMED (Paid, waiting for pickup)
     // - ONGOING (Car is out)
     // - RESERVED (Admin blocked)
-    const conflictStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'RESERVED'];
+    const conflictStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING'];
     const conflictingBookings = await database_1.default.booking.findMany({
         where: {
             AND: [

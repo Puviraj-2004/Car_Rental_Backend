@@ -17,7 +17,7 @@ const buildBookingAvailabilityFilter = (startDateTime, endDateTime, includeBuffe
     const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0; // 24 Hours buffer if enabled
     // 🛑 BLOCKING STATUSES:
     // If a booking is in any of these states, the car is NOT available.
-    const conflictStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'RESERVED'];
+    const conflictStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING'];
     const dateOverlapConditions = includeBuffer ? [
         // 1. Direct Overlap
         {
@@ -121,13 +121,16 @@ exports.carResolvers = {
                     else {
                         endDateTime = new Date(`${filter.endDate}T10:00:00`);
                     }
-                    // Force status AVAILABLE when searching by date
-                    where.status = 'AVAILABLE';
-                    // Apply Booking Conflict Logic
+                    // ✅ INDUSTRIAL LOGIC CHANGE:
+                    // Allow cars that are 'AVAILABLE' OR 'RENTED'.
+                    // Even if a car is currently RENTED, it might be free during the requested future dates.
+                    // We exclude 'MAINTENANCE' and 'OUT_OF_SERVICE' because we don't know when they will be ready.
+                    where.status = { in: ['AVAILABLE', 'RENTED'] };
+                    // Apply Booking Calendar Conflict Logic
                     where.bookings = buildBookingAvailabilityFilter(startDateTime, endDateTime, true); // True = Include Buffer
                 }
                 else {
-                    // Date not selected - show everything except OUT_OF_SERVICE (unless admin override)
+                    // Date not selected - show cars based on status filter (default hides OUT_OF_SERVICE)
                     Object.assign(where, buildStatusFilter(filter.includeOutOfService));
                 }
             }
@@ -173,7 +176,8 @@ exports.carResolvers = {
             }
             return await database_1.default.car.findMany({
                 where: {
-                    status: 'AVAILABLE',
+                    // ✅ SAME LOGIC HERE: Check calendar availability for both Available and Rented cars
+                    status: { in: ['AVAILABLE', 'RENTED'] },
                     bookings: buildBookingAvailabilityFilter(startDateTime, endDateTime, false) // No buffer for quick check
                 },
                 include: { model: { include: { brand: true } }, images: true }
