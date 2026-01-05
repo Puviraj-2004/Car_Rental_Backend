@@ -30,7 +30,7 @@ export class OCRService {
     }
     this.debugEnabled = String(process.env.DEBUG_OCR || '').toLowerCase() === 'true';
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
   }
 
   private debugLog(message: string, data?: unknown) {

@@ -45,6 +45,7 @@ cloudinary.config({
   cloud_name: cloudName,
   api_key: apiKey,
   api_secret: apiSecret,
+  timeout: 120000,
 });
 
 // Helpful diagnostic (non-secret) for debugging invalid cloud name issues
@@ -113,14 +114,12 @@ export const uploadToCloudinary = async (
     fs.mkdirSync(uploadsDir, { recursive: true });
 
     const ext = originalFilename ? path.extname(originalFilename) : '.jpg';
-    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
     const fullPath = path.join(uploadsDir, safeName);
 
     if (Buffer.isBuffer(fileInput)) {
-      // If input is a Buffer, write it directly
       fs.writeFileSync(fullPath, fileInput);
     } else if (fileInput && typeof fileInput.pipe === 'function') {
-      // If input is a Stream, pipe it
       await new Promise((resolve, reject) => {
         const ws = fs.createWriteStream(fullPath);
         fileInput.pipe(ws);
@@ -137,87 +136,90 @@ export const uploadToCloudinary = async (
     return { secure_url: secureUrl, public_id: `local:uploads/${publicPath}`, url: secureUrl };
   }
 
-  return new Promise(async (resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        folder: `car_rental_industrial/${folder}`,
-        type: isPrivate ? 'authenticated' : 'upload',
-        resource_type: 'auto',
-      },
-      async (error, result) => {
-        if (error) {
-          console.error('Cloudinary Upload Error:', error);
-          // Mark Cloudinary as unavailable and store last error
-          cloudinaryReady = false;
-          lastCloudinaryValidationError = error;
-          console.warn('Disabling Cloudinary and falling back to local storage due to upload error.');
+  const saveLocallyAndReturn = async () => {
+    const uploadsDir = path.join(process.cwd(), 'uploads', 'car_rental_industrial', folder);
+    fs.mkdirSync(uploadsDir, { recursive: true });
 
-          // Fallback: save locally and return a compatible object
-          try {
-            const uploadsDir = path.join(process.cwd(), 'uploads', 'car_rental_industrial', folder);
-            fs.mkdirSync(uploadsDir, { recursive: true });
+    const ext = originalFilename ? path.extname(originalFilename) : '.jpg';
+    const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
+    const fullPath = path.join(uploadsDir, safeName);
 
-            const ext = originalFilename ? path.extname(originalFilename) : '.jpg';
-            const safeName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${ext}`;
-            const fullPath = path.join(uploadsDir, safeName);
-
-            // Handle both Buffer and Stream for fallback
-            if (Buffer.isBuffer(fileInput)) {
-              // If input was a Buffer, write it directly
-              fs.writeFileSync(fullPath, fileInput);
-            } else if (fileInput && typeof fileInput.pipe === 'function') {
-              // If input was a Stream, check if it's still readable
-              if (!fileInput.readable) {
-                console.error('Original file stream is not readable for local fallback. Please retry the upload.');
-                return reject(new Error('Upload failed and fallback is not available; retry the upload.'));
-              }
-
-              if (Buffer.isBuffer(fileInput)) {
-                // If input was a Buffer, write it directly
-                fs.writeFileSync(fullPath, fileInput);
-              } else if (fileInput && typeof fileInput.pipe === 'function') {
-                // If input was a Stream, pipe it
-                await new Promise((res, rej) => {
-                  const ws = fs.createWriteStream(fullPath);
-                  fileInput.pipe(ws);
-                  ws.on('finish', res);
-                  ws.on('error', rej);
-                });
-              } else {
-                console.error('Unsupported file input type for fallback');
-                return reject(new Error('Unsupported file input type'));
-              }
-            } else {
-              console.error('Unsupported file input type for fallback');
-              return reject(new Error('Unsupported file input type'));
-            }
-
-            const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
-            const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
-            console.log(`Saved upload locally at ${fullPath} as fallback`);
-            return resolve({ secure_url: secureUrl, public_id: `local:uploads/${publicPath}`, url: secureUrl });
-          } catch (fallbackErr) {
-            console.error('Local fallback save failed:', fallbackErr);
-            return reject(error);
-          }
-        }
-        resolve(result);
-      }
-    );
-
-    // Handle both Buffer and Stream inputs
     if (Buffer.isBuffer(fileInput)) {
-      // If input is a Buffer, create a readable stream from it
-      const { Readable } = require('stream');
-      const readableStream = Readable.from(fileInput);
-      readableStream.pipe(stream);
+      fs.writeFileSync(fullPath, fileInput);
     } else if (fileInput && typeof fileInput.pipe === 'function') {
-      // If input is a Stream, pipe it directly
-      fileInput.pipe(stream);
+      await new Promise((resolve, reject) => {
+        const ws = fs.createWriteStream(fullPath);
+        fileInput.pipe(ws);
+        ws.on('finish', resolve);
+        ws.on('error', reject);
+      });
     } else {
-      reject(new Error('Unsupported file input type'));
+      throw new Error('Unsupported file input type');
     }
-  });
+
+    const publicPath = path.join('car_rental_industrial', folder, safeName).replace(/\\/g, '/');
+    const secureUrl = `${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 4000}`}/uploads/${publicPath}`;
+    console.log(`Saved upload locally at ${fullPath}`);
+    return { secure_url: secureUrl, public_id: `local:uploads/${publicPath}`, url: secureUrl };
+  };
+
+  const attemptUpload = async (attempt: number): Promise<any> => {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: `car_rental_industrial/${folder}`,
+          type: isPrivate ? 'authenticated' : 'upload',
+          resource_type: 'auto',
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          return resolve(result);
+        }
+      );
+
+      // Handle both Buffer and Stream inputs
+      if (Buffer.isBuffer(fileInput)) {
+        const { Readable } = require('stream');
+        Readable.from(fileInput).pipe(stream);
+      } else if (fileInput && typeof fileInput.pipe === 'function') {
+        fileInput.pipe(stream);
+      } else {
+        reject(new Error('Unsupported file input type'));
+      }
+    }).catch(async (error) => {
+      const httpCode = (error as any)?.http_code;
+      const name = (error as any)?.name;
+      const message = String((error as any)?.message || '');
+      const isTimeout = httpCode === 499 || name === 'TimeoutError' || /timeout/i.test(message);
+
+      // Retry once on transient timeouts (do not permanently disable Cloudinary)
+      if (isTimeout && attempt < 2) {
+        console.warn(`Cloudinary upload timed out (attempt ${attempt}). Retrying...`);
+        return attemptUpload(attempt + 1);
+      }
+
+      console.error('Cloudinary Upload Error:', error);
+
+      // Only disable Cloudinary on auth/config errors; timeouts are transient.
+      if (httpCode === 401 || /invalid cloud_name/i.test(message)) {
+        cloudinaryReady = false;
+        lastCloudinaryValidationError = error;
+        console.warn('Disabling Cloudinary due to authentication/config error. Falling back to local storage.');
+      } else {
+        lastCloudinaryValidationError = error;
+        console.warn('Falling back to local storage due to Cloudinary upload error.');
+      }
+
+      try {
+        return await saveLocallyAndReturn();
+      } catch (fallbackErr) {
+        console.error('Local fallback save failed:', fallbackErr);
+        throw error;
+      }
+    });
+  };
+
+  return attemptUpload(1);
 };
 
 export const deleteFromCloudinary = async (publicId: string): Promise<void> => {

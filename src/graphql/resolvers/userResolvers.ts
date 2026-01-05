@@ -3,6 +3,7 @@ import prisma from '../../utils/database';
 import { generateToken, hashPassword, comparePasswords } from '../../utils/auth';
 import { isAuthenticated, isAdmin } from '../../utils/authguard';
 import { OCRService } from '../../services/ocrService';
+import { uploadToCloudinary } from '../../utils/cloudinary';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const USER_INCLUDES = { verification: true, bookings: true };
@@ -88,12 +89,29 @@ export const userResolvers = {
         where: { userId: context.userId }
       });
 
+      const uploadIfPresent = async (upload: any, folder: string) => {
+        if (!upload) return undefined;
+        const uploadObj = await upload;
+        const { filename, createReadStream } = uploadObj || {};
+        if (!createReadStream) throw new Error('File upload failed: createReadStream is not available.');
+        const stream = createReadStream();
+        const result = await uploadToCloudinary(stream, folder, false, filename);
+        return result?.secure_url as string;
+      };
+
+      const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
+        uploadIfPresent(input.licenseFrontFile, 'verifications'),
+        uploadIfPresent(input.licenseBackFile, 'verifications'),
+        uploadIfPresent(input.idCardFile, 'verifications'),
+        uploadIfPresent(input.addressProofFile, 'verifications'),
+      ]);
+
       const dataToSave = {
         licenseCategory: input.licenseCategory || 'B',
-        licenseFrontUrl: input.licenseFrontUrl || existingVerification?.licenseFrontUrl,
-        licenseBackUrl: input.licenseBackUrl || existingVerification?.licenseBackUrl,
-        idCardUrl: input.idCardUrl || existingVerification?.idCardUrl,
-        addressProofUrl: input.addressProofUrl || existingVerification?.addressProofUrl,
+        licenseFrontUrl: licenseFrontUrl || input.licenseFrontUrl || existingVerification?.licenseFrontUrl,
+        licenseBackUrl: licenseBackUrl || input.licenseBackUrl || existingVerification?.licenseBackUrl,
+        idCardUrl: idCardUrl || input.idCardUrl || existingVerification?.idCardUrl,
+        addressProofUrl: addressProofUrl || input.addressProofUrl || existingVerification?.addressProofUrl,
         licenseNumber: input.licenseNumber || existingVerification?.licenseNumber,
         licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : existingVerification?.licenseExpiry,
         idNumber: input.idNumber || existingVerification?.idNumber,
@@ -107,23 +125,42 @@ export const userResolvers = {
         create: { user: { connect: { id: context.userId } }, ...dataToSave }
       });
 
-      if (verification.licenseNumber && verification.licenseFrontUrl) {
-        
+      const hasAllDocs =
+        !!verification.licenseNumber &&
+        !!verification.licenseFrontUrl &&
+        !!verification.licenseBackUrl &&
+        !!verification.idCardUrl &&
+        !!verification.addressProofUrl;
+
+      if (hasAllDocs) {
         await prisma.documentVerification.update({
           where: { userId: context.userId },
           data: { status: 'APPROVED', verifiedAt: new Date() }
         });
 
-        await prisma.booking.updateMany({
-          where: { 
-            userId: context.userId, 
-            status: 'PENDING' 
-          },
-          data: { 
-            status: 'VERIFIED',
-            updatedAt: new Date() // Reset 15-min payment timer
+        if (input.bookingToken) {
+          const bookingVerification = await prisma.bookingVerification.findUnique({
+            where: { token: input.bookingToken }
+          });
+
+          if (bookingVerification?.bookingId) {
+            await prisma.booking.update({
+              where: { id: bookingVerification.bookingId },
+              data: { status: 'VERIFIED', updatedAt: new Date() }
+            });
           }
-        });
+        } else {
+          await prisma.booking.updateMany({
+            where: {
+              userId: context.userId,
+              status: 'PENDING'
+            },
+            data: {
+              status: 'VERIFIED',
+              updatedAt: new Date() // Reset 15-min payment timer
+            }
+          });
+        }
       }
 
       return verification;

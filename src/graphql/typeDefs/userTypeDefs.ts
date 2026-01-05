@@ -143,10 +143,16 @@ export const userTypeDefs = gql`
   }
 
   input DocumentVerificationInput {
+    bookingToken: String
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
     addressProofUrl: String
+
+    licenseFrontFile: Upload
+    licenseBackFile: Upload
+    idCardFile: Upload
+    addressProofFile: Upload
     
     licenseNumber: String
     licenseExpiry: String
