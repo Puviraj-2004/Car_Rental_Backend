@@ -21,6 +21,11 @@ export const paymentTypeDefs = gql`
     updatedAt: String!
   }
 
+  type StripeCheckoutSession {
+    url: String!
+    sessionId: String!
+  }
+
   input CreatePaymentInput {
     bookingId: ID!
     amount: Float!
@@ -42,5 +47,7 @@ export const paymentTypeDefs = gql`
   type Mutation {
     createPayment(input: CreatePaymentInput!): Payment!
     updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
+    createStripeCheckoutSession(bookingId: ID!): StripeCheckoutSession!
+    mockFinalizePayment(bookingId: ID!, success: Boolean!): Payment!
   }
 `;

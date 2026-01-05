@@ -22,6 +22,21 @@ async function startServer() {
   const app = express();
   const httpServer = http.createServer(app);
 
+  const isMockStripe = (process.env.MOCK_STRIPE || '').toLowerCase() === 'true';
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+  const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+  let stripe: any = null;
+  if (!isMockStripe && stripeSecretKey) {
+    try {
+      // Lazy require so MOCK_STRIPE=true works without installing stripe
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const Stripe = require('stripe');
+      stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+    } catch (e) {
+      stripe = null;
+    }
+  }
+
   const server = new ApolloServer({
     typeDefs,
     resolvers,
@@ -45,6 +60,56 @@ async function startServer() {
   }));
   
   app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
+
+  app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+      if (isMockStripe) {
+        return res.status(204).send();
+      }
+
+      if (!stripe || !stripeWebhookSecret) {
+        return res.status(500).json({ error: 'Stripe is not configured' });
+      }
+
+      const sig = req.headers['stripe-signature'];
+      if (!sig || Array.isArray(sig)) {
+        return res.status(400).json({ error: 'Missing stripe-signature header' });
+      }
+
+      const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as any;
+        const bookingId = session?.metadata?.bookingId;
+        const amountTotal = typeof session?.amount_total === 'number' ? session.amount_total : undefined;
+
+        if (bookingId) {
+          await prisma.payment.upsert({
+            where: { bookingId },
+            update: {
+              status: 'SUCCEEDED',
+              stripeId: session.id,
+              amount: amountTotal !== undefined ? amountTotal / 100 : undefined,
+            },
+            create: {
+              bookingId,
+              amount: amountTotal !== undefined ? amountTotal / 100 : 0,
+              status: 'SUCCEEDED',
+              stripeId: session.id
+            },
+          });
+
+          await prisma.booking.update({
+            where: { id: bookingId },
+            data: { status: 'CONFIRMED' },
+          });
+        }
+      }
+
+      return res.json({ received: true });
+    } catch (e: any) {
+      return res.status(400).json({ error: e.message || 'Webhook Error' });
+    }
+  });
 
   // 2. Body Parsing & Static Files
   app.use(bodyParser.json());
