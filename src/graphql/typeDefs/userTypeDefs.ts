@@ -17,10 +17,20 @@ export const userTypeDefs = gql`
 
   enum LicenseCategory {
     AM
+    A1
+    A2
     A
+    B1
     B
+    BE
+    C1
     C
+    C1E
+    CE
+    D1
     D
+    D1E
+    DE
   }
 
   enum DocumentType {

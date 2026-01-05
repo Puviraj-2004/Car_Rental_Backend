@@ -81,7 +81,6 @@ export const userResolvers = {
       }
     },
 
-    // 🔥 UPDATED: AI Verification & Auto Booking Update
     createOrUpdateVerification: async (_: any, { input }: { input: any }, context: any) => {
       isAuthenticated(context);
 
@@ -108,16 +107,13 @@ export const userResolvers = {
         create: { user: { connect: { id: context.userId } }, ...dataToSave }
       });
 
-      // 🚀 LOGIC: If AI extraction or Manual entry is successful (License Number exists)
       if (verification.licenseNumber && verification.licenseFrontUrl) {
         
-        // 1. Auto Approve Verification
         await prisma.documentVerification.update({
           where: { userId: context.userId },
           data: { status: 'APPROVED', verifiedAt: new Date() }
         });
 
-        // 2. Move PENDING bookings to VERIFIED (Ready for Payment)
         await prisma.booking.updateMany({
           where: { 
             userId: context.userId, 
@@ -133,7 +129,6 @@ export const userResolvers = {
       return verification;
     },
 
-    // 🔥 UPDATED: Admin Manual Verification
     verifyDocument: async (_: any, { userId, status, reason }: any, context: any) => {
       isAdmin(context);
 
@@ -146,7 +141,6 @@ export const userResolvers = {
         }
       });
 
-      // 🚀 LOGIC: If Admin manual approves, Move all pending/verified to CONFIRMED
       if (status === 'APPROVED') {
         await prisma.booking.updateMany({
           where: { 
@@ -166,7 +160,16 @@ export const userResolvers = {
     processDocumentOCR: async (_: any, { file, documentType, side }: any, context: any) => {
       isAuthenticated(context);
       try {
-        const { createReadStream } = await file;
+        const debugOcrEnabled = String(process.env.DEBUG_OCR || '').toLowerCase() === 'true';
+        if (debugOcrEnabled) {
+          console.log('[OCR][Resolver] processDocumentOCR called', {
+            userId: context?.userId,
+            documentType,
+            side,
+          });
+        }
+
+        const { createReadStream, mimetype } = await file;
         const stream = createReadStream();
         const chunks: Buffer[] = [];
         const buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -176,15 +179,49 @@ export const userResolvers = {
         });
 
         const ocrService = new OCRService();
-        const serviceDocType = documentType?.toLowerCase().replace('_', '');
-        const serviceSide = side?.toLowerCase();
+        const serviceDocType = (() => {
+          switch (documentType) {
+            case 'LICENSE':
+              return 'license';
+            case 'ID_CARD':
+              return 'id';
+            case 'ADDRESS_PROOF':
+              return 'address';
+            default:
+              return undefined;
+          }
+        })();
 
-        const ocrResult = await ocrService.extractDocumentData(buffer, serviceDocType, serviceSide);
+        const serviceSide = (() => {
+          switch (side) {
+            case 'FRONT':
+              return 'front';
+            case 'BACK':
+              return 'back';
+            default:
+              return undefined;
+          }
+        })();
+
+        if (debugOcrEnabled) {
+          console.log('[OCR][Resolver] upload received', {
+            mimetype,
+            bufferBytes: buffer.length,
+            serviceDocType,
+            serviceSide,
+          });
+        }
+
+        const ocrResult = await ocrService.extractDocumentData(buffer, serviceDocType, serviceSide, mimetype);
         if (ocrResult.isQuotaExceeded) return { isQuotaExceeded: true, fallbackUsed: false };
         return ocrResult;
 
       } catch (error) {
-        console.error('OCR Processing Error:', error);
+        console.error('OCR Processing Error:', {
+          message: (error as any)?.message,
+          name: (error as any)?.name,
+          stack: (error as any)?.stack,
+        });
         return { fallbackUsed: true, isQuotaExceeded: false };
       }
     },

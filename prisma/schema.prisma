@@ -47,10 +47,20 @@ enum VerificationStatus {
 
 enum LicenseCategory {
   AM // Mopeds
+  A1 // Light Motorcycles
+  A2 // Medium Motorcycles
   A  // Motorcycles
+  B1 // Light vehicles / quadricycles
   B  // Cars (Standard)
+  BE // Cars + trailer
+  C1 // Medium trucks
   C  // Heavy Vehicles
+  C1E // C1 + trailer
+  CE  // C + trailer
+  D1 // Minibus
   D  // Buses
+  D1E // D1 + trailer
+  DE  // D + trailer
 }
 
 enum CritAirCategory {

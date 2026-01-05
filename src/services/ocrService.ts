@@ -21,31 +21,50 @@ export interface ExtractedDocumentData {
 export class OCRService {
   private genAI: GoogleGenerativeAI;
   private model: GenerativeModel;
+  private debugEnabled: boolean;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is missing. Set it in your environment variables.');
     }
+    this.debugEnabled = String(process.env.DEBUG_OCR || '').toLowerCase() === 'true';
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-latest' });
+  }
+
+  private debugLog(message: string, data?: unknown) {
+    if (!this.debugEnabled) return;
+    if (data !== undefined) console.log(`[OCR][Gemini] ${message}`, data);
+    else console.log(`[OCR][Gemini] ${message}`);
   }
 
   async extractDocumentData(
     fileBuffer: Buffer,
     documentType?: 'license' | 'id' | 'address',
-    side?: 'front' | 'back'
+    side?: 'front' | 'back',
+    mimeType?: string
   ): Promise<ExtractedDocumentData> {
     try {
       const base64Image = fileBuffer.toString('base64');
       const prompt = this.createGeminiPrompt(documentType, side);
+      const safeMimeType = mimeType && mimeType.trim().length > 0 ? mimeType : 'image/jpeg';
+
+      this.debugLog('Request prepared', {
+        documentType,
+        side,
+        mimeType: safeMimeType,
+        bufferBytes: fileBuffer.length,
+        base64Chars: base64Image.length,
+      });
+      this.debugLog('Prompt', prompt);
 
       let result: any;
       try {
         result = await Promise.race([
           this.model.generateContent([
             prompt,
-            { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
+            { inlineData: { mimeType: safeMimeType, data: base64Image } }
           ]),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Gemini API timeout')), 30000)
@@ -53,6 +72,12 @@ export class OCRService {
         ]);
       } catch (apiError: any) {
         const msg = String(apiError?.message || '').toLowerCase();
+        this.debugLog('Gemini API error', {
+          message: apiError?.message,
+          name: apiError?.name,
+          status: apiError?.status,
+          code: apiError?.code,
+        });
         if (msg.includes('429') || msg.includes('quota') || msg.includes('exhausted')) {
           return { isQuotaExceeded: true };
         }
@@ -62,16 +87,43 @@ export class OCRService {
       const response = await result.response;
       const text = response.text();
 
+      this.debugLog('Gemini response received', {
+        textLength: text?.length || 0,
+        textPreview: text ? text.slice(0, 500) : '',
+      });
+
       if (!text || text.trim().length < 10) {
+        this.debugLog('Response too short/empty -> fallbackRegexExtraction');
         return this.fallbackRegexExtraction(text || 'empty');
       }
 
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
+        this.debugLog('No JSON object found in response -> fallbackRegexExtraction');
         return this.fallbackRegexExtraction(text);
       }
 
-      const extractedData = JSON.parse(jsonMatch[0]);
+      let extractedData: any;
+      try {
+        extractedData = JSON.parse(jsonMatch[0]);
+      } catch (e: any) {
+        this.debugLog('JSON.parse failed -> fallbackRegexExtraction', {
+          error: e?.message,
+          jsonPreview: jsonMatch[0]?.slice(0, 500),
+        });
+        return this.fallbackRegexExtraction(text);
+      }
+
+      this.debugLog('Parsed JSON', extractedData);
+
+      const rawLicenseCategory = (extractedData as any)?.licenseCategory;
+      const rawLicenseCategories = (extractedData as any)?.licenseCategories;
+      const mergedLicenseCategories = Array.from(
+        new Set([
+          ...(Array.isArray(rawLicenseCategories) ? rawLicenseCategories : []),
+          ...(Array.isArray(rawLicenseCategory) ? rawLicenseCategory : []),
+        ])
+      );
 
       const mapped: ExtractedDocumentData = {
         firstName: (extractedData.firstName || extractedData.prenom || '').trim(),
@@ -82,16 +134,22 @@ export class OCRService {
         expiryDate: extractedData.expiryDate || extractedData.documentDate || "",
         birthDate: extractedData.birthDate || "",
         address: extractedData.address || "",
-        licenseCategory: extractedData.licenseCategory || "",
-        licenseCategories: Array.isArray(extractedData.licenseCategories) ? extractedData.licenseCategories : undefined,
+        licenseCategory: typeof rawLicenseCategory === 'string' ? rawLicenseCategory : "",
+        licenseCategories: mergedLicenseCategories.length ? mergedLicenseCategories : undefined,
         restrictsToAutomatic: typeof extractedData.restrictsToAutomatic === 'boolean' ? extractedData.restrictsToAutomatic : undefined,
         documentDate: extractedData.documentDate || "",
         issueDate: extractedData.issueDate || "",
         fallbackUsed: false,
       };
 
-      return this.sanitizeExtractedData(mapped);
+      const sanitized = this.sanitizeExtractedData(mapped);
+      this.debugLog('Sanitized extracted data', sanitized);
+      return sanitized;
     } catch (error) {
+      this.debugLog('Unhandled OCRService error -> handleFallbackSystem', {
+        message: (error as any)?.message,
+        name: (error as any)?.name,
+      });
       return this.handleFallbackSystem(fileBuffer, documentType);
     }
   }
@@ -99,7 +157,14 @@ export class OCRService {
   private createGeminiPrompt(documentType?: string, side?: 'front' | 'back'): string {
     switch (documentType) {
       case 'license':
-        return `OCR for French license (${side}). Extract JSON: {firstName, lastName, birthDate, expiryDate, licenseNumber, licenseCategories:[], licenseCategory, restrictsToAutomatic:bool}. Dates: YYYY-MM-DD. Return null for fields not found.`;
+        return `OCR for French driving license (${side}). Extract JSON ONLY: {firstName, lastName, birthDate, expiryDate, licenseNumber, licenseCategories:[], licenseCategory, restrictsToAutomatic:bool}.
+
+Rules:
+- Return ONLY categories that are explicitly visible/printed on the document (e.g. AM, A1, A2, A, B1, B, BE, C1, C, C1E, CE, D1, D, D1E, DE). Do NOT guess.
+- If you cannot clearly read categories, return licenseCategories: [] and licenseCategory: null.
+- Dates must be YYYY-MM-DD.
+- Return null for fields not found.
+`;
       case 'id':
         return `OCR for French ID card. Extract JSON: {firstName, lastName, documentId, birthDate, expiryDate}. Dates: YYYY-MM-DD. Return null for fields not found.`;
       case 'address':
@@ -114,31 +179,71 @@ export class OCRService {
     const highest = this.pickHighestCategory(categories);
     const finalCategory = this.normalizeLicenseCategory(data.licenseCategory || highest);
 
+    // Heuristic: if model returns an implausibly large set of categories,
+    // treat categories as unreliable and avoid auto-prefill.
+    const maxReasonableCategories = 6;
+    const categoriesAreSuspicious = categories.length > maxReasonableCategories;
+
     return {
       ...data,
       fullName: data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
       birthDate: this.normalizeDateToIso(data.birthDate || ''),
       expiryDate: this.normalizeDateToIso(data.expiryDate || ''),
-      licenseCategory: finalCategory || undefined, 
-      licenseCategories: categories.length ? categories : undefined,
-      fallbackUsed: !!data.fallbackUsed
+      licenseCategory: categoriesAreSuspicious ? undefined : (finalCategory || undefined),
+      licenseCategories: categoriesAreSuspicious ? undefined : (categories.length ? categories : undefined),
+      fallbackUsed: !!data.fallbackUsed || categoriesAreSuspicious
     };
   }
 
   private normalizeLicenseCategories(input: any[]): string[] {
-    const allowed = new Set(['AM', 'A', 'B', 'C', 'D']);
-    return Array.from(new Set(input.map(c => String(c).toUpperCase().trim()).filter(c => allowed.has(c))));
+    const allowed = new Set([
+      'AM',
+      'A1', 'A2', 'A',
+      'B1', 'B', 'BE',
+      'C1', 'C', 'C1E', 'CE',
+      'D1', 'D', 'D1E', 'DE',
+    ]);
+
+    return Array.from(
+      new Set(
+        input
+          .map((c) => String(c).toUpperCase().trim())
+          .map((c) => c.replace(/\s+/g, ''))
+          .filter((c) => allowed.has(c))
+      )
+    );
   }
 
   private pickHighestCategory(categories: string[]): string {
-    const rank: Record<string, number> = { AM: 0, A: 1, B: 2, C: 3, D: 4 };
+    const rank: Record<string, number> = {
+      AM: 0,
+
+      A1: 10,
+      A2: 11,
+      A: 12,
+
+      B1: 20,
+      B: 21,
+      BE: 22,
+
+      C1: 30,
+      C: 31,
+      C1E: 32,
+      CE: 33,
+
+      D1: 40,
+      D: 41,
+      D1E: 42,
+      DE: 43,
+    };
     if (categories.length === 0) return '';
     return categories.reduce((prev, curr) => (rank[curr] > rank[prev] ? curr : prev), 'AM');
   }
 
   private normalizeLicenseCategory(input: string): string | undefined {
+    if (!input || typeof input !== 'string') return undefined;
     const normalized = input.toUpperCase().trim();
-    const valid = ['AM', 'A', 'B', 'C', 'D'];
+    const valid = ['AM', 'A1', 'A2', 'A', 'B1', 'B', 'BE', 'C1', 'C', 'C1E', 'CE', 'D1', 'D', 'D1E', 'DE'];
     return valid.includes(normalized) ? normalized : undefined;
   }
 
