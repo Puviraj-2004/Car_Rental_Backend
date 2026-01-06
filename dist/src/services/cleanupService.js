@@ -5,6 +5,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.cleanupService = void 0;
 const database_1 = __importDefault(require("../utils/database"));
+const securityLogger_1 = require("../utils/securityLogger");
+const client_1 = require("@prisma/client");
 class CleanupService {
     /**
      * Clean up old completed bookings (optional - for database maintenance)
@@ -16,7 +18,7 @@ class CleanupService {
             cutoffDate.setDate(cutoffDate.getDate() - daysOld);
             const oldBookings = await database_1.default.booking.findMany({
                 where: {
-                    status: 'COMPLETED',
+                    status: client_1.BookingStatus.COMPLETED,
                     updatedAt: {
                         lt: cutoffDate
                     }
@@ -27,17 +29,18 @@ class CleanupService {
             }
             const { count } = await database_1.default.booking.deleteMany({
                 where: {
-                    status: 'COMPLETED',
+                    status: client_1.BookingStatus.COMPLETED,
                     updatedAt: {
                         lt: cutoffDate
                     }
                 }
             });
-            console.log(`Deleted ${count} old bookings.`);
+            securityLogger_1.securityLogger.info('Cleanup completed', { deletedBookings: count });
             return { deletedCount: count };
         }
         catch (error) {
-            console.error('❌ Error during old bookings cleanup:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            securityLogger_1.securityLogger.error('Cleanup operation failed', { error: errorMessage, operation: 'oldBookingsCleanup' });
             throw new Error('Failed to cleanup old completed bookings');
         }
     }
@@ -48,7 +51,7 @@ class CleanupService {
         try {
             const oldCompletedBookings = await database_1.default.booking.count({
                 where: {
-                    status: 'COMPLETED',
+                    status: client_1.BookingStatus.COMPLETED,
                     updatedAt: {
                         lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
                     }
@@ -60,7 +63,8 @@ class CleanupService {
             };
         }
         catch (error) {
-            console.error('❌ Error getting cleanup stats:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            securityLogger_1.securityLogger.error('Failed to get cleanup stats', { error: errorMessage, operation: 'getCleanupStats' });
             throw new Error('Failed to get cleanup statistics');
         }
     }

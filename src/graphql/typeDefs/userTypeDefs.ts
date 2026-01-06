@@ -1,4 +1,3 @@
-// backend/src/graphql/typeDefs/userTypeDefs.ts
 import { gql } from 'graphql-tag';
 
 export const userTypeDefs = gql`

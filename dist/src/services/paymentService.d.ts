@@ -1,0 +1,183 @@
+import { PaymentStatus, CreatePaymentInput } from '../types/graphql';
+export declare class PaymentService {
+    private getStripeClient;
+    createStripeSession(bookingId: string): Promise<{
+        url: any;
+        sessionId: any;
+    }>;
+    finalizeMockPayment(bookingId: string, success: boolean): Promise<{
+        booking: {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            surchargeAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
+        id: string;
+        bookingId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.PaymentStatus;
+        amount: number;
+        stripeId: string | null;
+    }>;
+    processManualPayment(input: CreatePaymentInput): Promise<{
+        booking: {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            surchargeAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
+        id: string;
+        bookingId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.PaymentStatus;
+        amount: number;
+        stripeId: string | null;
+    }>;
+    getAllPayments(): Promise<({
+        booking: {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            surchargeAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
+        id: string;
+        bookingId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.PaymentStatus;
+        amount: number;
+        stripeId: string | null;
+    })[]>;
+    getPaymentByBookingId(bookingId: string): Promise<({
+        booking: {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            surchargeAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
+        id: string;
+        bookingId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.PaymentStatus;
+        amount: number;
+        stripeId: string | null;
+    }) | null>;
+    updatePaymentStatus(id: string, status: PaymentStatus): Promise<{
+        booking: {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            userId: string;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            surchargeAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
+        id: string;
+        bookingId: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.PaymentStatus;
+        amount: number;
+        stripeId: string | null;
+    }>;
+    getBookingForAuth(bookingId: string): Promise<{
+        userId: string;
+    } | null>;
+}
+export declare const paymentService: PaymentService;
+//# sourceMappingURL=paymentService.d.ts.map

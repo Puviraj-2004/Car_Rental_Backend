@@ -1,4 +1,6 @@
 import prisma from '../utils/database';
+import { securityLogger } from '../utils/securityLogger';
+import { BookingStatus } from '@prisma/client';
 
 class CleanupService {
   /**
@@ -12,7 +14,7 @@ class CleanupService {
 
       const oldBookings = await prisma.booking.findMany({
         where: {
-          status: 'COMPLETED',
+          status: BookingStatus.COMPLETED,
           updatedAt: {
             lt: cutoffDate
           }
@@ -25,18 +27,19 @@ class CleanupService {
 
       const { count } = await prisma.booking.deleteMany({
         where: {
-          status: 'COMPLETED',
+          status: BookingStatus.COMPLETED,
           updatedAt: {
             lt: cutoffDate
           }
         }
       });
 
-      console.log(`Deleted ${count} old bookings.`);
+      securityLogger.info('Cleanup completed', { deletedBookings: count });
       return { deletedCount: count };
 
     } catch (error) {
-      console.error('❌ Error during old bookings cleanup:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      securityLogger.error('Cleanup operation failed', { error: errorMessage, operation: 'oldBookingsCleanup' });
       throw new Error('Failed to cleanup old completed bookings');
     }
   }
@@ -48,7 +51,7 @@ class CleanupService {
     try {
       const oldCompletedBookings = await prisma.booking.count({
         where: {
-          status: 'COMPLETED',
+          status: BookingStatus.COMPLETED,
           updatedAt: {
             lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
           }
@@ -60,7 +63,8 @@ class CleanupService {
         totalPendingCleanup: oldCompletedBookings
       };
     } catch (error) {
-      console.error('❌ Error getting cleanup stats:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      securityLogger.error('Failed to get cleanup stats', { error: errorMessage, operation: 'getCleanupStats' });
       throw new Error('Failed to get cleanup statistics');
     }
   }

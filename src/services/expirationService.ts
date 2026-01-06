@@ -1,5 +1,7 @@
 import cron from 'node-cron';
 import prisma from '../utils/database';
+import { securityLogger } from '../utils/securityLogger';
+import { BookingStatus } from '@prisma/client';
 
 class ExpirationService {
   /**
@@ -7,7 +9,7 @@ class ExpirationService {
    * Industrial Standard: High frequency check for precise inventory release.
    */
   startExpirationService(): void {
-    console.log('⏳ Expiration Service Started: Monitoring Booking Lifecycle...');
+    securityLogger.info('Expiration service started', { message: 'Monitoring booking lifecycle' });
     
     // Run every minute
     cron.schedule('*/1 * * * *', async () => {
@@ -30,7 +32,7 @@ class ExpirationService {
       // Condition: Created > 1 hour ago AND User hasn't uploaded anything for 15 mins.
       const stalePendingBookings = await prisma.booking.findMany({
         where: {
-          status: 'PENDING',
+          status: BookingStatus.PENDING,
           createdAt: { lt: oneHourAgo },
           updatedAt: { lt: fifteenMinsAgo } 
         },
@@ -38,10 +40,10 @@ class ExpirationService {
       });
 
       if (stalePendingBookings.length > 0) {
-        console.log(`❌ Auto-cancelling ${stalePendingBookings.length} stale PENDING bookings...`);
+        securityLogger.warn('Auto-cancelling stale bookings', { count: stalePendingBookings.length, status: 'PENDING' });
         await prisma.booking.updateMany({
           where: { id: { in: stalePendingBookings.map(b => b.id) } },
-          data: { status: 'CANCELLED', updatedAt: now }
+          data: { status: BookingStatus.CANCELLED, updatedAt: now }
         });
       }
 
@@ -52,7 +54,7 @@ class ExpirationService {
       // Condition: User hasn't paid within 15 minutes of verification.
       const unpaidVerifiedBookings = await prisma.booking.findMany({
         where: {
-          status: 'VERIFIED',
+          status: BookingStatus.VERIFIED,
           payment: null, // No payment record exists
           updatedAt: { lt: fifteenMinsAgo }
         },
@@ -60,10 +62,10 @@ class ExpirationService {
       });
 
       if (unpaidVerifiedBookings.length > 0) {
-        console.log(`⚠️ Releasing inventory for ${unpaidVerifiedBookings.length} unpaid VERIFIED bookings...`);
+        securityLogger.warn('Releasing inventory for unpaid bookings', { count: unpaidVerifiedBookings.length, status: 'VERIFIED' });
         await prisma.booking.updateMany({
           where: { id: { in: unpaidVerifiedBookings.map(b => b.id) } },
-          data: { status: 'CANCELLED', updatedAt: now }
+          data: { status: BookingStatus.CANCELLED, updatedAt: now }
         });
       }
 
@@ -79,7 +81,8 @@ class ExpirationService {
       });
 
     } catch (error) {
-      console.error('❌ Error in Expiration Service:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      securityLogger.error('Expiration service error', { error: errorMessage, operation: 'expirationCheck' });
     }
   }
 

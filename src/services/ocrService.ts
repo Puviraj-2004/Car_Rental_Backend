@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
+import { OCRResult } from '../types/graphql';
 
 export interface ExtractedDocumentData {
   firstName?: string;
@@ -33,10 +34,8 @@ export class OCRService {
     this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
   }
 
-  private debugLog(message: string, data?: unknown) {
+  private debugLog(_message: string, _data?: unknown) {
     if (!this.debugEnabled) return;
-    if (data !== undefined) console.log(`[OCR][Gemini] ${message}`, data);
-    else console.log(`[OCR][Gemini] ${message}`);
   }
 
   async extractDocumentData(
@@ -59,7 +58,7 @@ export class OCRService {
       });
       this.debugLog('Prompt', prompt);
 
-      let result: any;
+      let result: any; // Keep as any for OCR API response flexibility
       try {
         result = await Promise.race([
           this.model.generateContent([
@@ -103,7 +102,7 @@ export class OCRService {
         return this.fallbackRegexExtraction(text);
       }
 
-      let extractedData: any;
+      let extractedData: Partial<OCRResult>;
       try {
         extractedData = JSON.parse(jsonMatch[0]);
       } catch (e: any) {
@@ -195,7 +194,7 @@ Rules:
     };
   }
 
-  private normalizeLicenseCategories(input: any[]): string[] {
+  private normalizeLicenseCategories(input: (string | undefined)[]): string[] {
     const allowed = new Set([
       'AM',
       'A1', 'A2', 'A',
@@ -263,7 +262,7 @@ Rules:
     return (n < 1900 || n > 2100) ? `20${year.slice(-2)}` : year;
   }
 
-  private combineGeminiNameFields(data: any): string {
+  private combineGeminiNameFields(data: Partial<OCRResult>): string {
     if (data.fullName) return data.fullName.trim();
     return `${data.firstName || ''} ${data.lastName || ''}`.trim();
   }

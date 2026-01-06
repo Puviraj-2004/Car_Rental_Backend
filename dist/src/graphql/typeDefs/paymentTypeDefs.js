@@ -23,6 +23,11 @@ exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
     updatedAt: String!
   }
 
+  type StripeCheckoutSession {
+    url: String!
+    sessionId: String!
+  }
+
   input CreatePaymentInput {
     bookingId: ID!
     amount: Float!
@@ -44,6 +49,8 @@ exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
   type Mutation {
     createPayment(input: CreatePaymentInput!): Payment!
     updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
+    createStripeCheckoutSession(bookingId: ID!): StripeCheckoutSession!
+    mockFinalizePayment(bookingId: ID!, success: Boolean!): Payment!
   }
 `;
 //# sourceMappingURL=paymentTypeDefs.js.map

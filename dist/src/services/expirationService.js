@@ -6,13 +6,15 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.expirationService = void 0;
 const node_cron_1 = __importDefault(require("node-cron"));
 const database_1 = __importDefault(require("../utils/database"));
+const securityLogger_1 = require("../utils/securityLogger");
+const client_1 = require("@prisma/client");
 class ExpirationService {
     /**
      * Starts the cron job to check for expired bookings every 1 minute.
      * Industrial Standard: High frequency check for precise inventory release.
      */
     startExpirationService() {
-        console.log('⏳ Expiration Service Started: Monitoring Booking Lifecycle...');
+        securityLogger_1.securityLogger.info('Expiration service started', { message: 'Monitoring booking lifecycle' });
         // Run every minute
         node_cron_1.default.schedule('*/1 * * * *', async () => {
             await this.handleBookingExpirations();
@@ -32,17 +34,17 @@ class ExpirationService {
             // Condition: Created > 1 hour ago AND User hasn't uploaded anything for 15 mins.
             const stalePendingBookings = await database_1.default.booking.findMany({
                 where: {
-                    status: 'PENDING',
+                    status: client_1.BookingStatus.PENDING,
                     createdAt: { lt: oneHourAgo },
                     updatedAt: { lt: fifteenMinsAgo }
                 },
                 select: { id: true }
             });
             if (stalePendingBookings.length > 0) {
-                console.log(`❌ Auto-cancelling ${stalePendingBookings.length} stale PENDING bookings...`);
+                securityLogger_1.securityLogger.warn('Auto-cancelling stale bookings', { count: stalePendingBookings.length, status: 'PENDING' });
                 await database_1.default.booking.updateMany({
                     where: { id: { in: stalePendingBookings.map(b => b.id) } },
-                    data: { status: 'CANCELLED', updatedAt: now }
+                    data: { status: client_1.BookingStatus.CANCELLED, updatedAt: now }
                 });
             }
             // ---------------------------------------------------------
@@ -52,17 +54,17 @@ class ExpirationService {
             // Condition: User hasn't paid within 15 minutes of verification.
             const unpaidVerifiedBookings = await database_1.default.booking.findMany({
                 where: {
-                    status: 'VERIFIED',
+                    status: client_1.BookingStatus.VERIFIED,
                     payment: null, // No payment record exists
                     updatedAt: { lt: fifteenMinsAgo }
                 },
                 select: { id: true }
             });
             if (unpaidVerifiedBookings.length > 0) {
-                console.log(`⚠️ Releasing inventory for ${unpaidVerifiedBookings.length} unpaid VERIFIED bookings...`);
+                securityLogger_1.securityLogger.warn('Releasing inventory for unpaid bookings', { count: unpaidVerifiedBookings.length, status: 'VERIFIED' });
                 await database_1.default.booking.updateMany({
                     where: { id: { in: unpaidVerifiedBookings.map(b => b.id) } },
-                    data: { status: 'CANCELLED', updatedAt: now }
+                    data: { status: client_1.BookingStatus.CANCELLED, updatedAt: now }
                 });
             }
             // ---------------------------------------------------------
@@ -77,7 +79,8 @@ class ExpirationService {
             });
         }
         catch (error) {
-            console.error('❌ Error in Expiration Service:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            securityLogger_1.securityLogger.error('Expiration service error', { error: errorMessage, operation: 'expirationCheck' });
         }
     }
     /**

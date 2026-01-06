@@ -1,0 +1,1 @@
+{"version":3,"file":"platformService.d.ts","sourceRoot":"","sources":["../../../src/services/platformService.ts"],"names":[],"mappings":"AAIA,OAAO,EAAE,qBAAqB,EAAE,MAAM,kBAAkB,CAAC;AAEzD,qBAAa,eAAe;IACpB,mBAAmB;;;;;;;;;;;;IAuBnB,sBAAsB,CAAC,KAAK,EAAE,qBAAqB;;;;;;;;;;;;IA+BnD,qBAAqB,CAAC,OAAO,EAAE,MAAM;IAKrC,uBAAuB;CAG9B;AAED,eAAO,MAAM,eAAe,iBAAwB,CAAC"}

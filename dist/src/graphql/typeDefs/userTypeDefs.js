@@ -1,7 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userTypeDefs = void 0;
-// backend/src/graphql/typeDefs/userTypeDefs.ts
 const graphql_tag_1 = require("graphql-tag");
 exports.userTypeDefs = (0, graphql_tag_1.gql) `
   # --- Enums ---
@@ -19,10 +18,20 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
 
   enum LicenseCategory {
     AM
+    A1
+    A2
     A
+    B1
     B
+    BE
+    C1
     C
+    C1E
+    CE
+    D1
     D
+    D1E
+    DE
   }
 
   enum DocumentType {
@@ -135,10 +144,16 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   }
 
   input DocumentVerificationInput {
+    bookingToken: String
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
     addressProofUrl: String
+
+    licenseFrontFile: Upload
+    licenseBackFile: Upload
+    idCardFile: Upload
+    addressProofFile: Upload
     
     licenseNumber: String
     licenseExpiry: String

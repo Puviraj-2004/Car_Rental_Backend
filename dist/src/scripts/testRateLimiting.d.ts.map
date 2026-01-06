@@ -1,0 +1,1 @@
+{"version":3,"file":"testRateLimiting.d.ts","sourceRoot":"","sources":["../../../src/scripts/testRateLimiting.ts"],"names":[],"mappings":";AAEA;;;;;GAKG;AAYH,cAAM,kBAAkB;IACtB,OAAO,CAAC,OAAO,CAAoB;IAEnC,OAAO,CAAC,GAAG;YAWG,kBAAkB;IA8B1B,mBAAmB;IA6CnB,oBAAoB;IAsDpB,mBAAmB;IA2DnB,kBAAkB;IA+DlB,WAAW;CAkClB;AAQD,eAAe,kBAAkB,CAAC"}

@@ -19,32 +19,38 @@ exports.validatePassword = validatePassword;
 const validateCarData = (carData) => {
     const errors = [];
     // Required Fields
-    if (!carData.brandId)
-        errors.push('Brand is required');
     if (!carData.modelId)
         errors.push('Model is required');
     if (!carData.plateNumber?.trim())
         errors.push('Plate number is required');
-    if (!carData.fuelType)
-        errors.push('Fuel type is required');
     if (!carData.transmission)
         errors.push('Transmission is required');
+    if (!carData.seats)
+        errors.push('Seats is required');
+    if (!carData.pricePerDay)
+        errors.push('Price per day is required');
     if (!carData.critAirRating)
         errors.push('CritAir rating is required');
-    // Numeric Checks
-    if (carData.seats < 1 || carData.seats > 60)
-        errors.push('Invalid seats count');
-    if (carData.year < 1900 || carData.year > new Date().getFullYear() + 1)
+    if (!carData.year)
+        errors.push('Year is required');
+    // Validation Rules
+    if (carData.plateNumber && carData.plateNumber.length < 3)
+        errors.push('Plate number too short');
+    if (carData.seats && (carData.seats < 1 || carData.seats > 60))
+        errors.push('Invalid seats count (1-60)');
+    if (carData.year && (carData.year < 1900 || carData.year > new Date().getFullYear() + 1))
         errors.push('Invalid year');
-    // New Fields check
-    if (carData.mileage < 0)
-        errors.push('Mileage cannot be negative');
-    if (carData.depositAmount < 0)
+    if (carData.pricePerDay && carData.pricePerDay <= 0)
+        errors.push('Price per day must be positive');
+    // Optional Fields Validation
+    if (carData.depositAmount !== undefined && carData.depositAmount < 0)
         errors.push('Deposit cannot be negative');
-    // Ensure at least one price is set
-    if (!carData.pricePerDay && !carData.pricePerHour && !carData.pricePerKm) {
-        errors.push('Set at least one pricing (Day, Hour, or KM)');
-    }
+    if (carData.dailyKmLimit !== undefined && carData.dailyKmLimit <= 0)
+        errors.push('Daily KM limit must be positive');
+    if (carData.extraKmCharge !== undefined && carData.extraKmCharge < 0)
+        errors.push('Extra KM charge cannot be negative');
+    if (carData.currentOdometer !== undefined && carData.currentOdometer < 0)
+        errors.push('Current odometer cannot be negative');
     return { isValid: errors.length === 0, errors };
 };
 exports.validateCarData = validateCarData;
@@ -53,10 +59,6 @@ const validateBookingInput = (input) => {
     // Required field validation
     if (!input.carId)
         errors.push('Car ID is required');
-    // Since we only support daily pricing currently, enforce DAY rental type
-    if (input.rentalType && input.rentalType !== 'DAY') {
-        errors.push('Only daily rentals are currently supported');
-    }
     // Date validation - always required for bookings
     if (!input.startDate || !input.endDate) {
         errors.push('Both pickup and return dates are required');

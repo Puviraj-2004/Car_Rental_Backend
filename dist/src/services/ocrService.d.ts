@@ -18,8 +18,10 @@ export interface ExtractedDocumentData {
 export declare class OCRService {
     private genAI;
     private model;
+    private debugEnabled;
     constructor();
-    extractDocumentData(fileBuffer: Buffer, documentType?: 'license' | 'id' | 'address', side?: 'front' | 'back'): Promise<ExtractedDocumentData>;
+    private debugLog;
+    extractDocumentData(fileBuffer: Buffer, documentType?: 'license' | 'id' | 'address', side?: 'front' | 'back', mimeType?: string): Promise<ExtractedDocumentData>;
     private createGeminiPrompt;
     private sanitizeExtractedData;
     private normalizeLicenseCategories;
@@ -28,6 +30,7 @@ export declare class OCRService {
     private normalizeDateToIso;
     private fixOcrYear;
     private combineGeminiNameFields;
+    private handleFallbackSystem;
     private extractLicenseDataWithFallback;
     private extractIdCardDataWithFallback;
     private extractAddressDataWithFallback;

@@ -2,8 +2,8 @@ export declare const platformResolvers: {
     Query: {
         platformSettings: () => Promise<{
             id: string;
-            address: string | null;
             updatedAt: Date;
+            address: string | null;
             companyName: string;
             supportEmail: string | null;
             supportPhone: string | null;
@@ -12,18 +12,15 @@ export declare const platformResolvers: {
             youngDriverMinAge: number;
             youngDriverFee: number;
         }>;
-        auditLogs: (_: any, { limit: _limit, offset: _offset }: {
-            limit?: number;
-            offset?: number;
-        }, context: any) => Promise<never[]>;
+        auditLogs: (_: any, __: any, context: any) => Promise<never[]>;
     };
     Mutation: {
         updatePlatformSettings: (_: any, { input }: {
             input: any;
         }, context: any) => Promise<{
             id: string;
-            address: string | null;
             updatedAt: Date;
+            address: string | null;
             companyName: string;
             supportEmail: string | null;
             supportPhone: string | null;
@@ -32,7 +29,7 @@ export declare const platformResolvers: {
             youngDriverMinAge: number;
             youngDriverFee: number;
         }>;
-        cleanupExpiredVerifications: (_: any, __: any, _context: any) => Promise<{
+        cleanupExpiredVerifications: (_: any, __: any, context: any) => Promise<{
             success: boolean;
             message: string;
             deletedCount: number;
@@ -44,7 +41,7 @@ export declare const platformResolvers: {
             message: string;
             deletedCount: number;
         }>;
-        getCleanupStats: (_: any, __: any, _context: any) => Promise<{
+        getCleanupStats: (_: any, __: any, context: any) => Promise<{
             oldCompletedBookings: number;
             totalPendingCleanup: number;
         }>;
@@ -53,7 +50,7 @@ export declare const platformResolvers: {
             message: string;
             details: boolean;
         }>;
-        getExpirationStats: (_: any, __: any, _context: any) => Promise<{
+        getExpirationStats: (_: any, __: any, context: any) => Promise<{
             expiredAwaitingVerification: number;
             expiredAwaitingPayment: number;
             totalExpired: number;
