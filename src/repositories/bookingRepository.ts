@@ -1,7 +1,11 @@
 import prisma from '../utils/database';
-import { BookingStatus, CarStatus } from '../types/graphql';
-import { Prisma } from '@prisma/client';
+import { Prisma, BookingStatus, CarStatus } from '@prisma/client'; // ✅ Use Prisma native enums for repo
 
+/**
+ * Senior Architect Note:
+ * Centralized Include configurations.
+ * Added 'images: true' to the admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
+ */
 export const BOOKING_INCLUDES = {
   basic: {
     car: { include: { model: { include: { brand: true } } } },
@@ -15,22 +19,26 @@ export const BOOKING_INCLUDES = {
   },
   admin: {
     user: true,
-    car: { include: { model: { include: { brand: true } } } },
+    car: { include: { model: { include: { brand: true } }, images: true } }, // ✅ FIXED: Added images: true
     payment: true,
     verification: true
   }
 };
 
 export class BookingRepository {
-  async findMany(where: Prisma.BookingWhereInput, include?: Prisma.BookingInclude, orderBy: Prisma.BookingOrderByWithRelationInput = { createdAt: 'desc' }) {
+  async findMany(
+    where: Prisma.BookingWhereInput, 
+    include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed, 
+    orderBy: Prisma.BookingOrderByWithRelationInput = { createdAt: 'desc' }
+  ) {
     return await prisma.booking.findMany({ where, include, orderBy });
   }
 
-  async findUnique(id: string, include?: Prisma.BookingInclude) {
+  async findUnique(id: string, include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed) {
     return await prisma.booking.findUnique({ where: { id }, include });
   }
 
-  async findFirst(where: Prisma.BookingWhereInput, include?: Prisma.BookingInclude) {
+  async findFirst(where: Prisma.BookingWhereInput, include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed) {
     return await prisma.booking.findFirst({ where, include });
   }
 
@@ -39,7 +47,14 @@ export class BookingRepository {
   }
 
   async findConflicts(carId: string, startDate: Date, endDate: Date) {
-    const conflictStatuses = [BookingStatus.PENDING, BookingStatus.VERIFIED, BookingStatus.CONFIRMED, BookingStatus.ONGOING];
+    // 🛡️ Senior Logic: Strict Status-based conflict check
+    const conflictStatuses: BookingStatus[] = [
+      BookingStatus.PENDING, 
+      BookingStatus.VERIFIED, 
+      BookingStatus.CONFIRMED, 
+      BookingStatus.ONGOING
+    ];
+
     return await prisma.booking.findMany({
       where: {
         AND: [
@@ -66,7 +81,11 @@ export class BookingRepository {
     });
   }
 
-  async update(id: string, data: Prisma.BookingUpdateInput, include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed) {
+  async update(
+    id: string, 
+    data: Prisma.BookingUpdateInput, 
+    include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed
+  ) {
     return await prisma.booking.update({ where: { id }, data, include });
   }
 
@@ -74,32 +93,34 @@ export class BookingRepository {
     return await prisma.booking.delete({ where: { id } });
   }
 
+  // 🚀 Transactional Start Trip: Atomic update for Booking & Car
   async startTripTransaction(bookingId: string, carId: string) {
-    return await prisma.$transaction(async (tx) => {
-      const b = await tx.booking.update({
+    return await prisma.$transaction([
+      prisma.booking.update({
         where: { id: bookingId },
-        data: { status: BookingStatus.ONGOING, updatedAt: new Date() }
-      });
-      await tx.car.update({
+        data: { status: BookingStatus.ONGOING, updatedAt: new Date() },
+        include: BOOKING_INCLUDES.detailed
+      }),
+      prisma.car.update({
         where: { id: carId },
         data: { status: CarStatus.RENTED }
-      });
-      return b;
-    });
+      })
+    ]);
   }
 
+  // 🧹 Transactional Complete Trip: Booking to COMPLETED, Car to MAINTENANCE
   async completeTripTransaction(bookingId: string, carId: string) {
-    return await prisma.$transaction(async (tx) => {
-      const b = await tx.booking.update({
+    return await prisma.$transaction([
+      prisma.booking.update({
         where: { id: bookingId },
-        data: { status: BookingStatus.COMPLETED, updatedAt: new Date() }
-      });
-      await tx.car.update({
+        data: { status: BookingStatus.COMPLETED, updatedAt: new Date() },
+        include: BOOKING_INCLUDES.detailed
+      }),
+      prisma.car.update({
         where: { id: carId },
         data: { status: CarStatus.MAINTENANCE }
-      });
-      return b;
-    });
+      })
+    ]);
   }
 }
 

@@ -17,8 +17,6 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     ONGOING
     COMPLETED
     CANCELLED
-    RESERVED
-    EXPIRED
   }
 
   # --- Types ---
@@ -28,8 +26,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     user: User!
     carId: ID!
     car: Car!
-    startDate: String!
-    endDate: String!
+    startDate: DateTime!
+    endDate: DateTime!
     pickupTime: String
     returnTime: String
     basePrice: Float
@@ -51,6 +49,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     verification: BookingVerification
   }
 
+
   type BookingVerification {
     id: ID!
     token: String!
@@ -64,8 +63,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
   # --- Inputs ---
   input CreateBookingInput {
     carId: ID!
-    startDate: String!
-    endDate: String!
+    startDate: DateTime!
+    endDate: DateTime!
     pickupTime: String
     returnTime: String
     basePrice: Float
@@ -82,8 +81,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
   }
 
   input UpdateBookingInput {
-    startDate: String
-    endDate: String
+    startDate: DateTime
+    endDate: DateTime
     pickupTime: String
     returnTime: String
     basePrice: Float

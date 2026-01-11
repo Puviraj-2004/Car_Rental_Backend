@@ -180,7 +180,80 @@ export declare class BookingService {
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
     }>;
-    startTrip(bookingId: string): Promise<{
+    startTrip(bookingId: string): Promise<[{
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            model: {
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
+                id: string;
+                brandId: string;
+                name: string;
+            };
+            images: {
+                id: string;
+                carId: string;
+                isPrimary: boolean;
+                url: string;
+            }[];
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -203,8 +276,99 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }>;
-    completeTrip(bookingId: string): Promise<{
+    }, {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.CarStatus;
+        depositAmount: number;
+        year: number;
+        modelId: string;
+        plateNumber: string;
+        transmission: import(".prisma/client").$Enums.Transmission;
+        fuelType: import(".prisma/client").$Enums.FuelType | null;
+        seats: number;
+        requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+        pricePerDay: number;
+        dailyKmLimit: number | null;
+        extraKmCharge: number;
+        currentOdometer: number;
+        critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+    }]>;
+    completeTrip(bookingId: string): Promise<[{
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            model: {
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
+                id: string;
+                brandId: string;
+                name: string;
+            };
+            images: {
+                id: string;
+                carId: string;
+                isPrimary: boolean;
+                url: string;
+            }[];
+        } & {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -227,8 +391,81 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }>;
-    getBookingByToken(token: string): Promise<{
+    }, {
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        status: import(".prisma/client").$Enums.CarStatus;
+        depositAmount: number;
+        year: number;
+        modelId: string;
+        plateNumber: string;
+        transmission: import(".prisma/client").$Enums.Transmission;
+        fuelType: import(".prisma/client").$Enums.FuelType | null;
+        seats: number;
+        requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+        pricePerDay: number;
+        dailyKmLimit: number | null;
+        extraKmCharge: number;
+        currentOdometer: number;
+        critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+    }]>;
+    getBookingByToken(token: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -251,8 +488,63 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    } | null>;
-    getAllBookings(): Promise<{
+    }) | null>;
+    getAllBookings(): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -275,8 +567,63 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }[]>;
-    getBookingsByUserId(userId: string): Promise<{
+    })[]>;
+    getBookingsByUserId(userId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -299,8 +646,63 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }[]>;
-    getBookingById(id: string): Promise<{
+    })[]>;
+    getBookingById(id: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -323,8 +725,63 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    } | null>;
-    getBookingsByUserIdBasic(userId: string): Promise<{
+    }) | null>;
+    getBookingsByUserIdBasic(userId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -347,8 +804,63 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }[]>;
-    getBookingsByCarId(carId: string): Promise<{
+    })[]>;
+    getBookingsByCarId(carId: string): Promise<({
+        user: {
+            id: string;
+            email: string;
+            facebookId: string | null;
+            appleId: string | null;
+            googleId: string | null;
+            fullName: string | null;
+            password: string | null;
+            phoneNumber: string | null;
+            avatarUrl: string | null;
+            dateOfBirth: Date | null;
+            fullAddress: string | null;
+            role: import(".prisma/client").$Enums.Role;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        car: {
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        };
+        payment: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.PaymentStatus;
+            amount: number;
+            stripeId: string | null;
+        } | null;
+        verification: {
+            id: string;
+            bookingId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            verifiedAt: Date | null;
+            token: string;
+            expiresAt: Date;
+            isVerified: boolean;
+        } | null;
+    } & {
         id: string;
         startDate: Date;
         endDate: Date;
@@ -371,7 +883,7 @@ export declare class BookingService {
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
-    }[]>;
+    })[]>;
     getBookingForAuth(id: string): Promise<{
         userId: string;
     } | null>;

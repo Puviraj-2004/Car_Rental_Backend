@@ -5,7 +5,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bookingRepository = exports.BookingRepository = exports.BOOKING_INCLUDES = void 0;
 const database_1 = __importDefault(require("../utils/database"));
-const graphql_1 = require("../types/graphql");
+const client_1 = require("@prisma/client"); // ✅ Use Prisma native enums for repo
+/**
+ * Senior Architect Note:
+ * Centralized Include configurations.
+ * Added 'images: true' to the admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
+ */
 exports.BOOKING_INCLUDES = {
     basic: {
         car: { include: { model: { include: { brand: true } } } },
@@ -19,26 +24,32 @@ exports.BOOKING_INCLUDES = {
     },
     admin: {
         user: true,
-        car: { include: { model: { include: { brand: true } } } },
+        car: { include: { model: { include: { brand: true } }, images: true } }, // ✅ FIXED: Added images: true
         payment: true,
         verification: true
     }
 };
 class BookingRepository {
-    async findMany(where, include, orderBy = { createdAt: 'desc' }) {
+    async findMany(where, include = exports.BOOKING_INCLUDES.detailed, orderBy = { createdAt: 'desc' }) {
         return await database_1.default.booking.findMany({ where, include, orderBy });
     }
-    async findUnique(id, include) {
+    async findUnique(id, include = exports.BOOKING_INCLUDES.detailed) {
         return await database_1.default.booking.findUnique({ where: { id }, include });
     }
-    async findFirst(where, include) {
+    async findFirst(where, include = exports.BOOKING_INCLUDES.detailed) {
         return await database_1.default.booking.findFirst({ where, include });
     }
     async findVerificationToken(token) {
         return await database_1.default.bookingVerification.findUnique({ where: { token } });
     }
     async findConflicts(carId, startDate, endDate) {
-        const conflictStatuses = [graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED, graphql_1.BookingStatus.CONFIRMED, graphql_1.BookingStatus.ONGOING];
+        // 🛡️ Senior Logic: Strict Status-based conflict check
+        const conflictStatuses = [
+            client_1.BookingStatus.PENDING,
+            client_1.BookingStatus.VERIFIED,
+            client_1.BookingStatus.CONFIRMED,
+            client_1.BookingStatus.ONGOING
+        ];
         return await database_1.default.booking.findMany({
             where: {
                 AND: [
@@ -69,31 +80,33 @@ class BookingRepository {
     async delete(id) {
         return await database_1.default.booking.delete({ where: { id } });
     }
+    // 🚀 Transactional Start Trip: Atomic update for Booking & Car
     async startTripTransaction(bookingId, carId) {
-        return await database_1.default.$transaction(async (tx) => {
-            const b = await tx.booking.update({
+        return await database_1.default.$transaction([
+            database_1.default.booking.update({
                 where: { id: bookingId },
-                data: { status: graphql_1.BookingStatus.ONGOING, updatedAt: new Date() }
-            });
-            await tx.car.update({
+                data: { status: client_1.BookingStatus.ONGOING, updatedAt: new Date() },
+                include: exports.BOOKING_INCLUDES.detailed
+            }),
+            database_1.default.car.update({
                 where: { id: carId },
-                data: { status: graphql_1.CarStatus.RENTED }
-            });
-            return b;
-        });
+                data: { status: client_1.CarStatus.RENTED }
+            })
+        ]);
     }
+    // 🧹 Transactional Complete Trip: Booking to COMPLETED, Car to MAINTENANCE
     async completeTripTransaction(bookingId, carId) {
-        return await database_1.default.$transaction(async (tx) => {
-            const b = await tx.booking.update({
+        return await database_1.default.$transaction([
+            database_1.default.booking.update({
                 where: { id: bookingId },
-                data: { status: graphql_1.BookingStatus.COMPLETED, updatedAt: new Date() }
-            });
-            await tx.car.update({
+                data: { status: client_1.BookingStatus.COMPLETED, updatedAt: new Date() },
+                include: exports.BOOKING_INCLUDES.detailed
+            }),
+            database_1.default.car.update({
                 where: { id: carId },
-                data: { status: graphql_1.CarStatus.MAINTENANCE }
-            });
-            return b;
-        });
+                data: { status: client_1.CarStatus.MAINTENANCE }
+            })
+        ]);
     }
 }
 exports.BookingRepository = BookingRepository;

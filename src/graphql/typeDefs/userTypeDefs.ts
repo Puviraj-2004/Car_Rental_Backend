@@ -192,5 +192,7 @@ export const userTypeDefs = gql`
 
     # Payment Processing
     updatePaymentStatus(bookingId: ID!, status: String!): JSON
+
+    
   }
 `;

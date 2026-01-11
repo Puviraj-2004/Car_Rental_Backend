@@ -194,6 +194,8 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
 
     # Payment Processing
     updatePaymentStatus(bookingId: ID!, status: String!): JSON
+
+    
   }
 `;
 //# sourceMappingURL=userTypeDefs.js.map

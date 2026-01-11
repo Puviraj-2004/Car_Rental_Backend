@@ -1,1 +1,1 @@
-{"version":3,"file":"bookingTypeDefs.d.ts","sourceRoot":"","sources":["../../../../src/graphql/typeDefs/bookingTypeDefs.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,eAAe,gCA4H3B,CAAC"}
+{"version":3,"file":"bookingTypeDefs.d.ts","sourceRoot":"","sources":["../../../../src/graphql/typeDefs/bookingTypeDefs.ts"],"names":[],"mappings":"AAEA,eAAO,MAAM,eAAe,gCA2H3B,CAAC"}

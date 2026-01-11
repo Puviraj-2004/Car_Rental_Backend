@@ -75,11 +75,11 @@ export const validateBookingInput = (input: CreateBookingInput): ValidationResul
         errors.push('Pickup date cannot be in the past');
       }
 
-      // Minimum booking duration (2 hours)
+      // Minimum booking duration (1 hour)
       const durationMs = end.getTime() - start.getTime();
       const durationHours = durationMs / (1000 * 60 * 60);
-      if (durationHours < 2) {
-        errors.push('Minimum booking duration is 2 hours');
+      if (durationHours < 1) {
+        errors.push('Minimum booking duration is 1 hour');
       }
 
       // Maximum booking duration (30 days)
@@ -137,11 +137,11 @@ export const validateCarFilterInput = (filter: CarFilterInput): ValidationResult
             errors.push('Return date must be after pickup date');
           }
 
-          // Minimum booking duration (2 hours)
+          // Minimum booking duration (1 hour)
           const durationMs = end.getTime() - start.getTime();
           const durationHours = durationMs / (1000 * 60 * 60);
-          if (durationHours < 2) {
-            errors.push('Minimum booking duration is 2 hours');
+          if (durationHours < 1) {
+            errors.push('Minimum booking duration is 1 hour');
           }
 
           // Maximum booking duration (30 days)

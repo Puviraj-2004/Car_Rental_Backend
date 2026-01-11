@@ -15,8 +15,6 @@ export const bookingTypeDefs = gql`
     ONGOING
     COMPLETED
     CANCELLED
-    RESERVED
-    EXPIRED
   }
 
   # --- Types ---
@@ -26,8 +24,8 @@ export const bookingTypeDefs = gql`
     user: User!
     carId: ID!
     car: Car!
-    startDate: String!
-    endDate: String!
+    startDate: DateTime!
+    endDate: DateTime!
     pickupTime: String
     returnTime: String
     basePrice: Float
@@ -49,6 +47,7 @@ export const bookingTypeDefs = gql`
     verification: BookingVerification
   }
 
+
   type BookingVerification {
     id: ID!
     token: String!
@@ -62,8 +61,8 @@ export const bookingTypeDefs = gql`
   # --- Inputs ---
   input CreateBookingInput {
     carId: ID!
-    startDate: String!
-    endDate: String!
+    startDate: DateTime!
+    endDate: DateTime!
     pickupTime: String
     returnTime: String
     basePrice: Float
@@ -80,8 +79,8 @@ export const bookingTypeDefs = gql`
   }
 
   input UpdateBookingInput {
-    startDate: String
-    endDate: String
+    startDate: DateTime
+    endDate: DateTime
     pickupTime: String
     returnTime: String
     basePrice: Float
