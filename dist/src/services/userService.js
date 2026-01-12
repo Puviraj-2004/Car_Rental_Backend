@@ -10,9 +10,22 @@ const graphql_1 = require("../types/graphql");
 const securityLogger_1 = require("../utils/securityLogger");
 const validation_1 = require("../utils/validation");
 const client_1 = require("@prisma/client");
+const cloudinary_1 = require("../utils/cloudinary");
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ocrService = new ocrService_1.OCRService();
 class UserService {
+    async uploadIfPresent(file, folder) {
+        if (!file)
+            return undefined;
+        try {
+            const result = await (0, cloudinary_1.uploadToCloudinary)(file, folder);
+            return result.secure_url;
+        }
+        catch (e) {
+            console.error('Upload failed:', e);
+            return undefined;
+        }
+    }
     async register(input) {
         const { email, password, phoneNumber, firstName, lastName } = input;
         // Validate email format
@@ -116,16 +129,23 @@ class UserService {
         }
     }
     async createOrUpdateVerification(userId, input) {
-        // const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
-        //   this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
-        //   this.uploadIfPresent(input.licenseBackFile, 'verifications'),
-        //   this.uploadIfPresent(input.idCardFile, 'verifications'),
-        //   this.uploadIfPresent(input.addressProofFile, 'verifications'),
-        // ]);
-        // For now, create a basic verification record
+        const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
+            this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
+            this.uploadIfPresent(input.licenseBackFile, 'verifications'),
+            this.uploadIfPresent(input.idCardFile, 'verifications'),
+            this.uploadIfPresent(input.addressProofFile, 'verifications'),
+        ]);
+        // Save the verification data
         const dataToSave = {
-            documentType: input.documentType || 'LICENSE',
-            side: input.side || 'FRONT',
+            licenseFrontUrl,
+            licenseBackUrl,
+            idCardUrl,
+            addressProofUrl,
+            licenseNumber: input.licenseNumber,
+            licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : undefined,
+            licenseCategory: input.licenseCategory,
+            idNumber: input.idNumber,
+            idExpiry: input.idExpiry ? new Date(input.idExpiry) : undefined,
             status: client_1.VerificationStatus.PENDING
         };
         const verification = await userRepository_1.userRepository.upsertVerification(userId, dataToSave);

@@ -7,6 +7,7 @@ import { RegisterInput, LoginInput, UpdateUserInput, CreateVerificationInput, Bo
 import { logSecurityEvent } from '../utils/securityLogger';
 import { validatePassword } from '../utils/validation';
 import { VerificationStatus } from '@prisma/client';
+import { uploadToCloudinary } from '../utils/cloudinary';
 
 // Document verification status type (alias for Prisma enum)
 type DocumentVerificationStatus = VerificationStatus;
@@ -15,6 +16,16 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ocrService = new OCRService();
 
 export class UserService {
+  private async uploadIfPresent(file: any, folder: string): Promise<string | undefined> {
+    if (!file) return undefined;
+    try {
+      const result = await uploadToCloudinary(file, folder);
+      return result.secure_url;
+    } catch (e) {
+      console.error('Upload failed:', e);
+      return undefined;
+    }
+  }
   async register(input: RegisterInput) {
     const { email, password, phoneNumber, firstName, lastName } = input;
 
@@ -144,17 +155,24 @@ export class UserService {
 
 
   async createOrUpdateVerification(userId: string, input: CreateVerificationInput) {
-    // const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
-    //   this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
-    //   this.uploadIfPresent(input.licenseBackFile, 'verifications'),
-    //   this.uploadIfPresent(input.idCardFile, 'verifications'),
-    //   this.uploadIfPresent(input.addressProofFile, 'verifications'),
-    // ]);
+    const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
+      this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
+      this.uploadIfPresent(input.licenseBackFile, 'verifications'),
+      this.uploadIfPresent(input.idCardFile, 'verifications'),
+      this.uploadIfPresent(input.addressProofFile, 'verifications'),
+    ]);
 
-    // For now, create a basic verification record
+    // Save the verification data
     const dataToSave = {
-      documentType: input.documentType || 'LICENSE',
-      side: input.side || 'FRONT',
+      licenseFrontUrl,
+      licenseBackUrl,
+      idCardUrl,
+      addressProofUrl,
+      licenseNumber: input.licenseNumber,
+      licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : undefined,
+      licenseCategory: input.licenseCategory,
+      idNumber: input.idNumber,
+      idExpiry: input.idExpiry ? new Date(input.idExpiry) : undefined,
       status: VerificationStatus.PENDING
     };
 

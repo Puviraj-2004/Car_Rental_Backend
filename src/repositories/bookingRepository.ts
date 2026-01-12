@@ -46,7 +46,7 @@ export class BookingRepository {
     return await prisma.bookingVerification.findUnique({ where: { token } });
   }
 
-  async findConflicts(carId: string, startDate: Date, endDate: Date) {
+  async findConflicts(carId: string, startDate: Date, endDate: Date, excludeBookingId?: string) {
     // 🛡️ Senior Logic: Strict Status-based conflict check
     const conflictStatuses: BookingStatus[] = [
       BookingStatus.PENDING, 
@@ -55,20 +55,27 @@ export class BookingRepository {
       BookingStatus.ONGOING
     ];
 
+    const whereClause: any = {
+      AND: [
+        { carId },
+        { status: { in: conflictStatuses } },
+        {
+          OR: [
+            { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
+            { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
+            { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
+          ]
+        }
+      ]
+    };
+
+    // Add exclude booking ID if provided
+    if (excludeBookingId) {
+      whereClause.AND.push({ id: { not: excludeBookingId } });
+    }
+
     return await prisma.booking.findMany({
-      where: {
-        AND: [
-          { carId },
-          { status: { in: conflictStatuses } },
-          {
-            OR: [
-              { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
-              { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
-              { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
-            ]
-          }
-        ]
-      },
+      where: whereClause,
       include: { user: true },
       orderBy: { startDate: 'asc' }
     });

@@ -22,7 +22,7 @@ import { expirationService } from './services/expirationService';
 import { BookingStatus } from '@prisma/client';
 import { apiLimiter } from './middleware/rateLimiter';
 import { securityLogger } from './utils/securityLogger';
-import { csrfProtection, csrfTokenHandler } from './middleware/csrfProtection';
+import {  csrfTokenHandler } from './middleware/csrfProtection';
 
 /**
  * Senior Architect Note: 
@@ -52,6 +52,8 @@ async function startServer() {
 
   // --- APOLLO SERVER SETUP ---
   const server = new ApolloServer({
+    csrfPrevention: false, 
+
     // 🔥 FIXED: Explicitly injecting "scalar DateTime" into the schema
     typeDefs: [
       `scalar DateTime`, 
@@ -123,7 +125,7 @@ async function startServer() {
   app.use(graphqlUploadExpress({ maxFileSize: 10000000, maxFiles: 10 }));
 
   // 6. CSRF
-  app.use('/graphql', csrfProtection);
+  // app.use('/graphql', csrfProtection);
   app.get('/csrf-token', csrfTokenHandler);
 
   // 7. STRIPE WEBHOOK

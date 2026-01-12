@@ -1,6 +1,7 @@
 import { isAuthenticated, isAdmin } from '../../utils/authguard';
 import { userService } from '../../services/userService';
 import { authOperationLimiter, registrationLimiter, generateRateLimitKey } from '../../middleware/graphqlRateLimiter';
+import { bookingService } from '../../services/bookingService';
 
 export const userResolvers = {
   Query: {
@@ -19,6 +20,9 @@ export const userResolvers = {
     myVerification: async (_: any, __: any, context: any) => {
       isAuthenticated(context);
       return await userService.getUserVerification(context.userId);
+    },
+    checkCarAvailability: async (_: any, { carId, startDate, endDate, excludeBookingId }: any) => {
+      return await bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
     }
   },
 

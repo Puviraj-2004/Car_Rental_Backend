@@ -326,10 +326,16 @@ export declare class UserRepository {
         verifiedAt: Date | null;
     } | null>;
     upsertVerification(userId: string, data: {
-        documentType: string;
-        side: string;
+        licenseFrontUrl?: string;
+        licenseBackUrl?: string;
+        idCardUrl?: string;
+        addressProofUrl?: string;
+        licenseNumber?: string;
+        licenseExpiry?: Date;
+        licenseCategory?: any;
+        idNumber?: string;
+        idExpiry?: Date;
         status?: VerificationStatus;
-        url?: string;
     }): Promise<{
         id: string;
         createdAt: Date;

@@ -51,6 +51,7 @@ async function startServer() {
     }
     // --- APOLLO SERVER SETUP ---
     const server = new server_1.ApolloServer({
+        csrfPrevention: false,
         // 🔥 FIXED: Explicitly injecting "scalar DateTime" into the schema
         typeDefs: [
             `scalar DateTime`,
@@ -115,7 +116,7 @@ async function startServer() {
     // 5. UPLOADS
     app.use((0, graphql_upload_ts_1.graphqlUploadExpress)({ maxFileSize: 10000000, maxFiles: 10 }));
     // 6. CSRF
-    app.use('/graphql', csrfProtection_1.csrfProtection);
+    // app.use('/graphql', csrfProtection);
     app.get('/csrf-token', csrfProtection_1.csrfTokenHandler);
     // 7. STRIPE WEBHOOK
     app.post('/webhooks/stripe', express_1.default.raw({ type: 'application/json' }), async (req, res) => {

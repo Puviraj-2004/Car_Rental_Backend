@@ -5,13 +5,14 @@ import { Prisma } from '@prisma/client';
 import { CreateBookingInput, UpdateBookingInput } from '../types/graphql';
 import { BookingStatus } from '@prisma/client';
 import { validateBookingInput } from '../utils/validation';
+import { calculateRentalCost, calculateTax, calculateTotalPrice } from '../utils/calculation';
 import crypto from 'crypto';
 
 export class BookingService {
-  async checkAvailability(carId: string, startDate: string, endDate: string) {
+  async checkAvailability(carId: string, startDate: string, endDate: string, excludeBookingId?: string) {
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const conflicts = await bookingRepository.findConflicts(carId, start, end);
+    const conflicts = await bookingRepository.findConflicts(carId, start, end, excludeBookingId);
     return {
       available: conflicts.length === 0,
       conflictingBookings: conflicts
@@ -40,6 +41,22 @@ export class BookingService {
     const { available } = await this.checkAvailability(input.carId, input.startDate, input.endDate);
     if (!available) throw new AppError('Car is not available for these dates', ErrorCode.ALREADY_EXISTS);
 
+    // Get car details for pricing calculation
+    const car = await carService.getCarById(input.carId);
+    if (!car) throw new AppError('Car not found', ErrorCode.NOT_FOUND);
+
+    // Calculate rental duration in days
+    const durationDays = Math.ceil(durationHours / 24);
+    
+    // Calculate base price using car's daily rate
+    const basePrice = calculateRentalCost('DAY', durationDays, null, null, car.pricePerDay);
+    
+    // Calculate tax (20% tax rate)
+    const taxAmount = calculateTax(basePrice, 20);
+    
+    // Calculate total price (excluding deposit)
+    const totalPrice = calculateTotalPrice(basePrice, taxAmount);
+
     // Transform GraphQL input to Prisma input
     const bookingData: Prisma.BookingCreateInput = {
       user: { connect: { id: userId } },
@@ -50,6 +67,11 @@ export class BookingService {
       endOdometer: 0,
       damageFee: input.damageFee || 0,
       extraKmFee: input.extraKmFee || 0,
+      // Add calculated pricing (deposit separate from total)
+      basePrice,
+      taxAmount,
+      totalPrice,
+      depositAmount: car.depositAmount,
     };
 
     return await bookingRepository.create(bookingData);
@@ -171,7 +193,23 @@ export class BookingService {
     return await bookingRepository.delete(id);
   }
 
-  async updateBooking(id: string, input: UpdateBookingInput) {
+  async updateBooking(id: string, input: UpdateBookingInput, userId?: string, userRole?: string) {
+    // Get the existing booking to check permissions
+    const existingBooking = await bookingRepository.findUnique(id, {});
+    if (!existingBooking) {
+      throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
+    }
+
+    // Check if user can update this booking
+    if (userRole !== 'ADMIN' && existingBooking.userId !== userId) {
+      throw new AppError('Access denied. You can only update your own bookings.', ErrorCode.FORBIDDEN);
+    }
+
+    // Only allow updates for PENDING bookings (non-admin users)
+    if (userRole !== 'ADMIN' && existingBooking.status !== 'PENDING') {
+      throw new AppError('Only pending bookings can be updated', ErrorCode.BAD_USER_INPUT);
+    }
+
     const data = {
       ...input,
       startDate: input.startDate ? new Date(input.startDate) : undefined,

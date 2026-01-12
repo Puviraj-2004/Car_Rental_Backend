@@ -13,8 +13,8 @@ export const bookingResolvers = {
       return await bookingService.getBookingsByUserId(context.userId);
     },
 
-    checkCarAvailability: async (_: any, { carId, startDate, endDate }: any) => {
-      return await bookingService.checkAvailability(carId, startDate, endDate);
+    checkCarAvailability: async (_: any, { carId, startDate, endDate, excludeBookingId }: any) => {
+      return await bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
     },
 
     booking: async (_: any, { id }: { id: string }, context: any) => {
@@ -83,8 +83,8 @@ export const bookingResolvers = {
     },
 
     updateBooking: async (_: any, { id, input }: { id: string, input: any }, context: any) => {
-      isAdmin(context);
-      return await bookingService.updateBooking(id, input);
+      isAuthenticated(context);
+      return await bookingService.updateBooking(id, input, context.userId, context.role);
     }
   }
 };

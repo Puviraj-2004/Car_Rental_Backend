@@ -106,7 +106,7 @@ export const bookingTypeDefs = gql`
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
     myBookings: [Booking!]!
-    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailability
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability
   }
 
   # --- Mutations ---
@@ -119,8 +119,8 @@ export const bookingTypeDefs = gql`
     deleteBooking(id: ID!): Boolean!
     
     # New Industrial Flow Mutations
-    startTrip(bookingId: ID!): Booking!
-    completeTrip(bookingId: ID!): Booking!
+    startTrip(bookingId: String!): Booking!
+    completeTrip(bookingId: String!): Booking!
     finishCarMaintenance(carId: ID!): Car!
   }
 `;

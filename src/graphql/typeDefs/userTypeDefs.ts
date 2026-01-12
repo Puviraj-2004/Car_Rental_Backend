@@ -167,7 +167,7 @@ export const userTypeDefs = gql`
     users: [User!]!
     myVerification: DocumentVerification
     availableCars(startDate: String!, endDate: String!): [Car!]!
-    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailability!
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability!
     bookingPayment(bookingId: ID!): JSON
   }
 
@@ -191,7 +191,7 @@ export const userTypeDefs = gql`
     processDocumentOCR(file: Upload!, documentType: DocumentType, side: DocumentSide): OCRResult!
 
     # Payment Processing
-    updatePaymentStatus(bookingId: ID!, status: String!): JSON
+    updatePaymentStatus(bookingId: String!, status: String!): JSON
 
     
   }

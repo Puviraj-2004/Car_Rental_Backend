@@ -62,10 +62,16 @@ export class UserRepository {
   }
 
   async upsertVerification(userId: string, data: {
-    documentType: string;
-    side: string;
+    licenseFrontUrl?: string;
+    licenseBackUrl?: string;
+    idCardUrl?: string;
+    addressProofUrl?: string;
+    licenseNumber?: string;
+    licenseExpiry?: Date;
+    licenseCategory?: any;
+    idNumber?: string;
+    idExpiry?: Date;
     status?: VerificationStatus;
-    url?: string;
   }) {
     return await prisma.documentVerification.upsert({
       where: { userId },

@@ -2,6 +2,7 @@ import { RegisterInput, LoginInput, UpdateUserInput, CreateVerificationInput, Fi
 import { VerificationStatus } from '@prisma/client';
 type DocumentVerificationStatus = VerificationStatus;
 export declare class UserService {
+    private uploadIfPresent;
     register(input: RegisterInput): Promise<{
         token: string;
         user: {
