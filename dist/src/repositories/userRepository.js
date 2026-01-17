@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.userRepository = exports.UserRepository = void 0;
 const database_1 = __importDefault(require("../utils/database"));
 const graphql_1 = require("../types/graphql");
-const USER_INCLUDE = { verification: true, bookings: true };
+const USER_INCLUDE = { bookings: true };
 class UserRepository {
     async findByEmail(email) {
         return await database_1.default.user.findUnique({
@@ -17,7 +17,7 @@ class UserRepository {
     async findById(id, includeAll = false) {
         return await database_1.default.user.findUnique({
             where: { id },
-            include: includeAll ? USER_INCLUDE : { verification: true }
+            include: includeAll ? USER_INCLUDE : { bookings: true }
         });
     }
     async findAll() {
@@ -41,32 +41,39 @@ class UserRepository {
     async deleteUser(id) {
         return await database_1.default.user.delete({ where: { id } });
     }
-    async findVerificationByUserId(userId) {
-        return await database_1.default.documentVerification.findUnique({ where: { userId } });
+    async findVerificationByBookingId(bookingId) {
+        return await database_1.default.documentVerification.findUnique({ where: { bookingId } });
     }
-    async upsertVerification(userId, data) {
+    async upsertVerification(bookingId, data) {
         return await database_1.default.documentVerification.upsert({
-            where: { userId },
+            where: { bookingId },
             update: data,
             create: {
-                user: { connect: { id: userId } },
+                booking: { connect: { id: bookingId } },
                 ...data
+            },
+            include: {
+                booking: {
+                    include: {
+                        user: true // Include user data for frontend
+                    }
+                }
             }
         });
     }
-    async updateVerification(userId, data) {
+    async updateVerification(bookingId, data) {
         return await database_1.default.documentVerification.update({
-            where: { userId },
+            where: { bookingId },
             data
         });
     }
     async findBookingVerificationByToken(token) {
         return await database_1.default.bookingVerification.findUnique({ where: { token } });
     }
-    async updateBookingStatus(id, status) {
-        return await database_1.default.booking.update({
+    async updateBookingVerification(id, data) {
+        return await database_1.default.bookingVerification.update({
             where: { id },
-            data: { status, updatedAt: new Date() }
+            data
         });
     }
     async updateManyBookingsStatus(userId, currentStatus, nextStatus) {

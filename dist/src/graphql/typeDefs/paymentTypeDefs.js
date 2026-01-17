@@ -49,8 +49,9 @@ exports.paymentTypeDefs = (0, graphql_tag_1.gql) `
   type Mutation {
     createPayment(input: CreatePaymentInput!): Payment!
     updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
-    createStripeCheckoutSession(bookingId: ID!): StripeCheckoutSession!
-    mockFinalizePayment(bookingId: ID!, success: Boolean!): Payment!
+    createStripeCheckoutSession(bookingId: String!): StripeCheckoutSession!
+    mockFinalizePayment(bookingId: String!, success: Boolean!): Payment!
+    refundPayment(paymentId: ID!): Payment!
   }
 `;
 //# sourceMappingURL=paymentTypeDefs.js.map

@@ -30,7 +30,6 @@ export const bookingTypeDefs = gql`
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float
@@ -45,6 +44,7 @@ export const bookingTypeDefs = gql`
     updatedAt: String!
     payment: Payment
     verification: BookingVerification
+    documentVerification: DocumentVerification
   }
 
 
@@ -67,7 +67,6 @@ export const bookingTypeDefs = gql`
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     damageFee: Float
@@ -85,7 +84,6 @@ export const bookingTypeDefs = gql`
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float

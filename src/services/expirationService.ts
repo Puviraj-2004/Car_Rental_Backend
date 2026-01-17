@@ -19,60 +19,63 @@ class ExpirationService {
 
   private async handleBookingExpirations(): Promise<void> {
     const now = new Date();
-    // Time thresholds
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const fifteenMinsAgo = new Date(now.getTime() - 15 * 60 * 1000);
+    const oneHourMs = 60 * 60 * 1000;
+    const fifteenMinMs = 15 * 60 * 1000;
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     try {
-      // ---------------------------------------------------------
-      // SCENARIO 1: Verification Timeout (Activity Based)
-      // ---------------------------------------------------------
-      // Rule: Booking is PENDING (waiting for docs).
-      // Condition: Created > 1 hour ago AND User hasn't uploaded anything for 15 mins.
-      const stalePendingBookings = await prisma.booking.findMany({
-        where: {
-          status: BookingStatus.PENDING,
-          createdAt: { lt: oneHourAgo },
-          updatedAt: { lt: fifteenMinsAgo } 
-        },
-        select: { id: true }
+      const pendingBookings = await prisma.booking.findMany({
+        where: { status: BookingStatus.PENDING },
+        select: {
+          id: true,
+          createdAt: true,
+          updatedAt: true,
+          documentVerification: { select: { createdAt: true } }
+        }
       });
 
-      if (stalePendingBookings.length > 0) {
-        securityLogger.warn('Auto-cancelling stale bookings', { count: stalePendingBookings.length, status: 'PENDING' });
+      const toCancelPending: string[] = [];
+      for (const b of pendingBookings) {
+        const baseExpiry = new Date(b.createdAt.getTime() + oneHourMs);
+        const dvStartedAt = b.documentVerification?.createdAt || null;
+        const effectiveExpiry = dvStartedAt && dvStartedAt >= new Date(baseExpiry.getTime() - fifteenMinMs)
+          ? new Date(baseExpiry.getTime() + fifteenMinMs)
+          : baseExpiry;
+
+        if (now > effectiveExpiry) {
+          toCancelPending.push(b.id);
+        }
+      }
+
+      if (toCancelPending.length > 0) {
+        securityLogger.warn('Auto-cancelling expired pending bookings', { count: toCancelPending.length, status: 'PENDING' });
         await prisma.booking.updateMany({
-          where: { id: { in: stalePendingBookings.map(b => b.id) } },
+          where: { id: { in: toCancelPending } },
           data: { status: BookingStatus.CANCELLED, updatedAt: now }
         });
       }
 
-      // ---------------------------------------------------------
-      // SCENARIO 2: Payment Timeout (15 Minute Window)
-      // ---------------------------------------------------------
-      // Rule: AI Verified the docs (Status: VERIFIED).
-      // Condition: User hasn't paid within 15 minutes of verification.
-      const unpaidVerifiedBookings = await prisma.booking.findMany({
-        where: {
-          status: BookingStatus.VERIFIED,
-          payment: null, // No payment record exists
-          updatedAt: { lt: fifteenMinsAgo }
-        },
-        select: { id: true }
+      const unpaidVerified = await prisma.booking.findMany({
+        where: { status: BookingStatus.VERIFIED },
+        select: { id: true, updatedAt: true, payment: { select: { status: true } } }
       });
 
-      if (unpaidVerifiedBookings.length > 0) {
-        securityLogger.warn('Releasing inventory for unpaid bookings', { count: unpaidVerifiedBookings.length, status: 'VERIFIED' });
+      const toCancelVerified: string[] = [];
+      for (const b of unpaidVerified) {
+        const hasSucceededPayment = b.payment?.status === 'SUCCEEDED';
+        if (!hasSucceededPayment && b.updatedAt < new Date(now.getTime() - fifteenMinMs)) {
+          toCancelVerified.push(b.id);
+        }
+      }
+
+      if (toCancelVerified.length > 0) {
+        securityLogger.warn('Releasing inventory for unpaid verified bookings', { count: toCancelVerified.length, status: 'VERIFIED' });
         await prisma.booking.updateMany({
-          where: { id: { in: unpaidVerifiedBookings.map(b => b.id) } },
+          where: { id: { in: toCancelVerified } },
           data: { status: BookingStatus.CANCELLED, updatedAt: now }
         });
       }
 
-      // ---------------------------------------------------------
-      // SCENARIO 3: Draft Cleanup
-      // ---------------------------------------------------------
-      // Remove Drafts older than 24 hours to keep DB clean
       await prisma.booking.deleteMany({
         where: { 
           status: 'DRAFT', 

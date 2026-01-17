@@ -82,6 +82,7 @@ export interface CarFilterInput {
 }
 export interface CreateCarInput {
     modelId: string;
+    brandId: string;
     year: number;
     plateNumber: string;
     transmission: Transmission;
@@ -98,6 +99,7 @@ export interface CreateCarInput {
 }
 export interface UpdateCarInput {
     modelId?: string;
+    brandId?: string;
     year?: number;
     plateNumber?: string;
     transmission?: Transmission;
@@ -146,13 +148,18 @@ export interface CreateBookingInput {
     carId: string;
     startDate: string;
     endDate: string;
+    pickupTime?: string;
+    returnTime?: string;
     bookingType?: string;
     damageFee?: number;
     extraKmFee?: number;
 }
 export interface UpdateBookingInput {
+    carId?: string;
     startDate?: string;
     endDate?: string;
+    pickupTime?: string;
+    returnTime?: string;
     status?: BookingStatus;
     damageFee?: number;
     extraKmFee?: number;
@@ -190,17 +197,46 @@ export interface CreateVerificationInput {
     licenseFrontFile?: FileUpload;
     licenseBackFile?: FileUpload;
     idCardFile?: FileUpload;
+    idCardBackFile?: FileUpload;
     addressProofFile?: FileUpload;
     licenseFrontUrl?: string;
     licenseBackUrl?: string;
     idCardUrl?: string;
+    idCardBackUrl?: string;
     addressProofUrl?: string;
-    licenseCategory?: LicenseCategory;
+    licenseCategories?: LicenseCategory[];
     licenseNumber?: string;
     licenseExpiry?: string;
+    licenseIssueDate?: string;
+    driverDob?: string;
     idNumber?: string;
     idExpiry?: string;
+    verifiedAddress?: string;
     bookingToken?: string;
+}
+export interface CreateVerificationInput {
+    documentType: string;
+    side: string;
+    licenseFrontFile?: FileUpload;
+    licenseBackFile?: FileUpload;
+    idCardFile?: FileUpload;
+    idCardBackFile?: FileUpload;
+    addressProofFile?: FileUpload;
+    licenseFrontUrl?: string;
+    licenseBackUrl?: string;
+    idCardUrl?: string;
+    idCardBackUrl?: string;
+    addressProofUrl?: string;
+    licenseCategories?: LicenseCategory[];
+    licenseNumber?: string;
+    licenseExpiry?: string;
+    licenseIssueDate?: string;
+    driverDob?: string;
+    idNumber?: string;
+    idExpiry?: string;
+    verifiedAddress?: string;
+    bookingToken?: string;
+    bookingId?: string;
 }
 export interface PlatformSettingsInput {
     businessName?: string;
@@ -238,7 +274,7 @@ export interface CarByIdArgs extends BaseArgs {
     id: string;
 }
 export interface ModelsByBrandArgs extends BaseArgs {
-    brandId: string;
+    brandId?: string;
 }
 export interface AvailableCarsArgs extends BaseArgs {
     startDate: string;

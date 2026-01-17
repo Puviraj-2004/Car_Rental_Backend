@@ -1,8 +1,8 @@
 import prisma from '../utils/database';
-import { VerificationStatus } from '@prisma/client';
+import { VerificationStatus , LicenseCategory } from '@prisma/client';
 import { BookingStatus } from '../types/graphql';
 
-const USER_INCLUDE = { verification: true, bookings: true };
+const USER_INCLUDE = { bookings: true };
 
 export class UserRepository {
   async findByEmail(email: string) {
@@ -15,7 +15,7 @@ export class UserRepository {
   async findById(id: string, includeAll: boolean = false) {
     return await prisma.user.findUnique({
       where: { id },
-      include: includeAll ? USER_INCLUDE : { verification: true }
+      include: includeAll ? USER_INCLUDE : { bookings: true }
     });
   }
 
@@ -57,40 +57,51 @@ export class UserRepository {
     return await prisma.user.delete({ where: { id } });
   }
 
-  async findVerificationByUserId(userId: string) {
-    return await prisma.documentVerification.findUnique({ where: { userId } });
+  async findVerificationByBookingId(bookingId: string) {
+    return await prisma.documentVerification.findUnique({ where: { bookingId } });
   }
 
-  async upsertVerification(userId: string, data: {
+  async upsertVerification(bookingId: string, data: {
     licenseFrontUrl?: string;
     licenseBackUrl?: string;
     idCardUrl?: string;
+    idCardBackUrl?: string;
     addressProofUrl?: string;
     licenseNumber?: string;
     licenseExpiry?: Date;
-    licenseCategory?: any;
+    licenseIssueDate?: Date;
+    driverDob?: Date;
+    licenseCategories?: LicenseCategory[];
     idNumber?: string;
     idExpiry?: Date;
+    verifiedAddress?: string;
     status?: VerificationStatus;
   }) {
     return await prisma.documentVerification.upsert({
-      where: { userId },
+      where: { bookingId },
       update: data,
       create: {
-        user: { connect: { id: userId } },
+        booking: { connect: { id: bookingId } },
         ...data
+      },
+      include: {
+        booking: {
+          include: {
+            user: true  // Include user data for frontend
+          }
+        }
       }
     });
   }
 
-  async updateVerification(userId: string, data: {
+  async updateVerification(bookingId: string, data: {
     documentType?: string;
     side?: string;
     status?: VerificationStatus;
     url?: string;
   }) {
     return await prisma.documentVerification.update({
-      where: { userId },
+      where: { bookingId },
       data
     });
   }
@@ -99,10 +110,14 @@ export class UserRepository {
     return await prisma.bookingVerification.findUnique({ where: { token } });
   }
 
-  async updateBookingStatus(id: string, status: BookingStatus) {
-    return await prisma.booking.update({
+
+  async updateBookingVerification(id: string, data: {
+    isVerified?: boolean;
+    verifiedAt?: Date;
+  }) {
+    return await prisma.bookingVerification.update({
       where: { id },
-      data: { status, updatedAt: new Date() }
+      data
     });
   }
 

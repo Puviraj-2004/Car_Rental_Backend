@@ -52,21 +52,25 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
   }
   type DocumentVerification {
     id: ID!
-    userId: ID!
-    user: User!
+    bookingId: ID!
+    booking: Booking!
 
     # Documents
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
+    idCardBackUrl: String
     addressProofUrl: String
 
     # Extracted Data
     licenseNumber: String
     licenseExpiry: String
-    licenseCategory: LicenseCategory
+    licenseIssueDate: String
+    driverDob: String
+    licenseCategories: [LicenseCategory!]
     idNumber: String
     idExpiry: String
+    verifiedAddress: String
 
     status: VerificationStatus!
     aiMetadata: JSON
@@ -110,7 +114,6 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     facebookId: String
     appleId: String
     googleId: String
-    verification: DocumentVerification
     bookings: [Booking!]
     createdAt: String!
     updatedAt: String!
@@ -145,21 +148,27 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
 
   input DocumentVerificationInput {
     bookingToken: String
+    bookingId: String
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
+    idCardBackUrl: String
     addressProofUrl: String
 
     licenseFrontFile: Upload
     licenseBackFile: Upload
     idCardFile: Upload
+    idCardBackFile: Upload
     addressProofFile: Upload
     
     licenseNumber: String
     licenseExpiry: String
-    licenseCategory: LicenseCategory
+    licenseIssueDate: String
+    driverDob: String
+    licenseCategories: [LicenseCategory]
     idNumber: String
     idExpiry: String
+    verifiedAddress: String
   }
 
   # --- Queries ---
@@ -169,7 +178,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     users: [User!]!
     myVerification: DocumentVerification
     availableCars(startDate: String!, endDate: String!): [Car!]!
-    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailability!
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability!
     bookingPayment(bookingId: ID!): JSON
   }
 
@@ -193,7 +202,7 @@ exports.userTypeDefs = (0, graphql_tag_1.gql) `
     processDocumentOCR(file: Upload!, documentType: DocumentType, side: DocumentSide): OCRResult!
 
     # Payment Processing
-    updatePaymentStatus(bookingId: ID!, status: String!): JSON
+    updatePaymentStatus(bookingId: String!, status: String!): JSON
 
     
   }

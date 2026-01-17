@@ -50,6 +50,10 @@ exports.paymentResolvers = {
             (0, authguard_1.isAdmin)(context);
             const { id, status } = input;
             return await paymentService_1.paymentService.updatePaymentStatus(id, status);
+        },
+        refundPayment: async (_, { paymentId }, context) => {
+            (0, authguard_1.isAdmin)(context);
+            return await paymentService_1.paymentService.refundPayment(paymentId);
         }
     }
 };

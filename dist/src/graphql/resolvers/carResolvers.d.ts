@@ -21,6 +21,7 @@ export declare const carResolvers: {
             }[];
         } & {
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;
@@ -57,13 +58,12 @@ export declare const carResolvers: {
                 carId: string;
                 createdAt: Date;
                 updatedAt: Date;
-                userId: string;
                 status: import(".prisma/client").$Enums.BookingStatus;
+                userId: string;
                 pickupTime: string | null;
                 returnTime: string | null;
                 basePrice: number;
                 taxAmount: number;
-                surchargeAmount: number;
                 depositAmount: number;
                 startOdometer: number | null;
                 endOdometer: number | null;
@@ -82,6 +82,7 @@ export declare const carResolvers: {
             }[];
         } & {
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;
@@ -129,6 +130,7 @@ export declare const carResolvers: {
             }[];
         } & {
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;
@@ -173,11 +175,7 @@ export declare const carResolvers: {
             brandId: string;
             name: string;
         }>;
-        deleteModel: (_: unknown, args: DeleteModelArgs, context: GraphQLContext) => Promise<{
-            id: string;
-            brandId: string;
-            name: string;
-        }>;
+        deleteModel: (_: unknown, args: DeleteModelArgs, context: GraphQLContext) => Promise<boolean>;
         createCar: (_: unknown, args: CreateCarArgs, context: GraphQLContext) => Promise<{
             model: {
                 brand: {
@@ -192,6 +190,7 @@ export declare const carResolvers: {
             };
         } & {
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;
@@ -223,6 +222,7 @@ export declare const carResolvers: {
             };
         } & {
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;
@@ -242,6 +242,7 @@ export declare const carResolvers: {
         }>;
         deleteCar: (_: unknown, args: DeleteCarArgs, context: GraphQLContext) => Promise<{
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.CarStatus;

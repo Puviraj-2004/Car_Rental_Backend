@@ -50,21 +50,25 @@ export const userTypeDefs = gql`
   }
   type DocumentVerification {
     id: ID!
-    userId: ID!
-    user: User!
+    bookingId: ID!
+    booking: Booking!
 
     # Documents
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
+    idCardBackUrl: String
     addressProofUrl: String
 
     # Extracted Data
     licenseNumber: String
     licenseExpiry: String
-    licenseCategory: LicenseCategory
+    licenseIssueDate: String
+    driverDob: String
+    licenseCategories: [LicenseCategory!]
     idNumber: String
     idExpiry: String
+    verifiedAddress: String
 
     status: VerificationStatus!
     aiMetadata: JSON
@@ -108,7 +112,6 @@ export const userTypeDefs = gql`
     facebookId: String
     appleId: String
     googleId: String
-    verification: DocumentVerification
     bookings: [Booking!]
     createdAt: String!
     updatedAt: String!
@@ -143,21 +146,27 @@ export const userTypeDefs = gql`
 
   input DocumentVerificationInput {
     bookingToken: String
+    bookingId: String
     licenseFrontUrl: String
     licenseBackUrl: String
     idCardUrl: String
+    idCardBackUrl: String
     addressProofUrl: String
 
     licenseFrontFile: Upload
     licenseBackFile: Upload
     idCardFile: Upload
+    idCardBackFile: Upload
     addressProofFile: Upload
     
     licenseNumber: String
     licenseExpiry: String
-    licenseCategory: LicenseCategory
+    licenseIssueDate: String
+    driverDob: String
+    licenseCategories: [LicenseCategory]
     idNumber: String
     idExpiry: String
+    verifiedAddress: String
   }
 
   # --- Queries ---

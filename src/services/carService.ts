@@ -17,23 +17,30 @@ import {
 } from '../types/graphql';
 
 export class CarService {
-  private buildBookingAvailabilityFilter(startDateTime: Date, endDateTime: Date, includeBuffer: boolean = false) {
-    const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0;
-    const conflictStatuses = [BookingStatus.PENDING, BookingStatus.VERIFIED, BookingStatus.CONFIRMED, BookingStatus.ONGOING];
+  private buildBookingAvailabilityFilter(startDateTime: Date, endDateTime: Date) {
+    const bufferMs = 24 * 60 * 60 * 1000;
 
-    const dateOverlapConditions = includeBuffer ? [
-      { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] },
-      { AND: [{ endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } }, { endDate: { lt: startDateTime } }] },
-      { AND: [{ startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } }, { startDate: { gt: endDateTime } }] }
-    ] : [
-      { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] }
-    ];
+    const overlapNoBuffer = { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] };
+    const overlapWithBuffer = {
+      OR: [
+        { AND: [{ startDate: { lt: new Date(endDateTime.getTime() + bufferMs) } }, { endDate: { gt: new Date(startDateTime.getTime() - bufferMs) } }] }]
+    };
 
     return {
       none: {
-        AND: [
-          { status: { in: conflictStatuses as any } },
-          { OR: dateOverlapConditions }
+        OR: [
+          {
+            AND: [
+              { status: { in: [BookingStatus.PENDING, BookingStatus.VERIFIED] as any } },
+              overlapNoBuffer
+            ]
+          },
+          {
+            AND: [
+              { status: { in: [BookingStatus.CONFIRMED, BookingStatus.ONGOING] as any } },
+              overlapWithBuffer
+            ]
+          }
         ]
       }
     };
@@ -51,20 +58,22 @@ export class CarService {
       }
     }
 
+  
+
     const where: Prisma.CarWhereInput = {};
     if (filter) {
-      if (filter.brandIds?.length) where.model = { brandId: { in: filter.brandIds } };
-      if (filter.modelIds?.length) where.modelId = { in: filter.modelIds };
-      if (filter.fuelTypes?.length) where.fuelType = { in: filter.fuelTypes };
-      if (filter.transmissions?.length) where.transmission = { in: filter.transmissions };
-      if (filter.statuses?.length) where.status = { in: filter.statuses };
-      if (filter.critAirRatings?.length) where.critAirRating = { in: filter.critAirRatings };
+      if (filter.brandIds?.length) (where as any).brandId = { in: filter.brandIds };  
+      if (filter.modelIds?.length) (where as any).modelId = { in: filter.modelIds };
+      if (filter.fuelTypes?.length) (where as any).fuelType = { in: filter.fuelTypes };
+      if (filter.transmissions?.length) (where as any).transmission = { in: filter.transmissions };
+      if (filter.statuses?.length) (where as any).status = { in: filter.statuses };
+      if (filter.critAirRatings?.length) (where as any).critAirRating = { in: filter.critAirRatings };
 
       if (filter.startDate && filter.endDate) {
         const start = filter.startDate.includes('T') ? new Date(filter.startDate) : new Date(`${filter.startDate}T10:00:00`);
         const end = filter.endDate.includes('T') ? new Date(filter.endDate) : new Date(`${filter.endDate}T10:00:00`);
         where.status = { in: [CarStatus.AVAILABLE, CarStatus.RENTED] };
-        where.bookings = this.buildBookingAvailabilityFilter(start, end, true);
+        where.bookings = this.buildBookingAvailabilityFilter(start, end);
       } else {
         Object.assign(where, this.buildStatusFilter(filter.includeOutOfService));
       }
@@ -81,7 +90,7 @@ export class CarService {
 
     return await carRepository.findMany({
       status: { in: [CarStatus.AVAILABLE, CarStatus.RENTED] },
-      bookings: this.buildBookingAvailabilityFilter(start, end, false)
+      bookings: this.buildBookingAvailabilityFilter(start, end)
     });
   }
 
@@ -170,15 +179,31 @@ export class CarService {
   }
 
   async deleteModel(id: string) {
-    // Check if model is being used by any cars
-    const carsCount = await carRepository.countCarsByModel(id);
-    if (carsCount > 0) {
-      throw new AppError('Cannot delete model that has associated cars', ErrorCode.BAD_USER_INPUT);
+    // Validate ID format
+    if (!id || id.trim() === '') {
+      throw new AppError('Model ID is required', ErrorCode.BAD_USER_INPUT);
     }
 
-    return await carRepository.deleteModel(id);
-  }
+    try {
+      // Check if model is being used by any cars
+      const carsCount = await carRepository.countCarsByModel(id);
+      if (carsCount > 0) {
+        throw new AppError('Cannot delete model that has associated cars', ErrorCode.BAD_USER_INPUT);
+      }
 
+      return await carRepository.deleteModel(id);
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+      // Handle Prisma "record not found" error
+      if (error instanceof Error && error.message.includes('Record to delete does not exist')) {
+        throw new AppError('Model not found. It may have been already deleted.', ErrorCode.NOT_FOUND);
+      }
+      throw error;
+    }
+  }
+  
   async createCar(data: CreateCarInput) {
     // Comprehensive input validation
     const validation = validateCarData(data);
@@ -190,19 +215,30 @@ export class CarService {
     if (!data.modelId) {
       throw new AppError('Model ID is required', ErrorCode.BAD_USER_INPUT);
     }
+    if (!data.brandId) {
+      throw new AppError('Brand ID is required', ErrorCode.BAD_USER_INPUT);
+    }
     if (!data.plateNumber || data.plateNumber.trim().length === 0) {
       throw new AppError('Plate number is required', ErrorCode.BAD_USER_INPUT);
     }
 
-    // Create the car data without modelId, then add the model relation
-    const { modelId, ...restData } = data;
-    const carData: Prisma.CarCreateInput = {
+    // Create car data with both modelId and brandId
+    const { modelId, brandId, ...restData } = data;
+    const carData: any = {
       ...restData,
-      model: { connect: { id: modelId } },
+      modelId,
+      brandId,  // NEW: Include brandId directly
       requiredLicense: (restData.requiredLicense || 'B') as any,
     };
 
     return await carRepository.createCar(carData);
+  }
+
+  async getModels(brandId?: string) {
+    if (brandId) {
+      return await carRepository.findModelsByBrand(brandId);
+    }
+    return await carRepository.findAllModels();
   }
 
   async updateCar(id: string, data: UpdateCarInput) {

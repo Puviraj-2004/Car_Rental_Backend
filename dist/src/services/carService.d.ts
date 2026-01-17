@@ -22,6 +22,7 @@ export declare class CarService {
         }[];
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -59,6 +60,7 @@ export declare class CarService {
         }[];
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -102,13 +104,12 @@ export declare class CarService {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -127,6 +128,7 @@ export declare class CarService {
         }[];
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -179,11 +181,7 @@ export declare class CarService {
         brandId: string;
         name: string;
     }>;
-    deleteModel(id: string): Promise<{
-        id: string;
-        brandId: string;
-        name: string;
-    }>;
+    deleteModel(id: string): Promise<boolean>;
     createCar(data: CreateCarInput): Promise<{
         model: {
             brand: {
@@ -198,6 +196,7 @@ export declare class CarService {
         };
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -215,6 +214,11 @@ export declare class CarService {
         currentOdometer: number;
         critAirRating: import(".prisma/client").$Enums.CritAirCategory;
     }>;
+    getModels(brandId?: string): Promise<{
+        id: string;
+        brandId: string;
+        name: string;
+    }[]>;
     updateCar(id: string, data: UpdateCarInput): Promise<{
         model: {
             brand: {
@@ -229,6 +233,7 @@ export declare class CarService {
         };
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -248,6 +253,7 @@ export declare class CarService {
     }>;
     deleteCar(id: string): Promise<{
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -290,6 +296,7 @@ export declare class CarService {
         };
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;

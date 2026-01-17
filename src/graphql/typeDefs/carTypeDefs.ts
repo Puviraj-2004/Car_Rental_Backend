@@ -1,7 +1,7 @@
 import { gql } from 'graphql-tag';
 
 export const carTypeDefs = gql`
-  # 🚀 முக்கியமான மாற்றம்: இமேஜ் அப்லோட் செய்ய இது தேவை
+  # 🚀 Important: required for image upload support
   scalar Upload
 
   # --- Enums ---
@@ -43,6 +43,7 @@ export const carTypeDefs = gql`
     name: String!
     logoUrl: String
     models: [VehicleModel!]
+    cars: [Car!]
   }
 
   type VehicleModel {
@@ -64,6 +65,7 @@ export const carTypeDefs = gql`
   type Car {
     id: ID!
     modelId: ID!
+    brandId: ID!
     model: VehicleModel!
     brand: Brand!
     year: Int!
@@ -88,6 +90,7 @@ export const carTypeDefs = gql`
   # --- Inputs ---
   input CreateCarInput {
     modelId: ID!
+    brandId: ID!
     year: Int!
     plateNumber: String!
     transmission: Transmission!
@@ -105,6 +108,7 @@ export const carTypeDefs = gql`
 
   input UpdateCarInput {
     modelId: ID
+    brandId: ID
     year: Int
     plateNumber: String
     transmission: Transmission
@@ -137,7 +141,7 @@ export const carTypeDefs = gql`
     cars(filter: CarFilterInput): [Car!]!
     car(id: ID!): Car
     brands: [Brand!]!
-    models(brandId: ID!): [VehicleModel!]!
+    models(brandId: ID): [VehicleModel!]!
   }
 
   # --- Mutations ---

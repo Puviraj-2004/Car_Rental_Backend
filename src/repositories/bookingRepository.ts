@@ -1,44 +1,45 @@
 import prisma from '../utils/database';
-import { Prisma, BookingStatus, CarStatus } from '@prisma/client'; // ✅ Use Prisma native enums for repo
+import { BookingStatus, CarStatus } from '@prisma/client';
 
 /**
  * Senior Architect Note:
  * Centralized Include configurations.
- * Added 'images: true' to the admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
+ * Added 'images: true' to admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
  */
 export const BOOKING_INCLUDES = {
   basic: {
-    car: { include: { model: { include: { brand: true } } } },
-    payment: true
+    user: true,
+    car: { include: { model: { include: { brand: true } }, images: true } },
+    payment: true,
+    verification: true,
+    documentVerification: true
   },
   detailed: {
     user: true,
     car: { include: { model: { include: { brand: true } }, images: true } },
     payment: true,
     verification: true,
+    documentVerification: true
   },
-  admin: {
+  admin: {  // ✅ Add this
     user: true,
-    car: { include: { model: { include: { brand: true } }, images: true } }, // ✅ FIXED: Added images: true
+    car: { include: { model: { include: { brand: true } }, images: true } },
     payment: true,
-    verification: true
+    verification: true,
+    documentVerification: true
   }
 };
 
 export class BookingRepository {
-  async findMany(
-    where: Prisma.BookingWhereInput, 
-    include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed, 
-    orderBy: Prisma.BookingOrderByWithRelationInput = { createdAt: 'desc' }
-  ) {
+  async findMany(where: any = {}, include: any = BOOKING_INCLUDES.basic, orderBy: any = { startDate: 'desc' }) {
     return await prisma.booking.findMany({ where, include, orderBy });
   }
 
-  async findUnique(id: string, include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed) {
+  async findUnique(id: string, include: any = BOOKING_INCLUDES.detailed) {
     return await prisma.booking.findUnique({ where: { id }, include });
   }
 
-  async findFirst(where: Prisma.BookingWhereInput, include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed) {
+  async findFirst(where: any, include: any = BOOKING_INCLUDES.detailed) {
     return await prisma.booking.findFirst({ where, include });
   }
 
@@ -46,24 +47,41 @@ export class BookingRepository {
     return await prisma.bookingVerification.findUnique({ where: { token } });
   }
 
+  async updateBookingStatus(id: string, status: BookingStatus) {
+    return await prisma.booking.update({
+      where: { id },
+      data: { status, updatedAt: new Date() }
+    });
+  }
+
   async findConflicts(carId: string, startDate: Date, endDate: Date, excludeBookingId?: string) {
-    // 🛡️ Senior Logic: Strict Status-based conflict check
-    const conflictStatuses: BookingStatus[] = [
-      BookingStatus.PENDING, 
-      BookingStatus.VERIFIED, 
-      BookingStatus.CONFIRMED, 
-      BookingStatus.ONGOING
-    ];
+    const bufferMs = 24 * 60 * 60 * 1000;
+
+    const noBufferOverlap = {
+      OR: [
+        { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
+        { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
+        { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
+      ]
+    };
+
+    const bufferedStart = new Date(startDate.getTime() - bufferMs);
+    const bufferedEnd = new Date(endDate.getTime() + bufferMs);
+    const bufferOverlap = {
+      OR: [
+        { AND: [{ startDate: { lte: bufferedStart } }, { endDate: { gt: bufferedStart } }] },
+        { AND: [{ startDate: { lt: bufferedEnd } }, { endDate: { gte: bufferedEnd } }] },
+        { AND: [{ startDate: { gte: bufferedStart } }, { endDate: { lte: bufferedEnd } }] }
+      ]
+    };
 
     const whereClause: any = {
       AND: [
         { carId },
-        { status: { in: conflictStatuses } },
         {
           OR: [
-            { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
-            { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
-            { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
+            { AND: [{ status: { in: [BookingStatus.PENDING, BookingStatus.VERIFIED] } }, noBufferOverlap] },
+            { AND: [{ status: { in: [BookingStatus.CONFIRMED, BookingStatus.ONGOING] } }, bufferOverlap] }
           ]
         }
       ]
@@ -76,24 +94,24 @@ export class BookingRepository {
 
     return await prisma.booking.findMany({
       where: whereClause,
-      include: { user: true },
+      include: BOOKING_INCLUDES.basic,
       orderBy: { startDate: 'asc' }
     });
   }
 
-  async create(data: Prisma.BookingCreateInput) {
+  async create(data: any) {
     return await prisma.booking.create({
       data,
-      include: { car: { include: { model: { include: { brand: true } } } } }
+      include: BOOKING_INCLUDES.detailed
     });
   }
 
-  async update(
-    id: string, 
-    data: Prisma.BookingUpdateInput, 
-    include: Prisma.BookingInclude = BOOKING_INCLUDES.detailed
-  ) {
-    return await prisma.booking.update({ where: { id }, data, include });
+  async update(id: string, data: any) {
+    return await prisma.booking.update({
+      where: { id },
+      data,
+      include: BOOKING_INCLUDES.detailed
+    });
   }
 
   async delete(id: string) {

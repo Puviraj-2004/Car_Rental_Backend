@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.carTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.carTypeDefs = (0, graphql_tag_1.gql) `
-  # 🚀 முக்கியமான மாற்றம்: இமேஜ் அப்லோட் செய்ய இது தேவை
+  # 🚀 Important: required for image upload support
   scalar Upload
 
   # --- Enums ---
@@ -45,6 +45,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     name: String!
     logoUrl: String
     models: [VehicleModel!]
+    cars: [Car!]
   }
 
   type VehicleModel {
@@ -66,6 +67,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
   type Car {
     id: ID!
     modelId: ID!
+    brandId: ID!
     model: VehicleModel!
     brand: Brand!
     year: Int!
@@ -90,6 +92,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
   # --- Inputs ---
   input CreateCarInput {
     modelId: ID!
+    brandId: ID!
     year: Int!
     plateNumber: String!
     transmission: Transmission!
@@ -107,6 +110,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
 
   input UpdateCarInput {
     modelId: ID
+    brandId: ID
     year: Int
     plateNumber: String
     transmission: Transmission
@@ -139,7 +143,7 @@ exports.carTypeDefs = (0, graphql_tag_1.gql) `
     cars(filter: CarFilterInput): [Car!]!
     car(id: ID!): Car
     brands: [Brand!]!
-    models(brandId: ID!): [VehicleModel!]!
+    models(brandId: ID): [VehicleModel!]!
   }
 
   # --- Mutations ---

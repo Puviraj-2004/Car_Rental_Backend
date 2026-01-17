@@ -8,6 +8,8 @@ import { logSecurityEvent } from '../utils/securityLogger';
 import { validatePassword } from '../utils/validation';
 import { VerificationStatus } from '@prisma/client';
 import { uploadToCloudinary } from '../utils/cloudinary';
+import { bookingRepository } from '../repositories/bookingRepository';
+import prisma from '../utils/database';
 
 // Document verification status type (alias for Prisma enum)
 type DocumentVerificationStatus = VerificationStatus;
@@ -19,7 +21,14 @@ export class UserService {
   private async uploadIfPresent(file: any, folder: string): Promise<string | undefined> {
     if (!file) return undefined;
     try {
-      const result = await uploadToCloudinary(file, folder);
+      // Extract the stream from the file object (like carService does)
+      const { createReadStream } = await file;
+      if (!createReadStream) {
+        console.error('No createReadStream found in file object');
+        return undefined;
+      }
+      
+      const result = await uploadToCloudinary(createReadStream(), folder);
       return result.secure_url;
     } catch (e) {
       console.error('Upload failed:', e);
@@ -154,58 +163,106 @@ export class UserService {
   }
 
 
-  async createOrUpdateVerification(userId: string, input: CreateVerificationInput) {
-    const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
+  async createOrUpdateVerification(bookingId: string, input: CreateVerificationInput) {
+  // 1. Validate booking exists first
+    const bookingExists = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: { id: true }
+    });
+
+    if (!bookingExists) {
+      throw new Error(`Booking with ID ${bookingId} not found`);
+    }
+
+    // 2. Upload files
+    const [licenseFrontUrl, licenseBackUrl, idCardUrl, idCardBackUrl, addressProofUrl] = await Promise.all([
       this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
       this.uploadIfPresent(input.licenseBackFile, 'verifications'),
       this.uploadIfPresent(input.idCardFile, 'verifications'),
-      this.uploadIfPresent(input.addressProofFile, 'verifications'),
+      this.uploadIfPresent(input.idCardBackFile, 'verifications'),
+      this.uploadIfPresent(input.addressProofFile, 'verifications')
     ]);
 
-    // Save the verification data
-    const dataToSave = {
+    // 3. Convert licenseCategories from string[] to LicenseCategory[]
+    const convertedLicenseCategories = input.licenseCategories?.map(cat => {
+      // Map frontend strings to backend enum values
+      switch (cat?.toUpperCase()) {
+        case 'A': return 'A' as const;
+        case 'A1': return 'A1' as const;
+        case 'A2': return 'A2' as const;
+        case 'B': return 'B' as const;
+        case 'C': return 'C' as const;
+        case 'D': return 'D' as const;
+        case 'AM': return 'AM' as const;
+        case 'B1': return 'B1' as const;
+        case 'BE': return 'BE' as const;
+        case 'C1': return 'C1' as const;
+        case 'C1E': return 'C1E' as const;
+        case 'CE': return 'CE' as const;
+        case 'D1': return 'D1' as const;
+        case 'D1E': return 'D1E' as const;
+        case 'DE': return 'DE' as const;
+        default: return 'B' as const; // Default fallback
+      }
+    }).filter(Boolean); // Remove any undefined values
+
+    // 4. Prepare verification data
+    const verificationData = {
       licenseFrontUrl,
       licenseBackUrl,
       idCardUrl,
+      idCardBackUrl,
       addressProofUrl,
       licenseNumber: input.licenseNumber,
       licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : undefined,
-      licenseCategory: input.licenseCategory,
+      licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : undefined,
+      driverDob: input.driverDob ? new Date(input.driverDob) : undefined,
+      licenseCategories: convertedLicenseCategories, // ✅ Use converted enum array
       idNumber: input.idNumber,
       idExpiry: input.idExpiry ? new Date(input.idExpiry) : undefined,
+      verifiedAddress: input.verifiedAddress,
       status: VerificationStatus.PENDING
     };
 
-    const verification = await userRepository.upsertVerification(userId, dataToSave);
+    // 5. Check if all documents are present
+    const hasAllDocs = !!(licenseFrontUrl && licenseBackUrl && idCardUrl && idCardBackUrl && addressProofUrl);
 
-    const hasAllDocs = !!(verification.licenseNumber && verification.licenseFrontUrl && verification.licenseBackUrl && verification.idCardUrl && verification.addressProofUrl);
+    // 6. Auto-approve if all docs present
+    if (hasAllDocs && input.bookingToken) {
+      const bVerif = await userRepository.findBookingVerificationByToken(input.bookingToken);
+      if (bVerif) {
+        await userRepository.updateBookingVerification(bVerif.id, { isVerified: true, verifiedAt: new Date() });
+        await bookingRepository.updateBookingStatus(bVerif.bookingId, BookingStatus.VERIFIED);
+      }
+    }
 
-    if (hasAllDocs) {
-      await userRepository.updateVerification(userId, { status: VerificationStatus.APPROVED });
+    // 7. Create/update document verification
+    return await userRepository.upsertVerification(bookingId, verificationData);
+  }
 
-      if (input.bookingToken) {
-        const bVerif = await userRepository.findBookingVerificationByToken(input.bookingToken);
-        if (bVerif?.bookingId) await userRepository.updateBookingStatus(bVerif.bookingId, BookingStatus.VERIFIED);
-      } else {
-        await userRepository.updateManyBookingsStatus(userId, BookingStatus.PENDING, BookingStatus.VERIFIED);
+  async verifyDocument(bookingId: string, status: DocumentVerificationStatus) {
+    const verification = await userRepository.updateVerification(bookingId, {
+      status: status === VerificationStatus.APPROVED ? VerificationStatus.APPROVED : VerificationStatus.REJECTED
+    });
+
+    if (status === VerificationStatus.APPROVED) {
+      // Get the booking to find the userId
+      const booking = await prisma.booking.findUnique({
+        where: { id: bookingId },
+        select: { userId: true }
+      });
+      
+      if (booking) {
+        // Update only PENDING bookings to VERIFIED
+        await userRepository.updateManyBookingsStatus(booking.userId, BookingStatus.PENDING, BookingStatus.VERIFIED);
+        // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
       }
     }
     return verification;
   }
 
-  async verifyDocument(userId: string, status: DocumentVerificationStatus) {
-    const verification = await userRepository.updateVerification(userId, {
-      status: status === VerificationStatus.APPROVED ? VerificationStatus.APPROVED : VerificationStatus.REJECTED
-    });
-
-    if (status === VerificationStatus.APPROVED) {
-      await userRepository.updateManyBookingsStatus(userId, BookingStatus.PENDING, BookingStatus.CONFIRMED);
-      await userRepository.updateManyBookingsStatus(userId, BookingStatus.VERIFIED, BookingStatus.CONFIRMED);
-    }
-    return verification;
-  }
-
   async processOCR(file: FileUpload, documentType: string, side: string) {
+    console.log('Processing file for type:', documentType, 'side:', side);
     const { createReadStream, mimetype } = await file;
     const chunks: Buffer[] = [];
     const buffer = await new Promise<Buffer>((resolve, reject) => {
@@ -213,6 +270,8 @@ export class UserService {
         .on('end', () => resolve(Buffer.concat(chunks)))
         .on('error', reject);
     });
+
+    console.log('Buffer length:', buffer.length);
 
     const typeMap: any = { LICENSE: 'license', ID_CARD: 'id', ADDRESS_PROOF: 'address' };
     const sideMap: any = { FRONT: 'front', BACK: 'back' };
@@ -233,8 +292,8 @@ export class UserService {
     return await userRepository.findAll();
   }
 
-  async getUserVerification(userId: string) {
-    return await userRepository.findVerificationByUserId(userId);
+  async getUserVerification(bookingId: string) {
+    return await userRepository.findVerificationByBookingId(bookingId);
   }
 
   async updateCurrentUser(userId: string, input: UpdateUserInput) {

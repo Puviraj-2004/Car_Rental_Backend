@@ -49,6 +49,86 @@ async function startServer() {
             console.warn('⚠️ Stripe module initialization failed.');
         }
     }
+    // 🚀 STRIPE WEBHOOK - MUST BE FIRST BEFORE ALL MIDDLEWARE
+    app.post('/webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
+        console.log('💰 Webhook hit!');
+        try {
+            if (isMockStripe) {
+                console.log('🔧 Mock Stripe mode - returning 204');
+                return res.status(204).send();
+            }
+            if (!stripe || !stripeWebhookSecret)
+                throw new Error('Stripe not configured');
+            const sig = req.headers['stripe-signature'];
+            if (!sig)
+                throw new Error('No Stripe signature');
+            const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+            console.log('📝 Webhook event type:', event.type);
+            if (event.type === 'checkout.session.completed') {
+                const session = event.data.object;
+                const bookingId = session?.metadata?.bookingId;
+                console.log('✅ Payment completed for booking:', bookingId);
+                if (bookingId) {
+                    // Use payment_intent id when available (so later refunds reference it)
+                    const paymentIdentifier = session.payment_intent || session.id;
+                    await database_1.default.payment.upsert({
+                        where: { bookingId },
+                        update: { status: 'SUCCEEDED', stripeId: paymentIdentifier },
+                        create: {
+                            bookingId,
+                            amount: session.amount_total / 100,
+                            status: 'SUCCEEDED',
+                            stripeId: paymentIdentifier
+                        },
+                    });
+                    console.log('💳 Payment record created/updated');
+                    await database_1.default.booking.update({
+                        where: { id: bookingId },
+                        data: { status: client_1.BookingStatus.CONFIRMED },
+                    });
+                    console.log('🎫 Booking status updated to CONFIRMED');
+                }
+            }
+            // Handle refunds coming from Stripe (charge refunded / refund updated)
+            if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
+                const charge = event.data.object;
+                const bookingId = charge?.metadata?.bookingId;
+                const paymentIntentId = charge?.payment_intent;
+                console.log('♻️ Refund event detected', { bookingId, paymentIntentId });
+                // Try to resolve payment by bookingId (preferred) or by payment_intent
+                let payment = null;
+                if (bookingId) {
+                    payment = await database_1.default.payment.findUnique({ where: { bookingId } });
+                }
+                if (!payment && paymentIntentId) {
+                    payment = await database_1.default.payment.findFirst({ where: { stripeId: paymentIntentId } });
+                }
+                if (payment) {
+                    await database_1.default.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
+                    console.log('💳 Payment marked REFUNDED:', payment.id);
+                    // Optionally set booking to CANCELLED when fully refunded
+                    try {
+                        await database_1.default.booking.update({ where: { id: payment.bookingId }, data: { status: client_1.BookingStatus.CANCELLED } });
+                        console.log('🎫 Booking status set to CANCELLED for refunded payment');
+                    }
+                    catch (e) {
+                        const errMsg = e && typeof e === 'object' && 'message' in e ? e.message : String(e);
+                        console.warn('Could not update booking on refund:', errMsg);
+                    }
+                }
+                else {
+                    console.warn('Refund event received but payment not found for charge:', charge.id);
+                }
+            }
+            console.log('✅ Webhook processed successfully');
+            return res.json({ received: true });
+        }
+        catch (error) {
+            const msg = error && typeof error === 'object' && 'message' in error ? error.message : String(error);
+            console.error('❌ Webhook error:', msg);
+            return res.status(400).json({ error: msg });
+        }
+    });
     // --- APOLLO SERVER SETUP ---
     const server = new server_1.ApolloServer({
         csrfPrevention: false,
@@ -118,42 +198,7 @@ async function startServer() {
     // 6. CSRF
     // app.use('/graphql', csrfProtection);
     app.get('/csrf-token', csrfProtection_1.csrfTokenHandler);
-    // 7. STRIPE WEBHOOK
-    app.post('/webhooks/stripe', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
-        try {
-            if (isMockStripe)
-                return res.status(204).send();
-            if (!stripe || !stripeWebhookSecret)
-                throw new Error('Stripe not configured');
-            const sig = req.headers['stripe-signature'];
-            const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
-            if (event.type === 'checkout.session.completed') {
-                const session = event.data.object;
-                const bookingId = session?.metadata?.bookingId;
-                if (bookingId) {
-                    await database_1.default.payment.upsert({
-                        where: { bookingId },
-                        update: { status: 'SUCCEEDED', stripeId: session.id },
-                        create: {
-                            bookingId,
-                            amount: session.amount_total / 100,
-                            status: 'SUCCEEDED',
-                            stripeId: session.id
-                        },
-                    });
-                    await database_1.default.booking.update({
-                        where: { id: bookingId },
-                        data: { status: client_1.BookingStatus.CONFIRMED },
-                    });
-                }
-            }
-            return res.json({ received: true });
-        }
-        catch (error) {
-            return res.status(400).json({ error: error.message });
-        }
-    });
-    // 8. GENERAL MIDDLEWARE
+    // 7. GENERAL MIDDLEWARE
     app.use(body_parser_1.default.json());
     app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
     // 9. DIAGNOSTICS

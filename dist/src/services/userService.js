@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.userService = exports.UserService = void 0;
 const userRepository_1 = require("../repositories/userRepository");
@@ -11,6 +14,8 @@ const securityLogger_1 = require("../utils/securityLogger");
 const validation_1 = require("../utils/validation");
 const client_1 = require("@prisma/client");
 const cloudinary_1 = require("../utils/cloudinary");
+const bookingRepository_1 = require("../repositories/bookingRepository");
+const database_1 = __importDefault(require("../utils/database"));
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ocrService = new ocrService_1.OCRService();
 class UserService {
@@ -18,7 +23,13 @@ class UserService {
         if (!file)
             return undefined;
         try {
-            const result = await (0, cloudinary_1.uploadToCloudinary)(file, folder);
+            // Extract the stream from the file object (like carService does)
+            const { createReadStream } = await file;
+            if (!createReadStream) {
+                console.error('No createReadStream found in file object');
+                return undefined;
+            }
+            const result = await (0, cloudinary_1.uploadToCloudinary)(createReadStream(), folder);
             return result.secure_url;
         }
         catch (e) {
@@ -128,52 +139,95 @@ class UserService {
             throw new AppError_1.AppError('Google authentication failed', AppError_1.ErrorCode.UNAUTHENTICATED);
         }
     }
-    async createOrUpdateVerification(userId, input) {
-        const [licenseFrontUrl, licenseBackUrl, idCardUrl, addressProofUrl] = await Promise.all([
+    async createOrUpdateVerification(bookingId, input) {
+        // 1. Validate booking exists first
+        const bookingExists = await database_1.default.booking.findUnique({
+            where: { id: bookingId },
+            select: { id: true }
+        });
+        if (!bookingExists) {
+            throw new Error(`Booking with ID ${bookingId} not found`);
+        }
+        // 2. Upload files
+        const [licenseFrontUrl, licenseBackUrl, idCardUrl, idCardBackUrl, addressProofUrl] = await Promise.all([
             this.uploadIfPresent(input.licenseFrontFile, 'verifications'),
             this.uploadIfPresent(input.licenseBackFile, 'verifications'),
             this.uploadIfPresent(input.idCardFile, 'verifications'),
-            this.uploadIfPresent(input.addressProofFile, 'verifications'),
+            this.uploadIfPresent(input.idCardBackFile, 'verifications'),
+            this.uploadIfPresent(input.addressProofFile, 'verifications')
         ]);
-        // Save the verification data
-        const dataToSave = {
+        // 3. Convert licenseCategories from string[] to LicenseCategory[]
+        const convertedLicenseCategories = input.licenseCategories?.map(cat => {
+            // Map frontend strings to backend enum values
+            switch (cat?.toUpperCase()) {
+                case 'A': return 'A';
+                case 'A1': return 'A1';
+                case 'A2': return 'A2';
+                case 'B': return 'B';
+                case 'C': return 'C';
+                case 'D': return 'D';
+                case 'AM': return 'AM';
+                case 'B1': return 'B1';
+                case 'BE': return 'BE';
+                case 'C1': return 'C1';
+                case 'C1E': return 'C1E';
+                case 'CE': return 'CE';
+                case 'D1': return 'D1';
+                case 'D1E': return 'D1E';
+                case 'DE': return 'DE';
+                default: return 'B'; // Default fallback
+            }
+        }).filter(Boolean); // Remove any undefined values
+        // 4. Prepare verification data
+        const verificationData = {
             licenseFrontUrl,
             licenseBackUrl,
             idCardUrl,
+            idCardBackUrl,
             addressProofUrl,
             licenseNumber: input.licenseNumber,
             licenseExpiry: input.licenseExpiry ? new Date(input.licenseExpiry) : undefined,
-            licenseCategory: input.licenseCategory,
+            licenseIssueDate: input.licenseIssueDate ? new Date(input.licenseIssueDate) : undefined,
+            driverDob: input.driverDob ? new Date(input.driverDob) : undefined,
+            licenseCategories: convertedLicenseCategories, // ✅ Use converted enum array
             idNumber: input.idNumber,
             idExpiry: input.idExpiry ? new Date(input.idExpiry) : undefined,
+            verifiedAddress: input.verifiedAddress,
             status: client_1.VerificationStatus.PENDING
         };
-        const verification = await userRepository_1.userRepository.upsertVerification(userId, dataToSave);
-        const hasAllDocs = !!(verification.licenseNumber && verification.licenseFrontUrl && verification.licenseBackUrl && verification.idCardUrl && verification.addressProofUrl);
-        if (hasAllDocs) {
-            await userRepository_1.userRepository.updateVerification(userId, { status: client_1.VerificationStatus.APPROVED });
-            if (input.bookingToken) {
-                const bVerif = await userRepository_1.userRepository.findBookingVerificationByToken(input.bookingToken);
-                if (bVerif?.bookingId)
-                    await userRepository_1.userRepository.updateBookingStatus(bVerif.bookingId, graphql_1.BookingStatus.VERIFIED);
-            }
-            else {
-                await userRepository_1.userRepository.updateManyBookingsStatus(userId, graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED);
+        // 5. Check if all documents are present
+        const hasAllDocs = !!(licenseFrontUrl && licenseBackUrl && idCardUrl && idCardBackUrl && addressProofUrl);
+        // 6. Auto-approve if all docs present
+        if (hasAllDocs && input.bookingToken) {
+            const bVerif = await userRepository_1.userRepository.findBookingVerificationByToken(input.bookingToken);
+            if (bVerif) {
+                await userRepository_1.userRepository.updateBookingVerification(bVerif.id, { isVerified: true, verifiedAt: new Date() });
+                await bookingRepository_1.bookingRepository.updateBookingStatus(bVerif.bookingId, graphql_1.BookingStatus.VERIFIED);
             }
         }
-        return verification;
+        // 7. Create/update document verification
+        return await userRepository_1.userRepository.upsertVerification(bookingId, verificationData);
     }
-    async verifyDocument(userId, status) {
-        const verification = await userRepository_1.userRepository.updateVerification(userId, {
+    async verifyDocument(bookingId, status) {
+        const verification = await userRepository_1.userRepository.updateVerification(bookingId, {
             status: status === client_1.VerificationStatus.APPROVED ? client_1.VerificationStatus.APPROVED : client_1.VerificationStatus.REJECTED
         });
         if (status === client_1.VerificationStatus.APPROVED) {
-            await userRepository_1.userRepository.updateManyBookingsStatus(userId, graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.CONFIRMED);
-            await userRepository_1.userRepository.updateManyBookingsStatus(userId, graphql_1.BookingStatus.VERIFIED, graphql_1.BookingStatus.CONFIRMED);
+            // Get the booking to find the userId
+            const booking = await database_1.default.booking.findUnique({
+                where: { id: bookingId },
+                select: { userId: true }
+            });
+            if (booking) {
+                // Update only PENDING bookings to VERIFIED
+                await userRepository_1.userRepository.updateManyBookingsStatus(booking.userId, graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED);
+                // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
+            }
         }
         return verification;
     }
     async processOCR(file, documentType, side) {
+        console.log('Processing file for type:', documentType, 'side:', side);
         const { createReadStream, mimetype } = await file;
         const chunks = [];
         const buffer = await new Promise((resolve, reject) => {
@@ -181,6 +235,7 @@ class UserService {
                 .on('end', () => resolve(Buffer.concat(chunks)))
                 .on('error', reject);
         });
+        console.log('Buffer length:', buffer.length);
         const typeMap = { LICENSE: 'license', ID_CARD: 'id', ADDRESS_PROOF: 'address' };
         const sideMap = { FRONT: 'front', BACK: 'back' };
         const result = await ocrService.extractDocumentData(buffer, typeMap[documentType], sideMap[side], mimetype);
@@ -195,8 +250,8 @@ class UserService {
     async getAllUsers() {
         return await userRepository_1.userRepository.findAll();
     }
-    async getUserVerification(userId) {
-        return await userRepository_1.userRepository.findVerificationByUserId(userId);
+    async getUserVerification(bookingId) {
+        return await userRepository_1.userRepository.findVerificationByBookingId(bookingId);
     }
     async updateCurrentUser(userId, input) {
         // Validate email if provided

@@ -29,6 +29,7 @@ export declare class CarRepository {
         }[];
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -65,13 +66,12 @@ export declare class CarRepository {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -90,6 +90,7 @@ export declare class CarRepository {
         }[];
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -107,6 +108,17 @@ export declare class CarRepository {
         currentOdometer: number;
         critAirRating: import(".prisma/client").$Enums.CritAirCategory;
     }) | null>;
+    findAllModels(): Promise<({
+        brand: {
+            id: string;
+            name: string;
+            logoUrl: string | null;
+        };
+    } & {
+        id: string;
+        brandId: string;
+        name: string;
+    })[]>;
     findBrands(): Promise<{
         id: string;
         name: string;
@@ -153,11 +165,7 @@ export declare class CarRepository {
         brandId: string;
         name: string;
     }>;
-    deleteModel(id: string): Promise<{
-        id: string;
-        brandId: string;
-        name: string;
-    }>;
+    deleteModel(id: string): Promise<boolean>;
     createCar(data: Prisma.CarCreateInput): Promise<{
         model: {
             brand: {
@@ -172,6 +180,7 @@ export declare class CarRepository {
         };
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -203,6 +212,7 @@ export declare class CarRepository {
         };
     } & {
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;
@@ -222,6 +232,7 @@ export declare class CarRepository {
     }>;
     deleteCar(id: string): Promise<{
         id: string;
+        brandId: string;
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.CarStatus;

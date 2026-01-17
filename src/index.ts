@@ -50,6 +50,94 @@ async function startServer() {
     }
   }
 
+  // 🚀 STRIPE WEBHOOK - MUST BE FIRST BEFORE ALL MIDDLEWARE
+  app.post('/webhook', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
+    console.log('💰 Webhook hit!');
+    try {
+      if (isMockStripe) {
+        console.log('🔧 Mock Stripe mode - returning 204');
+        return res.status(204).send();
+      }
+      if (!stripe || !stripeWebhookSecret) throw new Error('Stripe not configured');
+
+      const sig = req.headers['stripe-signature'];
+      if (!sig) throw new Error('No Stripe signature');
+      
+      const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+      console.log('📝 Webhook event type:', event.type);
+
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as any;
+        const bookingId = session?.metadata?.bookingId;
+        console.log('✅ Payment completed for booking:', bookingId);
+
+        if (bookingId) {
+          // Use payment_intent id when available (so later refunds reference it)
+          const paymentIdentifier = session.payment_intent || session.id;
+
+          await prisma.payment.upsert({
+            where: { bookingId },
+            update: { status: 'SUCCEEDED', stripeId: paymentIdentifier },
+            create: {
+              bookingId,
+              amount: session.amount_total / 100,
+              status: 'SUCCEEDED',
+              stripeId: paymentIdentifier
+            },
+          });
+          console.log('💳 Payment record created/updated');
+
+          await prisma.booking.update({
+            where: { id: bookingId },
+            data: { status: BookingStatus.CONFIRMED },
+          });
+          console.log('🎫 Booking status updated to CONFIRMED');
+        }
+      }
+
+      // Handle refunds coming from Stripe (charge refunded / refund updated)
+      if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
+        const charge = event.data.object as any;
+        const bookingId = charge?.metadata?.bookingId;
+        const paymentIntentId = charge?.payment_intent;
+
+        console.log('♻️ Refund event detected', { bookingId, paymentIntentId });
+
+        // Try to resolve payment by bookingId (preferred) or by payment_intent
+        let payment: any = null;
+        if (bookingId) {
+          payment = await prisma.payment.findUnique({ where: { bookingId } });
+        }
+        if (!payment && paymentIntentId) {
+          payment = await prisma.payment.findFirst({ where: { stripeId: paymentIntentId } });
+        }
+
+        if (payment) {
+          await prisma.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
+          console.log('💳 Payment marked REFUNDED:', payment.id);
+
+          // Optionally set booking to CANCELLED when fully refunded
+          try {
+            await prisma.booking.update({ where: { id: payment.bookingId }, data: { status: BookingStatus.CANCELLED } });
+            console.log('🎫 Booking status set to CANCELLED for refunded payment');
+          } catch (e) {
+            const errMsg = e && typeof e === 'object' && 'message' in e ? (e as any).message : String(e);
+            console.warn('Could not update booking on refund:', errMsg);
+          }
+        } else {
+          console.warn('Refund event received but payment not found for charge:', charge.id);
+        }
+      }
+      
+      console.log('✅ Webhook processed successfully');
+      return res.json({ received: true });
+    } catch (error: unknown) {
+      const msg = error && typeof error === 'object' && 'message' in error ? (error as any).message : String(error);
+      console.error('❌ Webhook error:', msg);
+      return res.status(400).json({ error: msg });
+    }
+  });
+
   // --- APOLLO SERVER SETUP ---
   const server = new ApolloServer({
     csrfPrevention: false, 
@@ -128,42 +216,7 @@ async function startServer() {
   // app.use('/graphql', csrfProtection);
   app.get('/csrf-token', csrfTokenHandler);
 
-  // 7. STRIPE WEBHOOK
-  app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async (req: Request, res: Response) => {
-    try {
-      if (isMockStripe) return res.status(204).send();
-      if (!stripe || !stripeWebhookSecret) throw new Error('Stripe not configured');
-
-      const sig = req.headers['stripe-signature'];
-      const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
-
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object as any;
-        const bookingId = session?.metadata?.bookingId;
-        if (bookingId) {
-          await prisma.payment.upsert({
-            where: { bookingId },
-            update: { status: 'SUCCEEDED', stripeId: session.id },
-            create: {
-              bookingId,
-              amount: session.amount_total / 100,
-              status: 'SUCCEEDED',
-              stripeId: session.id
-            },
-          });
-          await prisma.booking.update({
-            where: { id: bookingId },
-            data: { status: BookingStatus.CONFIRMED },
-          });
-        }
-      }
-      return res.json({ received: true });
-    } catch (error: any) {
-      return res.status(400).json({ error: error.message });
-    }
-  });
-
-  // 8. GENERAL MIDDLEWARE
+  // 7. GENERAL MIDDLEWARE
   app.use(bodyParser.json());
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 

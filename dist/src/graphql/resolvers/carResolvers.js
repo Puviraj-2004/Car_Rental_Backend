@@ -15,7 +15,7 @@ exports.carResolvers = {
             return await carService_1.carService.getBrands();
         },
         models: async (_, args) => {
-            return await carService_1.carService.getModelsByBrand(args.brandId);
+            return await carService_1.carService.getModels(args.brandId);
         },
         availableCars: async (_, args) => {
             return await carService_1.carService.getAvailableCars(args.startDate, args.endDate);

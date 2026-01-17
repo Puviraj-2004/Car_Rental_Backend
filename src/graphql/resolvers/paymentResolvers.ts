@@ -58,5 +58,10 @@ export const paymentResolvers = {
       const { id, status } = input;
       return await paymentService.updatePaymentStatus(id, status);
     }
+    ,
+    refundPayment: async (_: any, { paymentId }: { paymentId: string }, context: any) => {
+      isAdmin(context);
+      return await paymentService.refundPayment(paymentId);
+    }
   }
 };

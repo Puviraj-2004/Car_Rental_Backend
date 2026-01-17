@@ -29,6 +29,12 @@ class CarRepository {
             }
         });
     }
+    async findAllModels() {
+        return await database_1.default.vehicleModel.findMany({
+            include: { brand: true },
+            orderBy: { name: 'asc' }
+        });
+    }
     async findBrands() {
         return await database_1.default.brand.findMany({ orderBy: { name: 'asc' } });
     }
@@ -56,7 +62,15 @@ class CarRepository {
         return await database_1.default.vehicleModel.update({ where: { id }, data });
     }
     async deleteModel(id) {
-        return await database_1.default.vehicleModel.delete({ where: { id } });
+        // First check if model exists
+        const existingModel = await database_1.default.vehicleModel.findUnique({
+            where: { id }
+        });
+        if (!existingModel) {
+            throw new Error(`Model with ID ${id} not found`);
+        }
+        await database_1.default.vehicleModel.delete({ where: { id } });
+        return true; // Return boolean instead of deleted record
     }
     // Admin CRUD - Cars
     async createCar(data) {

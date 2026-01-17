@@ -4,6 +4,7 @@ exports.userResolvers = void 0;
 const authguard_1 = require("../../utils/authguard");
 const userService_1 = require("../../services/userService");
 const graphqlRateLimiter_1 = require("../../middleware/graphqlRateLimiter");
+const bookingService_1 = require("../../services/bookingService");
 exports.userResolvers = {
     Query: {
         me: async (_, __, context) => {
@@ -21,6 +22,9 @@ exports.userResolvers = {
         myVerification: async (_, __, context) => {
             (0, authguard_1.isAuthenticated)(context);
             return await userService_1.userService.getUserVerification(context.userId);
+        },
+        checkCarAvailability: async (_, { carId, startDate, endDate, excludeBookingId }) => {
+            return await bookingService_1.bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
         }
     },
     Mutation: {
@@ -41,7 +45,7 @@ exports.userResolvers = {
         },
         createOrUpdateVerification: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);
-            return await userService_1.userService.createOrUpdateVerification(context.userId, input);
+            return await userService_1.userService.createOrUpdateVerification(input.bookingId, input);
         },
         verifyDocument: async (_, { userId, status }, context) => {
             (0, authguard_1.isAdmin)(context);

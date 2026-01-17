@@ -5,32 +5,37 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.bookingRepository = exports.BookingRepository = exports.BOOKING_INCLUDES = void 0;
 const database_1 = __importDefault(require("../utils/database"));
-const client_1 = require("@prisma/client"); // ✅ Use Prisma native enums for repo
+const client_1 = require("@prisma/client");
 /**
  * Senior Architect Note:
  * Centralized Include configurations.
- * Added 'images: true' to the admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
+ * Added 'images: true' to admin section to prevent "Cannot return null for non-nullable field Car.images" errors.
  */
 exports.BOOKING_INCLUDES = {
     basic: {
-        car: { include: { model: { include: { brand: true } } } },
-        payment: true
+        user: true,
+        car: { include: { model: { include: { brand: true } }, images: true } },
+        payment: true,
+        verification: true,
+        documentVerification: true
     },
     detailed: {
         user: true,
         car: { include: { model: { include: { brand: true } }, images: true } },
         payment: true,
         verification: true,
+        documentVerification: true
     },
     admin: {
         user: true,
-        car: { include: { model: { include: { brand: true } }, images: true } }, // ✅ FIXED: Added images: true
+        car: { include: { model: { include: { brand: true } }, images: true } },
         payment: true,
-        verification: true
+        verification: true,
+        documentVerification: true
     }
 };
 class BookingRepository {
-    async findMany(where, include = exports.BOOKING_INCLUDES.detailed, orderBy = { createdAt: 'desc' }) {
+    async findMany(where = {}, include = exports.BOOKING_INCLUDES.basic, orderBy = { startDate: 'desc' }) {
         return await database_1.default.booking.findMany({ where, include, orderBy });
     }
     async findUnique(id, include = exports.BOOKING_INCLUDES.detailed) {
@@ -42,40 +47,63 @@ class BookingRepository {
     async findVerificationToken(token) {
         return await database_1.default.bookingVerification.findUnique({ where: { token } });
     }
-    async findConflicts(carId, startDate, endDate) {
-        // 🛡️ Senior Logic: Strict Status-based conflict check
-        const conflictStatuses = [
-            client_1.BookingStatus.PENDING,
-            client_1.BookingStatus.VERIFIED,
-            client_1.BookingStatus.CONFIRMED,
-            client_1.BookingStatus.ONGOING
-        ];
+    async updateBookingStatus(id, status) {
+        return await database_1.default.booking.update({
+            where: { id },
+            data: { status, updatedAt: new Date() }
+        });
+    }
+    async findConflicts(carId, startDate, endDate, excludeBookingId) {
+        const bufferMs = 24 * 60 * 60 * 1000;
+        const noBufferOverlap = {
+            OR: [
+                { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
+                { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
+                { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
+            ]
+        };
+        const bufferedStart = new Date(startDate.getTime() - bufferMs);
+        const bufferedEnd = new Date(endDate.getTime() + bufferMs);
+        const bufferOverlap = {
+            OR: [
+                { AND: [{ startDate: { lte: bufferedStart } }, { endDate: { gt: bufferedStart } }] },
+                { AND: [{ startDate: { lt: bufferedEnd } }, { endDate: { gte: bufferedEnd } }] },
+                { AND: [{ startDate: { gte: bufferedStart } }, { endDate: { lte: bufferedEnd } }] }
+            ]
+        };
+        const whereClause = {
+            AND: [
+                { carId },
+                {
+                    OR: [
+                        { AND: [{ status: { in: [client_1.BookingStatus.PENDING, client_1.BookingStatus.VERIFIED] } }, noBufferOverlap] },
+                        { AND: [{ status: { in: [client_1.BookingStatus.CONFIRMED, client_1.BookingStatus.ONGOING] } }, bufferOverlap] }
+                    ]
+                }
+            ]
+        };
+        // Add exclude booking ID if provided
+        if (excludeBookingId) {
+            whereClause.AND.push({ id: { not: excludeBookingId } });
+        }
         return await database_1.default.booking.findMany({
-            where: {
-                AND: [
-                    { carId },
-                    { status: { in: conflictStatuses } },
-                    {
-                        OR: [
-                            { AND: [{ startDate: { lte: startDate } }, { endDate: { gt: startDate } }] },
-                            { AND: [{ startDate: { lt: endDate } }, { endDate: { gte: endDate } }] },
-                            { AND: [{ startDate: { gte: startDate } }, { endDate: { lte: endDate } }] }
-                        ]
-                    }
-                ]
-            },
-            include: { user: true },
+            where: whereClause,
+            include: exports.BOOKING_INCLUDES.basic,
             orderBy: { startDate: 'asc' }
         });
     }
     async create(data) {
         return await database_1.default.booking.create({
             data,
-            include: { car: { include: { model: { include: { brand: true } } } } }
+            include: exports.BOOKING_INCLUDES.detailed
         });
     }
-    async update(id, data, include = exports.BOOKING_INCLUDES.detailed) {
-        return await database_1.default.booking.update({ where: { id }, data, include });
+    async update(id, data) {
+        return await database_1.default.booking.update({
+            where: { id },
+            data,
+            include: exports.BOOKING_INCLUDES.detailed
+        });
     }
     async delete(id) {
         return await database_1.default.booking.delete({ where: { id } });

@@ -49,5 +49,6 @@ export const paymentTypeDefs = gql`
     updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
     createStripeCheckoutSession(bookingId: String!): StripeCheckoutSession!
     mockFinalizePayment(bookingId: String!, success: Boolean!): Payment!
+    refundPayment(paymentId: ID!): Payment!
   }
 `;

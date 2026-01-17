@@ -5,89 +5,50 @@ const generative_ai_1 = require("@google/generative-ai");
 class OCRService {
     genAI;
     model;
-    debugEnabled;
     constructor() {
         const apiKey = process.env.GEMINI_API_KEY;
         if (!apiKey) {
             throw new Error('GEMINI_API_KEY is missing. Set it in your environment variables.');
         }
-        this.debugEnabled = String(process.env.DEBUG_OCR || '').toLowerCase() === 'true';
         this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
-        this.model = this.genAI.getGenerativeModel({ model: 'gemini-flash-lite-latest' });
-    }
-    debugLog(_message, _data) {
-        if (!this.debugEnabled)
-            return;
+        this.model = this.genAI.getGenerativeModel({ model: "models/gemini-2.5-flash-lite" });
     }
     async extractDocumentData(fileBuffer, documentType, side, mimeType) {
+        console.log('--- STARTING OCR REQUEST ---');
         try {
             const base64Image = fileBuffer.toString('base64');
             const prompt = this.createGeminiPrompt(documentType, side);
             const safeMimeType = mimeType && mimeType.trim().length > 0 ? mimeType : 'image/jpeg';
-            this.debugLog('Request prepared', {
-                documentType,
-                side,
-                mimeType: safeMimeType,
-                bufferBytes: fileBuffer.length,
-                base64Chars: base64Image.length,
-            });
-            this.debugLog('Prompt', prompt);
-            let result; // Keep as any for OCR API response flexibility
-            try {
-                result = await Promise.race([
-                    this.model.generateContent([
-                        prompt,
-                        { inlineData: { mimeType: safeMimeType, data: base64Image } }
-                    ]),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Gemini API timeout')), 30000))
-                ]);
-            }
-            catch (apiError) {
-                const msg = String(apiError?.message || '').toLowerCase();
-                this.debugLog('Gemini API error', {
-                    message: apiError?.message,
-                    name: apiError?.name,
-                    status: apiError?.status,
-                    code: apiError?.code,
-                });
-                if (msg.includes('429') || msg.includes('quota') || msg.includes('exhausted')) {
-                    return { isQuotaExceeded: true };
-                }
-                throw apiError;
-            }
+            console.log(' SENDING TO GEMINI...');
+            console.log(' Safe MIME Type:', safeMimeType);
+            console.log(' Document Type:', documentType);
+            console.log(' Side:', side);
+            console.log(' Buffer Length:', fileBuffer.length);
+            const result = await this.model.generateContent([
+                prompt,
+                { inlineData: { data: base64Image, mimeType: safeMimeType } }
+            ]);
             const response = await result.response;
-            const text = response.text();
-            this.debugLog('Gemini response received', {
-                textLength: text?.length || 0,
-                textPreview: text ? text.slice(0, 500) : '',
-            });
+            const text = response.text().replace(/```json|```/g, "").trim();
+            console.log('--- RAW AI ---', text, '--- RAW END ---');
             if (!text || text.trim().length < 10) {
-                this.debugLog('Response too short/empty -> fallbackRegexExtraction');
-                return this.fallbackRegexExtraction(text || 'empty');
-            }
-            const jsonMatch = text.match(/\{[\s\S]*\}/);
-            if (!jsonMatch) {
-                this.debugLog('No JSON object found in response -> fallbackRegexExtraction');
-                return this.fallbackRegexExtraction(text);
+                console.log(' Response too short/empty -> fallbackUsed');
+                return { fallbackUsed: true };
             }
             let extractedData;
             try {
-                extractedData = JSON.parse(jsonMatch[0]);
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                const cleanedJson = jsonMatch ? jsonMatch[0] : text;
+                extractedData = JSON.parse(cleanedJson);
             }
             catch (e) {
-                this.debugLog('JSON.parse failed -> fallbackRegexExtraction', {
-                    error: e?.message,
-                    jsonPreview: jsonMatch[0]?.slice(0, 500),
-                });
-                return this.fallbackRegexExtraction(text);
+                console.error(' JSON PARSE ERROR:', e);
+                console.log(' Failed JSON Text:', text);
+                return { fallbackUsed: true };
             }
-            this.debugLog('Parsed JSON', extractedData);
-            const rawLicenseCategory = extractedData?.licenseCategory;
+            console.log(' Parsed JSON:', extractedData);
             const rawLicenseCategories = extractedData?.licenseCategories;
-            const mergedLicenseCategories = Array.from(new Set([
-                ...(Array.isArray(rawLicenseCategories) ? rawLicenseCategories : []),
-                ...(Array.isArray(rawLicenseCategory) ? rawLicenseCategory : []),
-            ]));
+            const mergedLicenseCategories = Array.isArray(rawLicenseCategories) ? rawLicenseCategories : [];
             const mapped = {
                 firstName: (extractedData.firstName || extractedData.prenom || '').trim(),
                 lastName: (extractedData.lastName || extractedData.nom || '').trim(),
@@ -97,60 +58,125 @@ class OCRService {
                 expiryDate: extractedData.expiryDate || extractedData.documentDate || "",
                 birthDate: extractedData.birthDate || "",
                 address: extractedData.address || "",
-                licenseCategory: typeof rawLicenseCategory === 'string' ? rawLicenseCategory : "",
-                licenseCategories: mergedLicenseCategories.length ? mergedLicenseCategories : undefined,
+                licenseCategories: mergedLicenseCategories,
                 restrictsToAutomatic: typeof extractedData.restrictsToAutomatic === 'boolean' ? extractedData.restrictsToAutomatic : undefined,
                 documentDate: extractedData.documentDate || "",
                 issueDate: extractedData.issueDate || "",
                 fallbackUsed: false,
             };
             const sanitized = this.sanitizeExtractedData(mapped);
-            this.debugLog('Sanitized extracted data', sanitized);
+            console.log(' Sanitized extracted data:', sanitized);
             return sanitized;
         }
         catch (error) {
-            this.debugLog('Unhandled OCRService error -> handleFallbackSystem', {
-                message: error?.message,
-                name: error?.name,
-            });
+            console.error(' OCR ERROR:', error.message);
+            console.error(' ERROR STACK:', error.stack);
+            console.log(' FALLING BACK TO SYSTEM');
             return this.handleFallbackSystem(fileBuffer, documentType);
         }
     }
     createGeminiPrompt(documentType, side) {
+        const jsonInstruction = "Return ONLY a valid JSON object. No markdown, no prose, no explanations.";
         switch (documentType) {
             case 'license':
-                return `OCR for French driving license (${side}). Extract JSON ONLY: {firstName, lastName, birthDate, expiryDate, licenseNumber, licenseCategories:[], licenseCategory, restrictsToAutomatic:bool}.
-
-Rules:
-- Return ONLY categories that are explicitly visible/printed on the document (e.g. AM, A1, A2, A, B1, B, BE, C1, C, C1E, CE, D1, D, D1E, DE). Do NOT guess.
-- If you cannot clearly read categories, return licenseCategories: [] and licenseCategory: null.
-- Dates must be YYYY-MM-DD.
-- Return null for fields not found.
-`;
+                if (side === 'front') {
+                    return `Extract data from FRONT of this French Driving License (Permis de Conduire).
+          Fields mapping:
+          - Field 1 (NOM): lastName
+          - Field 2 (Prénoms): firstName
+          - Field 3 (Né le): birthDate (Format: YYYY-MM-DD)
+          - Field 4a (Date de délivrance): issueDate (Format: YYYY-MM-DD)
+          - Field 4b (Date d'expiration): expiryDate (Format: YYYY-MM-DD)
+          - Field 5 (N° du permis): licenseNumber
+          
+          Required JSON Structure:
+          {
+            "lastName": "string",
+            "firstName": "string",
+            "birthDate": "YYYY-MM-DD",
+            "issueDate": "YYYY-MM-DD",
+            "expiryDate": "YYYY-MM-DD",
+            "licenseNumber": "string"
+          }
+          ${jsonInstruction}`;
+                }
+                else {
+                    return `Analyze BACK of this French Driving License.
+          Look at 2x5 table (Categories A to E).
+          Identify categories that have a date or stamp next to them (Columns 10, 11, or 12).
+          
+          Required JSON Structure:
+          {
+            "licenseCategories": ["string"]
+          }
+          Example: ["AM", "B", "BE"]
+          ${jsonInstruction}`;
+                }
             case 'id':
-                return `OCR for French ID card. Extract JSON: {firstName, lastName, documentId, birthDate, expiryDate}. Dates: YYYY-MM-DD. Return null for fields not found.`;
+                if (side === 'front') {
+                    return `Extract data from FRONT of this French National ID Card (CNI).
+          Instructions:
+          - "Nom": lastName
+          - "Prénom": firstName  
+          - "Né(e) le": birthDate (Format: YYYY-MM-DD)
+          - "N° du document": documentId
+          - "Expire le" or "Valable jusqu'au": expiryDate (Format: YYYY-MM-DD)
+          
+          Required JSON Structure:
+          {
+            "lastName": "string",
+            "firstName": "string", 
+            "birthDate": "YYYY-MM-DD",
+            "documentId": "string",
+            "expiryDate": "YYYY-MM-DD"
+          }
+          ${jsonInstruction}`;
+                }
+                else {
+                    return `Extract data from BACK of this French National ID Card (CNI).
+          Instructions:
+          - "Adresse": address (street, city, postal code)
+          - "Valable jusqu'au" or "Date d'expiration": expiryDate
+          
+          Required JSON Structure:
+          {
+            "address": "string",
+            "expiryDate": "YYYY-MM-DD"
+          }
+          ${jsonInstruction}`;
+                }
             case 'address':
-                return `OCR for French proof of address. Extract JSON: {fullName, address, documentId, documentDate}. Dates: YYYY-MM-DD. Return null for fields not found.`;
+                return `Extract data from this French Proof of Address (e.g., EDF bill, Water bill, or Tax notice).
+        Identify:
+        1. The Main Subscriber/Contract Holder name (usually under 'Titulaire' or in address block).
+        2. The full residential address.
+        3. The 'Date de facture' or 'Date d'émission' (Issue Date).
+        
+        Required JSON Structure:
+        {
+          "lastName": "string",
+          "firstName": "string",
+          "address": "string",
+          "documentDate": "YYYY-MM-DD"
+        }
+        ${jsonInstruction}`;
             default:
-                return `Extract JSON: {fullName, documentId, expiryDate, birthDate, address}. Dates: YYYY-MM-DD. Return null for fields not found.`;
+                return `Analyze image and return a JSON object with any visible identity information. ${jsonInstruction}`;
         }
     }
     sanitizeExtractedData(data) {
         const categories = this.normalizeLicenseCategories(data.licenseCategories || []);
         const highest = this.pickHighestCategory(categories);
-        const finalCategory = this.normalizeLicenseCategory(data.licenseCategory || highest);
-        // Heuristic: if model returns an implausibly large set of categories,
-        // treat categories as unreliable and avoid auto-prefill.
-        const maxReasonableCategories = 6;
-        const categoriesAreSuspicious = categories.length > maxReasonableCategories;
+        const finalCategory = this.normalizeLicenseCategory(highest);
         return {
             ...data,
             fullName: data.fullName || `${data.firstName || ''} ${data.lastName || ''}`.trim(),
-            birthDate: this.normalizeDateToIso(data.birthDate || ''),
-            expiryDate: this.normalizeDateToIso(data.expiryDate || ''),
-            licenseCategory: categoriesAreSuspicious ? undefined : (finalCategory || undefined),
-            licenseCategories: categoriesAreSuspicious ? undefined : (categories.length ? categories : undefined),
-            fallbackUsed: !!data.fallbackUsed || categoriesAreSuspicious
+            birthDate: data.birthDate ? this.normalizeDateToIso(data.birthDate) : '',
+            issueDate: data.issueDate ? this.normalizeDateToIso(data.issueDate) : '',
+            expiryDate: data.expiryDate ? this.normalizeDateToIso(data.expiryDate) : '',
+            licenseCategory: finalCategory || undefined,
+            licenseCategories: data.licenseCategories || undefined,
+            fallbackUsed: !!data.fallbackUsed
         };
     }
     normalizeLicenseCategories(input) {
@@ -198,13 +224,43 @@ Rules:
     normalizeDateToIso(input) {
         if (!input)
             return '';
-        const cleaned = input.replace(/[^0-9/.-]/g, '').replace(/[./]/g, '-');
-        const parts = cleaned.split('-');
+        // Handle DD/MM/YYYY, DD.MM.YYYY, DD-MM-YYYY formats
+        const cleaned = input.replace(/[^0-9/.-]/g, '');
+        const parts = cleaned.split(/[./-]/);
         if (parts.length === 3) {
-            if (parts[0].length === 4)
-                return `${this.fixOcrYear(parts[0])}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-            if (parts[2].length === 4)
-                return `${this.fixOcrYear(parts[2])}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            let day, month, year;
+            // Check if it's DD/MM/YYYY or DD.MM.YYYY format (day first)
+            if (parts[0].length <= 2 && parts[1].length <= 2) {
+                day = parts[0].padStart(2, '0');
+                month = parts[1].padStart(2, '0');
+                year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
+            }
+            else if (parts[2].length <= 2 && parts[1].length <= 2) {
+                // Check if it's YYYY/MM/DD format (year first)
+                year = parts[0];
+                month = parts[1].padStart(2, '0');
+                day = parts[2].padStart(2, '0');
+            }
+            else if (parts[0].length === 4) {
+                // YYYY/MM/DD format
+                year = this.fixOcrYear(parts[0]);
+                month = parts[1].padStart(2, '0');
+                day = parts[2].padStart(2, '0');
+            }
+            else if (parts[2].length === 4) {
+                // DD/MM/YYYY format
+                year = this.fixOcrYear(parts[2]);
+                month = parts[1].padStart(2, '0');
+                day = parts[0].padStart(2, '0');
+            }
+            else {
+                return '';
+            }
+            // Validate date
+            const parsedDate = new Date(`${year}-${month}-${day}`);
+            if (isNaN(parsedDate.getTime()))
+                return '';
+            return `${year}-${month}-${day}`;
         }
         return '';
     }
@@ -231,31 +287,24 @@ Rules:
         return {
             fullName: this.extractNameFromText(""),
             licenseNumber: this.extractDocumentNumberFromText(""),
-            expiryDate: this.extractDateFromText("")
+            expiryDate: this.extractDateFromText(""),
+            issueDate: this.extractDateFromText("")
         };
     }
     async extractIdCardDataWithFallback(_buf) {
         return {
             fullName: this.extractNameFromText(""),
             documentId: this.extractDocumentNumberFromText(""),
-            birthDate: this.extractBirthDateFromText("")
+            birthDate: this.extractBirthDateFromText(""),
+            issueDate: this.extractDateFromText("")
         };
     }
     async extractAddressDataWithFallback(_buf) {
         return {
             fullName: this.extractNameFromText(""),
-            address: this.extractAddressFromText("")
-        };
-    }
-    fallbackRegexExtraction(text) {
-        return {
-            fullName: this.extractNameFromText(text),
-            licenseNumber: this.extractDocumentNumberFromText(text),
-            documentId: this.extractDocumentNumberFromText(text),
-            expiryDate: this.extractDateFromText(text),
-            birthDate: this.extractBirthDateFromText(text), // ✅ FIXED: Now used
-            address: this.extractAddressFromText(text), // ✅ FIXED: Now used
-            fallbackUsed: true
+            address: this.extractAddressFromText(""),
+            documentId: this.extractDocumentNumberFromText(""),
+            documentDate: this.extractDateFromText("")
         };
     }
     extractNameFromText(t) {

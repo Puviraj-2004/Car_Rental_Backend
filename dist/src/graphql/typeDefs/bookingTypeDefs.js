@@ -32,7 +32,6 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float
@@ -47,6 +46,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     updatedAt: String!
     payment: Payment
     verification: BookingVerification
+    documentVerification: DocumentVerification
   }
 
 
@@ -69,7 +69,6 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     damageFee: Float
@@ -87,7 +86,6 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     returnTime: String
     basePrice: Float
     taxAmount: Float
-    surchargeAmount: Float
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float
@@ -108,7 +106,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
     myBookings: [Booking!]!
-    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!): CarAvailability
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability
   }
 
   # --- Mutations ---
@@ -121,8 +119,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     deleteBooking(id: ID!): Boolean!
     
     # New Industrial Flow Mutations
-    startTrip(bookingId: ID!): Booking!
-    completeTrip(bookingId: ID!): Booking!
+    startTrip(bookingId: String!): Booking!
+    completeTrip(bookingId: String!): Booking!
     finishCarMaintenance(carId: ID!): Car!
   }
 `;

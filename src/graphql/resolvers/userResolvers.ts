@@ -49,7 +49,7 @@ export const userResolvers = {
 
     createOrUpdateVerification: async (_: any, { input }: { input: any }, context: any) => {
       isAuthenticated(context);
-      return await userService.createOrUpdateVerification(context.userId, input);
+      return await userService.createOrUpdateVerification(input.bookingId, input);
     },
 
     verifyDocument: async (_: any, { userId, status }: any, context: any) => {

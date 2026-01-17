@@ -3,7 +3,7 @@ import { AppError, ErrorCode } from '../errors/AppError';
 import { carService } from './carService';
 import { Prisma } from '@prisma/client';
 import { CreateBookingInput, UpdateBookingInput } from '../types/graphql';
-import { BookingStatus } from '@prisma/client';
+import { BookingStatus, VerificationStatus } from '@prisma/client';
 import { validateBookingInput } from '../utils/validation';
 import { calculateRentalCost, calculateTax, calculateTotalPrice } from '../utils/calculation';
 import crypto from 'crypto';
@@ -32,6 +32,10 @@ export class BookingService {
 
     const start = new Date(input.startDate);
     const end = new Date(input.endDate);
+    const now = new Date();
+    const minPickup = new Date(now.getTime() + 60 * 60 * 1000);
+
+    if (start < minPickup) throw new AppError('Pickup must be at least 1 hour from now', ErrorCode.BAD_USER_INPUT);
 
     if (start >= end) throw new AppError('End date must be after start date', ErrorCode.BAD_USER_INPUT);
     
@@ -63,11 +67,15 @@ export class BookingService {
       car: { connect: { id: input.carId } },
       startDate: start,
       endDate: end,
+      
+      // ✅ FIXED: Added pickupTime and returnTime to Database Save
+      pickupTime: input.pickupTime,
+      returnTime: input.returnTime,
+
       status: BookingStatus.DRAFT,
       endOdometer: 0,
       damageFee: input.damageFee || 0,
       extraKmFee: input.extraKmFee || 0,
-      // Add calculated pricing (deposit separate from total)
       basePrice,
       taxAmount,
       totalPrice,
@@ -92,16 +100,24 @@ export class BookingService {
   }
 
   async startTrip(bookingId: string) {
-    const booking = await bookingRepository.findUnique(bookingId, { car: true });
+    const booking = await bookingRepository.findUnique(bookingId, BOOKING_INCLUDES.detailed);
     if (!booking) throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
+    
+    // Security Check 1: Payment Required
     if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.VERIFIED) {
-      throw new AppError('Booking not ready for pickup', ErrorCode.BAD_USER_INPUT);
+      throw new AppError('Payment Required. Please complete payment before starting trip.', ErrorCode.BAD_USER_INPUT);
     }
+    
+    // Security Check 2: Document Verification
+    if ((booking.user as any)?.verification?.status !== VerificationStatus.APPROVED) {
+      throw new AppError('Driver documents are not verified yet. Please verify original documents on Admin Panel before handing over the key.', ErrorCode.BAD_USER_INPUT);
+    }
+    
     return await bookingRepository.startTripTransaction(bookingId, booking.carId);
   }
 
   async completeTrip(bookingId: string) {
-    const booking = await bookingRepository.findUnique(bookingId, {});
+    const booking = await bookingRepository.findUnique(bookingId, BOOKING_INCLUDES.detailed);
     if (!booking) throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
     return await bookingRepository.completeTripTransaction(bookingId, booking.carId);
   }
@@ -167,12 +183,42 @@ export class BookingService {
   }
 
   async cancelBooking(id: string, userId: string, role: string) {
-    const booking = await this.getBookingForAuth(id);
+    // Fetch full booking so we can evaluate pickup time and current status
+    const booking = await bookingRepository.findUnique(id, {});
     if (!booking) {
       throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
     }
+
+    // Only owner or admin may cancel
     if (booking.userId !== userId && role !== 'ADMIN') {
       throw new AppError('Unauthorized to cancel this booking', ErrorCode.FORBIDDEN);
+    }
+
+    // Prevent cancelling completed or already cancelled bookings
+    if (booking.status === BookingStatus.COMPLETED || booking.status === BookingStatus.CANCELLED) {
+      throw new AppError('Cannot cancel a completed or already cancelled booking', ErrorCode.BAD_USER_INPUT);
+    }
+
+    // Business rule: users may cancel up until 24 hours before pickup. Admins can always cancel.
+    if (role !== 'ADMIN') {
+      // Compute pickup datetime: prefer booking.pickupTime when present
+      let pickupDt = booking.startDate as Date;
+      try {
+        if (booking.pickupTime) {
+          // Combine date portion of startDate with pickupTime (format: HH:MM)
+          const datePart = (booking.startDate as Date).toISOString().split('T')[0];
+          // Construct as ISO without timezone; server treats Date as UTC when parsing
+          pickupDt = new Date(`${datePart}T${booking.pickupTime}:00`);
+        }
+      } catch (e) {
+        // If parsing fails, fall back to startDate
+        pickupDt = booking.startDate as Date;
+      }
+
+      const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
+      if (Date.now() > cutoff.getTime()) {
+        throw new AppError('Cancellation window has passed. Contact admin to cancel within 24 hours of pickup.', ErrorCode.FORBIDDEN);
+      }
     }
 
     return await bookingRepository.update(id, { status: BookingStatus.CANCELLED });
@@ -214,6 +260,10 @@ export class BookingService {
       ...input,
       startDate: input.startDate ? new Date(input.startDate) : undefined,
       endDate: input.endDate ? new Date(input.endDate) : undefined,
+      
+      // ✅ FIXED: Ensure time is also updated
+      pickupTime: input.pickupTime,
+      returnTime: input.returnTime,
     };
 
     // Business logic validation

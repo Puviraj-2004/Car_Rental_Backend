@@ -64,6 +64,10 @@ class PaymentService {
                         },
                     },
                 }],
+            // Pass bookingId/userId into the created PaymentIntent so refunds can be correlated
+            payment_intent_data: {
+                metadata: { bookingId: booking.id, userId: booking.userId }
+            },
             success_url: `${frontendUrl}/payment/success?bookingId=${booking.id}&session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${frontendUrl}/payment/cancel?bookingId=${booking.id}`,
             metadata: { bookingId: booking.id, userId: booking.userId },
@@ -107,6 +111,32 @@ class PaymentService {
             await bookingRepository_1.bookingRepository.update(input.bookingId, { status: graphql_1.BookingStatus.CONFIRMED });
         }
         return payment;
+    }
+    async refundPayment(paymentId) {
+        const payment = await paymentRepository_1.paymentRepository.findById(paymentId);
+        if (!payment)
+            throw new AppError_1.AppError('Payment not found', AppError_1.ErrorCode.NOT_FOUND);
+        const bookingId = payment.bookingId;
+        if (isMockStripe) {
+            await paymentRepository_1.paymentRepository.update(paymentId, { status: graphql_1.PaymentStatus.REFUNDED });
+            await bookingRepository_1.bookingRepository.update(bookingId, { status: graphql_1.BookingStatus.CANCELLED });
+            return await paymentRepository_1.paymentRepository.findById(paymentId);
+        }
+        const stripe = this.getStripeClient();
+        if (!stripe)
+            throw new AppError_1.AppError('Stripe is not configured correctly', AppError_1.ErrorCode.INTERNAL_SERVER_ERROR);
+        if (!payment.stripeId)
+            throw new AppError_1.AppError('No stripe identifier for payment', AppError_1.ErrorCode.BAD_USER_INPUT);
+        // Attempt refund using payment_intent id saved in stripeId
+        try {
+            await stripe.refunds.create({ payment_intent: payment.stripeId });
+            await paymentRepository_1.paymentRepository.update(paymentId, { status: graphql_1.PaymentStatus.REFUNDED });
+            await bookingRepository_1.bookingRepository.update(bookingId, { status: graphql_1.BookingStatus.CANCELLED });
+            return await paymentRepository_1.paymentRepository.findById(paymentId);
+        }
+        catch (err) {
+            throw new AppError_1.AppError(`Stripe refund failed: ${err?.message || err}`, AppError_1.ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
     async getAllPayments() {
         return await paymentRepository_1.paymentRepository.findAll();

@@ -35,7 +35,7 @@ export const carResolvers = {
     },
 
     models: async (_: unknown, args: ModelsByBrandArgs) => {
-      return await carService.getModelsByBrand(args.brandId);
+      return await carService.getModels(args.brandId);
     },
 
     availableCars: async (_: unknown, args: AvailableCarsArgs) => {

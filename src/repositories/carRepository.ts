@@ -27,6 +27,13 @@ export class CarRepository {
     });
   }
 
+  async findAllModels() {
+    return await prisma.vehicleModel.findMany({ 
+      include: { brand: true },
+      orderBy: { name: 'asc' } 
+    });
+  }
+
   async findBrands() {
     return await prisma.brand.findMany({ orderBy: { name: 'asc' } });
   }
@@ -57,7 +64,17 @@ export class CarRepository {
     return await prisma.vehicleModel.update({ where: { id }, data });
   }
   async deleteModel(id: string) {
-    return await prisma.vehicleModel.delete({ where: { id } });
+    // First check if model exists
+    const existingModel = await prisma.vehicleModel.findUnique({
+      where: { id }
+    });
+    
+    if (!existingModel) {
+      throw new Error(`Model with ID ${id} not found`);
+    }
+    
+    await prisma.vehicleModel.delete({ where: { id } });
+    return true; // Return boolean instead of deleted record
   }
 
   // Admin CRUD - Cars

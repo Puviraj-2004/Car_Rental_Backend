@@ -1,26 +1,7 @@
-import { VerificationStatus } from '@prisma/client';
+import { VerificationStatus, LicenseCategory } from '@prisma/client';
 import { BookingStatus } from '../types/graphql';
 export declare class UserRepository {
     findByEmail(email: string): Promise<({
-        verification: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idCardUrl: string | null;
-            addressProofUrl: string | null;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
-            idNumber: string | null;
-            idExpiry: Date | null;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
-            rejectionReason: string | null;
-            verifiedAt: Date | null;
-        } | null;
         bookings: {
             id: string;
             startDate: Date;
@@ -28,13 +9,12 @@ export declare class UserRepository {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -62,25 +42,29 @@ export declare class UserRepository {
         updatedAt: Date;
     }) | null>;
     findById(id: string, includeAll?: boolean): Promise<({
-        verification: {
+        bookings: {
             id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
             createdAt: Date;
             updatedAt: Date;
+            status: import(".prisma/client").$Enums.BookingStatus;
             userId: string;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idCardUrl: string | null;
-            addressProofUrl: string | null;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
-            idNumber: string | null;
-            idExpiry: Date | null;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
-            rejectionReason: string | null;
-            verifiedAt: Date | null;
-        } | null;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        }[];
     } & {
         id: string;
         email: string;
@@ -98,25 +82,6 @@ export declare class UserRepository {
         updatedAt: Date;
     }) | null>;
     findAll(): Promise<({
-        verification: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idCardUrl: string | null;
-            addressProofUrl: string | null;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
-            idNumber: string | null;
-            idExpiry: Date | null;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
-            rejectionReason: string | null;
-            verifiedAt: Date | null;
-        } | null;
         bookings: {
             id: string;
             startDate: Date;
@@ -124,13 +89,12 @@ export declare class UserRepository {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -164,25 +128,6 @@ export declare class UserRepository {
         phoneNumber?: string;
         dateOfBirth?: Date;
     }): Promise<{
-        verification: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idCardUrl: string | null;
-            addressProofUrl: string | null;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
-            idNumber: string | null;
-            idExpiry: Date | null;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
-            rejectionReason: string | null;
-            verifiedAt: Date | null;
-        } | null;
         bookings: {
             id: string;
             startDate: Date;
@@ -190,13 +135,12 @@ export declare class UserRepository {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -231,25 +175,6 @@ export declare class UserRepository {
         dateOfBirth?: Date;
         fullAddress?: string;
     }): Promise<{
-        verification: {
-            id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            userId: string;
-            licenseFrontUrl: string | null;
-            licenseBackUrl: string | null;
-            idCardUrl: string | null;
-            addressProofUrl: string | null;
-            licenseNumber: string | null;
-            licenseExpiry: Date | null;
-            licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
-            idNumber: string | null;
-            idExpiry: Date | null;
-            status: import(".prisma/client").$Enums.VerificationStatus;
-            aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
-            rejectionReason: string | null;
-            verifiedAt: Date | null;
-        } | null;
         bookings: {
             id: string;
             startDate: Date;
@@ -257,13 +182,12 @@ export declare class UserRepository {
             carId: string;
             createdAt: Date;
             updatedAt: Date;
-            userId: string;
             status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
             taxAmount: number;
-            surchargeAmount: number;
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
@@ -306,74 +230,131 @@ export declare class UserRepository {
         createdAt: Date;
         updatedAt: Date;
     }>;
-    findVerificationByUserId(userId: string): Promise<{
+    findVerificationByBookingId(bookingId: string): Promise<{
         id: string;
+        bookingId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         licenseFrontUrl: string | null;
         licenseBackUrl: string | null;
         idCardUrl: string | null;
+        idCardBackUrl: string | null;
         addressProofUrl: string | null;
         licenseNumber: string | null;
         licenseExpiry: Date | null;
-        licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
+        licenseIssueDate: Date | null;
+        driverDob: Date | null;
+        licenseCategories: import(".prisma/client").$Enums.LicenseCategory[];
         idNumber: string | null;
         idExpiry: Date | null;
+        verifiedAddress: string | null;
         status: import(".prisma/client").$Enums.VerificationStatus;
         aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
         rejectionReason: string | null;
         verifiedAt: Date | null;
     } | null>;
-    upsertVerification(userId: string, data: {
+    upsertVerification(bookingId: string, data: {
         licenseFrontUrl?: string;
         licenseBackUrl?: string;
         idCardUrl?: string;
+        idCardBackUrl?: string;
         addressProofUrl?: string;
         licenseNumber?: string;
         licenseExpiry?: Date;
-        licenseCategory?: any;
+        licenseIssueDate?: Date;
+        driverDob?: Date;
+        licenseCategories?: LicenseCategory[];
         idNumber?: string;
         idExpiry?: Date;
+        verifiedAddress?: string;
         status?: VerificationStatus;
     }): Promise<{
+        booking: {
+            user: {
+                id: string;
+                email: string;
+                facebookId: string | null;
+                appleId: string | null;
+                googleId: string | null;
+                fullName: string | null;
+                password: string | null;
+                phoneNumber: string | null;
+                avatarUrl: string | null;
+                dateOfBirth: Date | null;
+                fullAddress: string | null;
+                role: import(".prisma/client").$Enums.Role;
+                createdAt: Date;
+                updatedAt: Date;
+            };
+        } & {
+            id: string;
+            startDate: Date;
+            endDate: Date;
+            carId: string;
+            createdAt: Date;
+            updatedAt: Date;
+            status: import(".prisma/client").$Enums.BookingStatus;
+            userId: string;
+            pickupTime: string | null;
+            returnTime: string | null;
+            basePrice: number;
+            taxAmount: number;
+            depositAmount: number;
+            startOdometer: number | null;
+            endOdometer: number | null;
+            damageFee: number;
+            extraKmFee: number;
+            returnNotes: string | null;
+            totalPrice: number;
+            bookingType: import(".prisma/client").$Enums.BookingType;
+            repairOrderId: string | null;
+        };
+    } & {
         id: string;
+        bookingId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         licenseFrontUrl: string | null;
         licenseBackUrl: string | null;
         idCardUrl: string | null;
+        idCardBackUrl: string | null;
         addressProofUrl: string | null;
         licenseNumber: string | null;
         licenseExpiry: Date | null;
-        licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
+        licenseIssueDate: Date | null;
+        driverDob: Date | null;
+        licenseCategories: import(".prisma/client").$Enums.LicenseCategory[];
         idNumber: string | null;
         idExpiry: Date | null;
+        verifiedAddress: string | null;
         status: import(".prisma/client").$Enums.VerificationStatus;
         aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
         rejectionReason: string | null;
         verifiedAt: Date | null;
     }>;
-    updateVerification(userId: string, data: {
+    updateVerification(bookingId: string, data: {
         documentType?: string;
         side?: string;
         status?: VerificationStatus;
         url?: string;
     }): Promise<{
         id: string;
+        bookingId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
         licenseFrontUrl: string | null;
         licenseBackUrl: string | null;
         idCardUrl: string | null;
+        idCardBackUrl: string | null;
         addressProofUrl: string | null;
         licenseNumber: string | null;
         licenseExpiry: Date | null;
-        licenseCategory: import(".prisma/client").$Enums.LicenseCategory;
+        licenseIssueDate: Date | null;
+        driverDob: Date | null;
+        licenseCategories: import(".prisma/client").$Enums.LicenseCategory[];
         idNumber: string | null;
         idExpiry: Date | null;
+        verifiedAddress: string | null;
         status: import(".prisma/client").$Enums.VerificationStatus;
         aiMetadata: import("@prisma/client/runtime/library").JsonValue | null;
         rejectionReason: string | null;
@@ -389,29 +370,18 @@ export declare class UserRepository {
         expiresAt: Date;
         isVerified: boolean;
     } | null>;
-    updateBookingStatus(id: string, status: BookingStatus): Promise<{
+    updateBookingVerification(id: string, data: {
+        isVerified?: boolean;
+        verifiedAt?: Date;
+    }): Promise<{
         id: string;
-        startDate: Date;
-        endDate: Date;
-        carId: string;
+        bookingId: string;
         createdAt: Date;
         updatedAt: Date;
-        userId: string;
-        status: import(".prisma/client").$Enums.BookingStatus;
-        pickupTime: string | null;
-        returnTime: string | null;
-        basePrice: number;
-        taxAmount: number;
-        surchargeAmount: number;
-        depositAmount: number;
-        startOdometer: number | null;
-        endOdometer: number | null;
-        damageFee: number;
-        extraKmFee: number;
-        returnNotes: string | null;
-        totalPrice: number;
-        bookingType: import(".prisma/client").$Enums.BookingType;
-        repairOrderId: string | null;
+        verifiedAt: Date | null;
+        token: string;
+        expiresAt: Date;
+        isVerified: boolean;
     }>;
     updateManyBookingsStatus(userId: string, currentStatus: BookingStatus, nextStatus: BookingStatus): Promise<import(".prisma/client").Prisma.BatchPayload>;
     countActiveBookings(userId: string): Promise<number>;

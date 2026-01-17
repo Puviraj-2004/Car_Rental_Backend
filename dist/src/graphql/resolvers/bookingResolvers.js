@@ -13,8 +13,8 @@ exports.bookingResolvers = {
             (0, authguard_1.isAuthenticated)(context);
             return await bookingService_1.bookingService.getBookingsByUserId(context.userId);
         },
-        checkCarAvailability: async (_, { carId, startDate, endDate }) => {
-            return await bookingService_1.bookingService.checkAvailability(carId, startDate, endDate);
+        checkCarAvailability: async (_, { carId, startDate, endDate, excludeBookingId }) => {
+            return await bookingService_1.bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
         },
         booking: async (_, { id }, context) => {
             (0, authguard_1.isAuthenticated)(context);
@@ -71,8 +71,8 @@ exports.bookingResolvers = {
             return true;
         },
         updateBooking: async (_, { id, input }, context) => {
-            (0, authguard_1.isAdmin)(context);
-            return await bookingService_1.bookingService.updateBooking(id, input);
+            (0, authguard_1.isAuthenticated)(context);
+            return await bookingService_1.bookingService.updateBooking(id, input, context.userId, context.role);
         }
     }
 };

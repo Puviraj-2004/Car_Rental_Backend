@@ -126,32 +126,37 @@ model User {
   facebookId      String?               @unique
   appleId         String?               @unique
   googleId        String?               @unique
-  verification    DocumentVerification?
   bookings        Booking[]
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
   @@index([email])
 }
 
+
 model DocumentVerification {
   id                 String             @id @default(uuid())
-  userId             String             @unique
-  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookingId          String             @unique
+  booking            Booking            @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   licenseFrontUrl    String?
   licenseBackUrl     String?
-  idCardUrl          String?            
-  addressProofUrl    String?            
-  licenseNumber      String?            
-  licenseExpiry      DateTime?          
-  licenseCategory    LicenseCategory    @default(B)
-  idNumber           String?           
-  idExpiry           DateTime?          
+  idCardUrl          String?
+  idCardBackUrl      String?
+  addressProofUrl    String?
+  licenseNumber      String?
+  licenseExpiry      DateTime?
+  licenseIssueDate   DateTime?
+  driverDob          DateTime?
+  licenseCategories  LicenseCategory[]
+  idNumber           String?
+  idExpiry           DateTime?
+  verifiedAddress    String?
   status             VerificationStatus @default(NOT_UPLOADED)
-  aiMetadata         Json?              
-  rejectionReason    String?            
+  aiMetadata         Json?
+  rejectionReason    String?
   verifiedAt         DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
+  @@index([bookingId])
 }
 
 model BookingVerification {
@@ -175,6 +180,7 @@ model Brand {
   name      String   @unique
   logoUrl   String?
   models    VehicleModel[]
+  cars      Car[]
 }
 
 model VehicleModel {
@@ -190,7 +196,9 @@ model VehicleModel {
 model Car {
   id              String           @id @default(uuid())
   modelId         String
+  brandId         String
   model           VehicleModel     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  brand           Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
   year            Int
   plateNumber     String           @unique
   transmission    Transmission
@@ -210,6 +218,9 @@ model Car {
   updatedAt       DateTime         @updatedAt
 
   @@index([status])
+  @@index([modelId])
+  @@index([brandId])
+  @@index([pricePerDay])
 }
 
 model CarImage {
@@ -234,7 +245,6 @@ model Booking {
   returnTime      String?       // Time of return (e.g., "17:00")
   basePrice       Float         @default(0)
   taxAmount       Float         @default(0)
-  surchargeAmount Float         @default(0)
   depositAmount   Float         @default(0) 
   startOdometer   Float?        
   endOdometer     Float?        
@@ -249,10 +259,14 @@ model Booking {
   car             Car           @relation(fields: [carId], references: [id])
   payment         Payment?
   verification    BookingVerification?
+  documentVerification DocumentVerification?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
+  @@index([userId])
+  @@index([carId])
   @@index([status])
+  @@index([startDate])
   @@index([bookingType])
 }
 

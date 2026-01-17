@@ -7,21 +7,29 @@ const validation_1 = require("../utils/validation");
 const AppError_1 = require("../errors/AppError");
 const graphql_1 = require("../types/graphql");
 class CarService {
-    buildBookingAvailabilityFilter(startDateTime, endDateTime, includeBuffer = false) {
-        const bufferMs = includeBuffer ? 24 * 60 * 60 * 1000 : 0;
-        const conflictStatuses = [graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED, graphql_1.BookingStatus.CONFIRMED, graphql_1.BookingStatus.ONGOING];
-        const dateOverlapConditions = includeBuffer ? [
-            { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] },
-            { AND: [{ endDate: { gte: new Date(startDateTime.getTime() - bufferMs) } }, { endDate: { lt: startDateTime } }] },
-            { AND: [{ startDate: { lte: new Date(endDateTime.getTime() + bufferMs) } }, { startDate: { gt: endDateTime } }] }
-        ] : [
-            { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] }
-        ];
+    buildBookingAvailabilityFilter(startDateTime, endDateTime) {
+        const bufferMs = 24 * 60 * 60 * 1000;
+        const overlapNoBuffer = { AND: [{ startDate: { lt: endDateTime } }, { endDate: { gt: startDateTime } }] };
+        const overlapWithBuffer = {
+            OR: [
+                { AND: [{ startDate: { lt: new Date(endDateTime.getTime() + bufferMs) } }, { endDate: { gt: new Date(startDateTime.getTime() - bufferMs) } }] }
+            ]
+        };
         return {
             none: {
-                AND: [
-                    { status: { in: conflictStatuses } },
-                    { OR: dateOverlapConditions }
+                OR: [
+                    {
+                        AND: [
+                            { status: { in: [graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED] } },
+                            overlapNoBuffer
+                        ]
+                    },
+                    {
+                        AND: [
+                            { status: { in: [graphql_1.BookingStatus.CONFIRMED, graphql_1.BookingStatus.ONGOING] } },
+                            overlapWithBuffer
+                        ]
+                    }
                 ]
             }
         };
@@ -39,7 +47,7 @@ class CarService {
         const where = {};
         if (filter) {
             if (filter.brandIds?.length)
-                where.model = { brandId: { in: filter.brandIds } };
+                where.brandId = { in: filter.brandIds };
             if (filter.modelIds?.length)
                 where.modelId = { in: filter.modelIds };
             if (filter.fuelTypes?.length)
@@ -54,7 +62,7 @@ class CarService {
                 const start = filter.startDate.includes('T') ? new Date(filter.startDate) : new Date(`${filter.startDate}T10:00:00`);
                 const end = filter.endDate.includes('T') ? new Date(filter.endDate) : new Date(`${filter.endDate}T10:00:00`);
                 where.status = { in: [graphql_1.CarStatus.AVAILABLE, graphql_1.CarStatus.RENTED] };
-                where.bookings = this.buildBookingAvailabilityFilter(start, end, true);
+                where.bookings = this.buildBookingAvailabilityFilter(start, end);
             }
             else {
                 Object.assign(where, this.buildStatusFilter(filter.includeOutOfService));
@@ -70,7 +78,7 @@ class CarService {
         const end = endDate.includes('T') ? new Date(endDate) : new Date(`${endDate}T10:00:00`);
         return await carRepository_1.carRepository.findMany({
             status: { in: [graphql_1.CarStatus.AVAILABLE, graphql_1.CarStatus.RENTED] },
-            bookings: this.buildBookingAvailabilityFilter(start, end, false)
+            bookings: this.buildBookingAvailabilityFilter(start, end)
         });
     }
     async addCarImage(carId, file, isPrimary) {
@@ -141,12 +149,28 @@ class CarService {
         return await carRepository_1.carRepository.updateModel(id, data);
     }
     async deleteModel(id) {
-        // Check if model is being used by any cars
-        const carsCount = await carRepository_1.carRepository.countCarsByModel(id);
-        if (carsCount > 0) {
-            throw new AppError_1.AppError('Cannot delete model that has associated cars', AppError_1.ErrorCode.BAD_USER_INPUT);
+        // Validate ID format
+        if (!id || id.trim() === '') {
+            throw new AppError_1.AppError('Model ID is required', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
-        return await carRepository_1.carRepository.deleteModel(id);
+        try {
+            // Check if model is being used by any cars
+            const carsCount = await carRepository_1.carRepository.countCarsByModel(id);
+            if (carsCount > 0) {
+                throw new AppError_1.AppError('Cannot delete model that has associated cars', AppError_1.ErrorCode.BAD_USER_INPUT);
+            }
+            return await carRepository_1.carRepository.deleteModel(id);
+        }
+        catch (error) {
+            if (error instanceof AppError_1.AppError) {
+                throw error;
+            }
+            // Handle Prisma "record not found" error
+            if (error instanceof Error && error.message.includes('Record to delete does not exist')) {
+                throw new AppError_1.AppError('Model not found. It may have been already deleted.', AppError_1.ErrorCode.NOT_FOUND);
+            }
+            throw error;
+        }
     }
     async createCar(data) {
         // Comprehensive input validation
@@ -158,17 +182,27 @@ class CarService {
         if (!data.modelId) {
             throw new AppError_1.AppError('Model ID is required', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
+        if (!data.brandId) {
+            throw new AppError_1.AppError('Brand ID is required', AppError_1.ErrorCode.BAD_USER_INPUT);
+        }
         if (!data.plateNumber || data.plateNumber.trim().length === 0) {
             throw new AppError_1.AppError('Plate number is required', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
-        // Create the car data without modelId, then add the model relation
-        const { modelId, ...restData } = data;
+        // Create car data with both modelId and brandId
+        const { modelId, brandId, ...restData } = data;
         const carData = {
             ...restData,
-            model: { connect: { id: modelId } },
+            modelId,
+            brandId, // NEW: Include brandId directly
             requiredLicense: (restData.requiredLicense || 'B'),
         };
         return await carRepository_1.carRepository.createCar(carData);
+    }
+    async getModels(brandId) {
+        if (brandId) {
+            return await carRepository_1.carRepository.findModelsByBrand(brandId);
+        }
+        return await carRepository_1.carRepository.findAllModels();
     }
     async updateCar(id, data) {
         // Comprehensive input validation
