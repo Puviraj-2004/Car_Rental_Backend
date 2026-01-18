@@ -30,9 +30,11 @@ export const sendVerificationEmail = async (email: string, otp: string) => {
         </div>
       `,
     });
-    console.log(`Email sent to ${email}`);
+    if (process.env.NODE_ENV === 'development') {
+    }
   } catch (error) {
-    console.error("Error sending email:", error);
+    if (process.env.NODE_ENV === 'development') {
+    }
     // Don't throw error here to prevent crashing the registration flow, 
     // just log it. The user can request OTP again.
   }

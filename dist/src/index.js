@@ -3,95 +3,246 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-// backend/src/index.ts
 const server_1 = require("@apollo/server");
 const express4_1 = require("@apollo/server/express4");
 const drainHttpServer_1 = require("@apollo/server/plugin/drainHttpServer");
 const express_1 = __importDefault(require("express"));
 const http_1 = __importDefault(require("http"));
 const cors_1 = __importDefault(require("cors"));
+const helmet_1 = __importDefault(require("helmet"));
 const body_parser_1 = __importDefault(require("body-parser"));
 const graphql_upload_ts_1 = require("graphql-upload-ts");
+const graphql_scalars_1 = require("graphql-scalars");
 const dotenv_1 = __importDefault(require("dotenv"));
 const path_1 = __importDefault(require("path"));
+// Load env before any other imports
 dotenv_1.default.config();
 const database_1 = __importDefault(require("./utils/database"));
 const typeDefs_1 = __importDefault(require("./graphql/typeDefs"));
 const resolvers_1 = __importDefault(require("./graphql/resolvers"));
 const auth_1 = require("./utils/auth");
+const expirationService_1 = require("./services/expirationService");
+const client_1 = require("@prisma/client");
+const rateLimiter_1 = require("./middleware/rateLimiter");
+const securityLogger_1 = require("./utils/securityLogger");
+const csrfProtection_1 = require("./middleware/csrfProtection");
+/**
+ * Senior Architect Note:
+ * To fix "Unknown type DateTime", we must explicitly define the scalar
+ * in the typeDefs array passed to Apollo Server.
+ */
 async function startServer() {
+    console.log('🚀 INITIALIZING: Car Rental Backend...');
     const app = (0, express_1.default)();
     const httpServer = http_1.default.createServer(app);
+    // --- STRIPE CONFIGURATION ---
+    const isMockStripe = (process.env.MOCK_STRIPE || '').toLowerCase() === 'true';
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
+    const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+    let stripe = null;
+    if (!isMockStripe && stripeSecretKey) {
+        try {
+            const Stripe = require('stripe');
+            stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' });
+        }
+        catch (e) {
+            console.warn('⚠️ Stripe module initialization failed.');
+        }
+    }
+    // 🚀 STRIPE WEBHOOK - MUST BE FIRST BEFORE ALL MIDDLEWARE
+    app.post('/webhook', express_1.default.raw({ type: 'application/json' }), async (req, res) => {
+        console.log('💰 Webhook hit!');
+        try {
+            if (isMockStripe) {
+                console.log('🔧 Mock Stripe mode - returning 204');
+                return res.status(204).send();
+            }
+            if (!stripe || !stripeWebhookSecret)
+                throw new Error('Stripe not configured');
+            const sig = req.headers['stripe-signature'];
+            if (!sig)
+                throw new Error('No Stripe signature');
+            const event = stripe.webhooks.constructEvent(req.body, sig, stripeWebhookSecret);
+            console.log('📝 Webhook event type:', event.type);
+            if (event.type === 'checkout.session.completed') {
+                const session = event.data.object;
+                const bookingId = session?.metadata?.bookingId;
+                console.log('✅ Payment completed for booking:', bookingId);
+                if (bookingId) {
+                    // Use payment_intent id when available (so later refunds reference it)
+                    const paymentIdentifier = session.payment_intent || session.id;
+                    await database_1.default.payment.upsert({
+                        where: { bookingId },
+                        update: { status: 'SUCCEEDED', stripeId: paymentIdentifier },
+                        create: {
+                            bookingId,
+                            amount: session.amount_total / 100,
+                            status: 'SUCCEEDED',
+                            stripeId: paymentIdentifier
+                        },
+                    });
+                    console.log('💳 Payment record created/updated');
+                    await database_1.default.booking.update({
+                        where: { id: bookingId },
+                        data: { status: client_1.BookingStatus.CONFIRMED },
+                    });
+                    console.log('🎫 Booking status updated to CONFIRMED');
+                }
+            }
+            // Handle refunds coming from Stripe (charge refunded / refund updated)
+            if (event.type === 'charge.refunded' || event.type === 'charge.refund.updated') {
+                const charge = event.data.object;
+                const bookingId = charge?.metadata?.bookingId;
+                const paymentIntentId = charge?.payment_intent;
+                console.log('♻️ Refund event detected', { bookingId, paymentIntentId });
+                // Try to resolve payment by bookingId (preferred) or by payment_intent
+                let payment = null;
+                if (bookingId) {
+                    payment = await database_1.default.payment.findUnique({ where: { bookingId } });
+                }
+                if (!payment && paymentIntentId) {
+                    payment = await database_1.default.payment.findFirst({ where: { stripeId: paymentIntentId } });
+                }
+                if (payment) {
+                    await database_1.default.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
+                    console.log('💳 Payment marked REFUNDED:', payment.id);
+                    // Optionally set booking to CANCELLED when fully refunded
+                    try {
+                        await database_1.default.booking.update({ where: { id: payment.bookingId }, data: { status: client_1.BookingStatus.CANCELLED } });
+                        console.log('🎫 Booking status set to CANCELLED for refunded payment');
+                    }
+                    catch (e) {
+                        const errMsg = e && typeof e === 'object' && 'message' in e ? e.message : String(e);
+                        console.warn('Could not update booking on refund:', errMsg);
+                    }
+                }
+                else {
+                    console.warn('Refund event received but payment not found for charge:', charge.id);
+                }
+            }
+            console.log('✅ Webhook processed successfully');
+            return res.json({ received: true });
+        }
+        catch (error) {
+            const msg = error && typeof error === 'object' && 'message' in error ? error.message : String(error);
+            console.error('❌ Webhook error:', msg);
+            return res.status(400).json({ error: msg });
+        }
+    });
+    // --- APOLLO SERVER SETUP ---
     const server = new server_1.ApolloServer({
-        typeDefs: typeDefs_1.default,
-        resolvers: resolvers_1.default,
+        csrfPrevention: false,
+        // 🔥 FIXED: Explicitly injecting "scalar DateTime" into the schema
+        typeDefs: [
+            `scalar DateTime`,
+            ...(Array.isArray(typeDefs_1.default) ? typeDefs_1.default : [typeDefs_1.default])
+        ],
+        resolvers: {
+            DateTime: graphql_scalars_1.DateTimeResolver,
+            ...resolvers_1.default,
+        },
         plugins: [(0, drainHttpServer_1.ApolloServerPluginDrainHttpServer)({ httpServer })],
         introspection: true,
     });
     await server.start();
-    // ✅ முக்கியமான வரிசை: CORS மற்றும் Upload முதலில் வர வேண்டும்
-    app.use((0, cors_1.default)());
-    // 📸 இமேஜ் அப்லோடுக்கு இது மிக அவசியம்
+    console.log('✅ Apollo Server: Ready');
+    // 1. SECURITY HEADERS
+    app.use((0, helmet_1.default)({
+        contentSecurityPolicy: {
+            directives: {
+                defaultSrc: ["'self'"],
+                scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+                styleSrc: ["'self'", "'unsafe-inline'"],
+                imgSrc: ["'self'", "data:", "https:"],
+                fontSrc: ["'self'"],
+                connectSrc: ["'self'"],
+                mediaSrc: ["'self'"],
+                objectSrc: ["'none'"],
+                frameSrc: ["'none'"],
+                baseUri: ["'self'"],
+                formAction: ["'self'"],
+                frameAncestors: ["'none'"],
+            },
+        },
+        xFrameOptions: { action: 'deny' },
+        xContentTypeOptions: true,
+        hidePoweredBy: true,
+    }));
+    // 2. RATE LIMITING
+    app.use('/graphql', rateLimiter_1.apiLimiter);
+    // 3. LOGGING
+    app.use((req, _res, next) => {
+        if (req.path === '/graphql') {
+            securityLogger_1.securityLogger.info('Incoming GraphQL Request', {
+                method: req.method,
+                ip: req.ip,
+                operation: req.body?.operationName || 'unknown'
+            });
+        }
+        next();
+    });
+    // 4. CORS
+    app.use((0, cors_1.default)({
+        origin: [
+            'http://localhost:3000',
+            'http://localhost:3001',
+            'http://127.0.0.1:3000',
+            process.env.FRONTEND_URL || ''
+        ].filter(Boolean),
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Apollo-Require-Preflight', 'x-csrf-token']
+    }));
+    // 5. UPLOADS
     app.use((0, graphql_upload_ts_1.graphqlUploadExpress)({ maxFileSize: 10000000, maxFiles: 10 }));
+    // 6. CSRF
+    // app.use('/graphql', csrfProtection);
+    app.get('/csrf-token', csrfProtection_1.csrfTokenHandler);
+    // 7. GENERAL MIDDLEWARE
     app.use(body_parser_1.default.json());
     app.use('/uploads', express_1.default.static(path_1.default.join(process.cwd(), 'uploads')));
-    // Diagnostic HTTP routes to confirm Cloudinary env at runtime (non-sensitive values only)
+    // 9. DIAGNOSTICS
     app.get('/diag/cloudinary', (_req, res) => {
         try {
             const raw = process.env.CLOUDINARY_CLOUD_NAME;
             const cloudLib = require('./utils/cloudinary');
-            const effective = (cloudLib && cloudLib.default && cloudLib.default.config && cloudLib.default.config().cloud_name) || null;
+            const effective = (cloudLib?.default?.config?.().cloud_name) || null;
             res.json({ rawCloudName: raw || null, effectiveCloudName: effective });
         }
         catch (e) {
-            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostic info', detail: e.message });
+            res.status(500).json({ error: 'Cloudinary diagnostic failed' });
         }
     });
-    // Full diagnostics including ready state and last error
-    app.get('/diag/cloudinary/full', (_req, res) => {
-        try {
-            const { getCloudinaryDiagnostics } = require('./utils/cloudinary');
-            const diag = getCloudinaryDiagnostics();
-            res.json(diag);
-        }
-        catch (e) {
-            res.status(500).json({ error: 'Failed to fetch cloudinary diagnostics', detail: e.message });
-        }
-    });
-    // Trigger an immediate revalidation of Cloudinary credentials (useful after updating .env and restarting)
-    app.post('/diag/cloudinary/validate', async (_req, res) => {
-        try {
-            const { revalidateCloudinaryCredentials } = require('./utils/cloudinary');
-            const diag = await revalidateCloudinaryCredentials();
-            res.json(diag);
-        }
-        catch (e) {
-            res.status(500).json({ error: 'Failed to revalidate Cloudinary credentials', detail: e.message });
-        }
-    });
+    // 10. GRAPHQL HANDLER
     app.use('/graphql', (0, express4_1.expressMiddleware)(server, {
         context: async ({ req }) => {
-            const context = { prisma: database_1.default };
+            const context = { prisma: database_1.default, req };
             const authHeader = req.headers.authorization;
             if (authHeader && authHeader.startsWith('Bearer ')) {
                 const token = authHeader.split(' ')[1];
                 try {
                     const decoded = (0, auth_1.verifyToken)(token);
-                    context.userId = decoded.userId;
-                    context.role = decoded.role;
+                    if (decoded) {
+                        context.userId = decoded.userId;
+                        context.role = decoded.role;
+                    }
                 }
                 catch (error) {
-                    // Token verification failed
+                    // Context remains Guest
                 }
             }
             return context;
         },
     }));
     const PORT = process.env.PORT || 4000;
-    await new Promise((resolve) => httpServer.listen({ port: parseInt(PORT.toString()) }, resolve));
-    console.log(`🚀 Server ready at http://localhost:${PORT}/graphql`);
+    console.log(`🔌 Attempting to listen on port: ${PORT}...`);
+    await new Promise((resolve) => httpServer.listen({ port: Number(PORT) }, resolve));
+    console.log(`🚀 SUCCESS: Server ready at http://localhost:${PORT}/graphql`);
+    // START BACKGROUND SERVICES
+    expirationService_1.expirationService.startExpirationService();
 }
 startServer().catch(error => {
-    console.error('Error starting server:', error);
+    console.error('❌ CRITICAL ERROR DURING STARTUP:', error);
+    process.exit(1);
 });
 //# sourceMappingURL=index.js.map

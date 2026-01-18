@@ -13,7 +13,7 @@ export declare function getCloudinaryDiagnostics(): {
 /**
  * Upload with fallback to local disk when Cloudinary is unavailable
  */
-export declare const uploadToCloudinary: (fileStream: any, folder: string, isPrivate?: boolean, originalFilename?: string) => Promise<any>;
+export declare const uploadToCloudinary: (fileInput: Buffer | any, folder: string, isPrivate?: boolean, originalFilename?: string) => Promise<any>;
 export declare const deleteFromCloudinary: (publicId: string) => Promise<void>;
 export default cloudinary;
 //# sourceMappingURL=cloudinary.d.ts.map

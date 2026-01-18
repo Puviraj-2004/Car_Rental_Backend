@@ -5,58 +5,50 @@ export const paymentTypeDefs = gql`
 
   enum PaymentStatus {
     PENDING
-    COMPLETED
+    SUCCEEDED
     FAILED
     REFUNDED
-  }
-
-  enum PaymentMethod {
-    CREDIT_CARD
-    DEBIT_CARD
-    PAYPAL
-    STRIPE
-    BANK_TRANSFER
   }
 
   type Payment {
     id: ID!
     bookingId: ID!
     booking: Booking!
-    
     amount: Float!
-    currency: String!
     status: PaymentStatus!
-    paymentMethod: PaymentMethod
-    transactionId: String
-    metadata: JSON # Stores extra response data from Stripe/Paypal
-    
+    stripeId: String
     createdAt: String!
     updatedAt: String!
+  }
+
+  type StripeCheckoutSession {
+    url: String!
+    sessionId: String!
   }
 
   input CreatePaymentInput {
     bookingId: ID!
     amount: Float!
-    currency: String
-    paymentMethod: PaymentMethod
-    transactionId: String
-    metadata: JSON
+    status: PaymentStatus!
+    stripeId: String
   }
 
-  input UpdatePaymentStatusInput {
-    id: ID!
-    status: PaymentStatus!
-    transactionId: String
+  input UpdatePaymentInput {
+    amount: Float
+    status: PaymentStatus
+    stripeId: String
   }
 
   type Query {
     payments: [Payment!]!
     payment(id: ID!): Payment
-    bookingPayment(bookingId: ID!): Payment
   }
 
   type Mutation {
     createPayment(input: CreatePaymentInput!): Payment!
-    updatePaymentStatus(input: UpdatePaymentStatusInput!): Payment!
+    updatePayment(id: ID!, input: UpdatePaymentInput!): Payment!
+    createStripeCheckoutSession(bookingId: String!): StripeCheckoutSession!
+    mockFinalizePayment(bookingId: String!, success: Boolean!): Payment!
+    refundPayment(paymentId: ID!): Payment!
   }
 `;

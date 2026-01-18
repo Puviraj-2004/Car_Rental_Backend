@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.isOwnerOrAdmin = exports.isAdmin = exports.isAuthenticated = void 0;
 const graphql_1 = require("graphql");
-// 1. Check if User is Logged In
 const isAuthenticated = (context) => {
     if (!context.userId) {
         throw new graphql_1.GraphQLError('Authentication required. Please login.', {

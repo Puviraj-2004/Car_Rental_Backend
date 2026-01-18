@@ -4,21 +4,19 @@ exports.bookingTypeDefs = void 0;
 const graphql_tag_1 = require("graphql-tag");
 exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
   # --- Enums ---
-  enum RentalType {
-    HOUR
-    KM
-    DAY
+  enum BookingType {
+    RENTAL
+    REPLACEMENT
   }
 
   enum BookingStatus {
     DRAFT
-    AWAITING_VERIFICATION
-    AWAITING_PAYMENT
+    PENDING
+    VERIFIED
     CONFIRMED
     ONGOING
     COMPLETED
     CANCELLED
-    REJECTED
   }
 
   # --- Types ---
@@ -28,77 +26,102 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     user: User!
     carId: ID!
     car: Car!
-    
-    startDate: String
-    endDate: String
-    
-    # Financials
-    totalPrice: Float!
-    basePrice: Float!
-    taxAmount: Float!
-    depositAmount: Float!
-    surchargeAmount: Float!
-    rentalType: RentalType!
-    
+    startDate: DateTime!
+    endDate: DateTime!
+    pickupTime: String
+    returnTime: String
+    basePrice: Float
+    taxAmount: Float
+    depositAmount: Float
+    startOdometer: Float
+    endOdometer: Float
+    damageFee: Float
+    extraKmFee: Float
+    returnNotes: String
+    totalPrice: Float
+    bookingType: BookingType!
+    repairOrderId: String
     status: BookingStatus!
-    pickupLocation: String
-    dropoffLocation: String
-    
     createdAt: String!
     updatedAt: String!
-    
     payment: Payment
+    verification: BookingVerification
+    documentVerification: DocumentVerification
   }
 
-  type BookingLinkResponse {
-    success: Boolean!
-    message: String!
-    bookingId: ID!
+
+  type BookingVerification {
+    id: ID!
+    token: String!
+    expiresAt: String!
+    isVerified: Boolean!
+    verifiedAt: String
+    createdAt: String!
+    updatedAt: String!
   }
 
   # --- Inputs ---
   input CreateBookingInput {
-    userId: ID! 
     carId: ID!
-    startDate: String!
-    endDate: String!
-    
-    totalPrice: Float!
-    basePrice: Float!
-    taxAmount: Float!
-    depositAmount: Float!
-    surchargeAmount: Float!
-    rentalType: RentalType!
-    
-    pickupLocation: String
-    dropoffLocation: String
+    startDate: DateTime!
+    endDate: DateTime!
+    pickupTime: String
+    returnTime: String
+    basePrice: Float
+    taxAmount: Float
+    depositAmount: Float
+    startOdometer: Float
+    damageFee: Float
+    extraKmFee: Float
+    returnNotes: String
+    totalPrice: Float
+    bookingType: BookingType
+    repairOrderId: String
+  }
+
+  input UpdateBookingInput {
+    startDate: DateTime
+    endDate: DateTime
+    pickupTime: String
+    returnTime: String
+    basePrice: Float
+    taxAmount: Float
+    depositAmount: Float
+    startOdometer: Float
+    endOdometer: Float
+    damageFee: Float
+    extraKmFee: Float
+    returnNotes: String
+    totalPrice: Float
+    bookingType: BookingType
+    repairOrderId: String
+    status: BookingStatus
   }
 
   # --- Queries ---
   type Query {
     bookings: [Booking!]!
     booking(id: ID!): Booking
+    bookingByToken(token: String!): Booking
     userBookings(userId: ID!): [Booking!]!
     carBookings(carId: ID!): [Booking!]!
     myBookings: [Booking!]!
+    checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability
   }
 
   # --- Mutations ---
   type Mutation {
-    # Step 1: User creates a draft booking
     createBooking(input: CreateBookingInput!): Booking!
-    
-    # Step 2: System sends the verification link (email)
-    sendBookingVerificationLink(bookingId: ID!): BookingLinkResponse!
-    
-    # Step 3: Verify the token from email (User clicks the link)
-    verifyBookingToken(token: String!): BookingLinkResponse!
-    
-    # Admin or System updates status
+    updateBooking(id: ID!, input: UpdateBookingInput!): Booking!
     updateBookingStatus(id: ID!, status: BookingStatus!): Booking!
-    
+    confirmReservation(id: ID!): Booking!
     cancelBooking(id: ID!): Boolean!
     deleteBooking(id: ID!): Boolean!
+    
+    # New Industrial Flow Mutations
+    startTrip(bookingId: String!): Booking!
+    completeTrip(bookingId: String!): Booking!
+    finishCarMaintenance(carId: ID!): Car!
   }
 `;
 //# sourceMappingURL=bookingTypeDefs.js.map

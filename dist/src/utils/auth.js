@@ -15,7 +15,8 @@ exports.generateToken = generateToken;
 // 2. Verify JWT Token
 const verifyToken = (token) => {
     try {
-        return jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        return decoded;
     }
     catch (error) {
         throw new Error('Invalid or Expired Token');

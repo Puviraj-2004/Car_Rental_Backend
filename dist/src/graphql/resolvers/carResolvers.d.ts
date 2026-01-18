@@ -1,277 +1,282 @@
+import { GraphQLContext, CarQueryArgs, CarByIdArgs, ModelsByBrandArgs, AvailableCarsArgs, CreateCarArgs, UpdateCarArgs, DeleteCarArgs, CreateBrandArgs, UpdateBrandArgs, DeleteBrandArgs, CreateModelArgs, UpdateModelArgs, DeleteModelArgs, AddCarImageArgs, DeleteCarImageArgs, SetPrimaryCarImageArgs } from '../../types/graphql';
 export declare const carResolvers: {
     Query: {
-        cars: (_: any, { filter }: any) => Promise<({
+        cars: (_: unknown, args: CarQueryArgs) => Promise<({
             model: {
-                name: string;
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
                 id: string;
-                createdAt: Date;
                 brandId: string;
-            };
-            brand: {
                 name: string;
-                id: string;
-                createdAt: Date;
-                logoUrl: string | null;
-                logoPublicId: string | null;
             };
             images: {
                 id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 carId: string;
                 isPrimary: boolean;
-                imagePath: string;
-                publicId: string | null;
-                altText: string | null;
+                url: string;
             }[];
         } & {
-            year: number;
             id: string;
-            status: import(".prisma/client").$Enums.CarStatus;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
-            brandId: string;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
             modelId: string;
             plateNumber: string;
-            fuelType: import(".prisma/client").$Enums.FuelType;
-            transmission: import(".prisma/client").$Enums.TransmissionType;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
             seats: number;
-            mileage: number;
-            pricePerHour: number | null;
-            pricePerKm: number | null;
-            pricePerDay: number | null;
-            depositAmount: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
             critAirRating: import(".prisma/client").$Enums.CritAirCategory;
-            descriptionEn: string | null;
-            descriptionFr: string | null;
         })[]>;
-        car: (_: any, { id }: any) => Promise<({
+        car: (_: unknown, args: CarByIdArgs) => Promise<({
             model: {
-                name: string;
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
                 id: string;
-                createdAt: Date;
                 brandId: string;
-            };
-            brand: {
                 name: string;
-                id: string;
-                createdAt: Date;
-                logoUrl: string | null;
-                logoPublicId: string | null;
             };
             bookings: {
-                userId: string;
                 id: string;
-                status: import(".prisma/client").$Enums.BookingStatus;
-                createdAt: Date;
-                updatedAt: Date;
                 startDate: Date;
                 endDate: Date;
                 carId: string;
-                depositAmount: number;
-                pickupLocation: string | null;
-                dropoffLocation: string | null;
-                totalPrice: number;
+                createdAt: Date;
+                updatedAt: Date;
+                status: import(".prisma/client").$Enums.BookingStatus;
+                userId: string;
+                pickupTime: string | null;
+                returnTime: string | null;
                 basePrice: number;
                 taxAmount: number;
-                rentalType: import(".prisma/client").$Enums.RentalType;
-                surchargeAmount: number;
+                depositAmount: number;
+                startOdometer: number | null;
+                endOdometer: number | null;
+                damageFee: number;
+                extraKmFee: number;
+                returnNotes: string | null;
+                totalPrice: number;
+                bookingType: import(".prisma/client").$Enums.BookingType;
+                repairOrderId: string | null;
             }[];
             images: {
                 id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 carId: string;
                 isPrimary: boolean;
-                imagePath: string;
-                publicId: string | null;
-                altText: string | null;
+                url: string;
             }[];
         } & {
-            year: number;
             id: string;
-            status: import(".prisma/client").$Enums.CarStatus;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
-            brandId: string;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
             modelId: string;
             plateNumber: string;
-            fuelType: import(".prisma/client").$Enums.FuelType;
-            transmission: import(".prisma/client").$Enums.TransmissionType;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
             seats: number;
-            mileage: number;
-            pricePerHour: number | null;
-            pricePerKm: number | null;
-            pricePerDay: number | null;
-            depositAmount: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
             critAirRating: import(".prisma/client").$Enums.CritAirCategory;
-            descriptionEn: string | null;
-            descriptionFr: string | null;
         }) | null>;
         brands: () => Promise<{
-            name: string;
             id: string;
-            createdAt: Date;
+            name: string;
             logoUrl: string | null;
-            logoPublicId: string | null;
         }[]>;
-        models: (_: any, { brandId }: any) => Promise<{
-            name: string;
+        models: (_: unknown, args: ModelsByBrandArgs) => Promise<{
             id: string;
-            createdAt: Date;
             brandId: string;
+            name: string;
         }[]>;
-        availableCars: (_: any, { startDate, endDate }: any) => Promise<({
+        availableCars: (_: unknown, args: AvailableCarsArgs) => Promise<({
             model: {
-                name: string;
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
                 id: string;
-                createdAt: Date;
                 brandId: string;
-            };
-            brand: {
                 name: string;
-                id: string;
-                createdAt: Date;
-                logoUrl: string | null;
-                logoPublicId: string | null;
             };
             images: {
                 id: string;
-                createdAt: Date;
-                updatedAt: Date;
                 carId: string;
                 isPrimary: boolean;
-                imagePath: string;
-                publicId: string | null;
-                altText: string | null;
+                url: string;
             }[];
         } & {
-            year: number;
             id: string;
-            status: import(".prisma/client").$Enums.CarStatus;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
-            brandId: string;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
             modelId: string;
             plateNumber: string;
-            fuelType: import(".prisma/client").$Enums.FuelType;
-            transmission: import(".prisma/client").$Enums.TransmissionType;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
             seats: number;
-            mileage: number;
-            pricePerHour: number | null;
-            pricePerKm: number | null;
-            pricePerDay: number | null;
-            depositAmount: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
             critAirRating: import(".prisma/client").$Enums.CritAirCategory;
-            descriptionEn: string | null;
-            descriptionFr: string | null;
         })[]>;
     };
     Mutation: {
-        createBrand: (_: any, args: any, context: any) => Promise<{
-            name: string;
+        createBrand: (_: unknown, args: CreateBrandArgs, context: GraphQLContext) => Promise<{
             id: string;
-            createdAt: Date;
+            name: string;
             logoUrl: string | null;
-            logoPublicId: string | null;
         }>;
-        updateBrand: (_: any, { id, ...args }: any, context: any) => Promise<{
-            name: string;
+        updateBrand: (_: unknown, args: UpdateBrandArgs, context: GraphQLContext) => Promise<{
             id: string;
-            createdAt: Date;
+            name: string;
             logoUrl: string | null;
-            logoPublicId: string | null;
         }>;
-        deleteBrand: (_: any, { id }: any, context: any) => Promise<boolean>;
-        createModel: (_: any, args: any, context: any) => Promise<{
-            name: string;
+        deleteBrand: (_: unknown, args: DeleteBrandArgs, context: GraphQLContext) => Promise<{
             id: string;
-            createdAt: Date;
+            name: string;
+            logoUrl: string | null;
+        }>;
+        createModel: (_: unknown, args: CreateModelArgs, context: GraphQLContext) => Promise<{
+            id: string;
             brandId: string;
+            name: string;
         }>;
-        createCar: (_: any, { input }: any, context: any) => Promise<{
+        updateModel: (_: unknown, args: UpdateModelArgs, context: GraphQLContext) => Promise<{
+            id: string;
+            brandId: string;
+            name: string;
+        }>;
+        deleteModel: (_: unknown, args: DeleteModelArgs, context: GraphQLContext) => Promise<boolean>;
+        createCar: (_: unknown, args: CreateCarArgs, context: GraphQLContext) => Promise<{
             model: {
-                name: string;
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
                 id: string;
-                createdAt: Date;
                 brandId: string;
-            };
-            brand: {
                 name: string;
-                id: string;
-                createdAt: Date;
-                logoUrl: string | null;
-                logoPublicId: string | null;
             };
         } & {
-            year: number;
             id: string;
-            status: import(".prisma/client").$Enums.CarStatus;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
-            brandId: string;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
             modelId: string;
             plateNumber: string;
-            fuelType: import(".prisma/client").$Enums.FuelType;
-            transmission: import(".prisma/client").$Enums.TransmissionType;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
             seats: number;
-            mileage: number;
-            pricePerHour: number | null;
-            pricePerKm: number | null;
-            pricePerDay: number | null;
-            depositAmount: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
             critAirRating: import(".prisma/client").$Enums.CritAirCategory;
-            descriptionEn: string | null;
-            descriptionFr: string | null;
         }>;
-        updateCar: (_: any, { id, input }: any, context: any) => Promise<{
+        updateCar: (_: unknown, args: UpdateCarArgs, context: GraphQLContext) => Promise<{
             model: {
-                name: string;
+                brand: {
+                    id: string;
+                    name: string;
+                    logoUrl: string | null;
+                };
+            } & {
                 id: string;
-                createdAt: Date;
                 brandId: string;
-            };
-            brand: {
                 name: string;
-                id: string;
-                createdAt: Date;
-                logoUrl: string | null;
-                logoPublicId: string | null;
             };
         } & {
-            year: number;
             id: string;
-            status: import(".prisma/client").$Enums.CarStatus;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
-            brandId: string;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
             modelId: string;
             plateNumber: string;
-            fuelType: import(".prisma/client").$Enums.FuelType;
-            transmission: import(".prisma/client").$Enums.TransmissionType;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
             seats: number;
-            mileage: number;
-            pricePerHour: number | null;
-            pricePerKm: number | null;
-            pricePerDay: number | null;
-            depositAmount: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
             critAirRating: import(".prisma/client").$Enums.CritAirCategory;
-            descriptionEn: string | null;
-            descriptionFr: string | null;
         }>;
-        deleteCar: (_: any, { id }: any, context: any) => Promise<boolean>;
-        addCarImage: (_: any, { carId, file, isPrimary }: any, context: any) => Promise<{
+        deleteCar: (_: unknown, args: DeleteCarArgs, context: GraphQLContext) => Promise<{
             id: string;
+            brandId: string;
             createdAt: Date;
             updatedAt: Date;
+            status: import(".prisma/client").$Enums.CarStatus;
+            depositAmount: number;
+            year: number;
+            modelId: string;
+            plateNumber: string;
+            transmission: import(".prisma/client").$Enums.Transmission;
+            fuelType: import(".prisma/client").$Enums.FuelType | null;
+            seats: number;
+            requiredLicense: import(".prisma/client").$Enums.LicenseCategory;
+            pricePerDay: number;
+            dailyKmLimit: number | null;
+            extraKmCharge: number;
+            currentOdometer: number;
+            critAirRating: import(".prisma/client").$Enums.CritAirCategory;
+        }>;
+        addCarImage: (_: unknown, args: AddCarImageArgs, context: GraphQLContext) => Promise<{
+            id: string;
             carId: string;
             isPrimary: boolean;
-            imagePath: string;
-            publicId: string | null;
-            altText: string | null;
+            url: string;
         }>;
-        deleteCarImage: (_: any, { imageId }: any, context: any) => Promise<boolean>;
-        setPrimaryCarImage: (_: any, { carId, imageId }: any, context: any) => Promise<boolean>;
+        deleteCarImage: (_: unknown, args: DeleteCarImageArgs, context: GraphQLContext) => Promise<boolean>;
+        setPrimaryCarImage: (_: unknown, args: SetPrimaryCarImageArgs, context: GraphQLContext) => Promise<boolean>;
+    };
+    Car: {
+        brand: (parent: {
+            id: string;
+        }) => Promise<{
+            id: string;
+            name: string;
+            logoUrl: string | null;
+        } | undefined>;
     };
 };
 //# sourceMappingURL=carResolvers.d.ts.map

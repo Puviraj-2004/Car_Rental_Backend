@@ -1,1 +1,1 @@
-{"version":3,"file":"platformTypeDefs.js","sourceRoot":"","sources":["../../../../src/graphql/typeDefs/platformTypeDefs.ts"],"names":[],"mappings":";;;AAAA,6CAAkC;AAErB,QAAA,gBAAgB,GAAG,IAAA,iBAAG,EAAA;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CAuFlC,CAAC"}
+{"version":3,"file":"platformTypeDefs.js","sourceRoot":"","sources":["../../../../src/graphql/typeDefs/platformTypeDefs.ts"],"names":[],"mappings":";;;AAAA,6CAAkC;AAErB,QAAA,gBAAgB,GAAG,IAAA,iBAAG,EAAA;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;CA4ClC,CAAC"}

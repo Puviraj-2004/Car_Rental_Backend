@@ -1,68 +1,59 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.paymentResolvers = void 0;
-const database_1 = __importDefault(require("../../utils/database"));
 const authguard_1 = require("../../utils/authguard");
+const paymentService_1 = require("../../services/paymentService");
 exports.paymentResolvers = {
     Query: {
         payments: async (_, __, context) => {
             (0, authguard_1.isAdmin)(context);
-            return await database_1.default.payment.findMany({ include: { booking: true } });
+            return await paymentService_1.paymentService.getAllPayments();
         },
         bookingPayment: async (_, { bookingId }, context) => {
-            const payment = await database_1.default.payment.findUnique({
-                where: { bookingId },
-                include: { booking: true }
-            });
+            const payment = await paymentService_1.paymentService.getPaymentByBookingId(bookingId);
             if (payment) {
                 (0, authguard_1.isOwnerOrAdmin)(context, payment.booking.userId);
             }
             else {
-                (0, authguard_1.isAdmin)(context); // If no payment found, only admin usually checks this directly
+                (0, authguard_1.isAdmin)(context);
             }
             return payment;
         }
     },
     Mutation: {
-        createPayment: async (_, { input }, context) => {
+        createStripeCheckoutSession: async (_, { bookingId }, context) => {
             (0, authguard_1.isAuthenticated)(context);
-            const booking = await database_1.default.booking.findUnique({
-                where: { id: input.bookingId }
-            });
+            // Fetch booking to check ownership before calling service
+            const booking = await paymentService_1.paymentService.getBookingForAuth(bookingId);
             if (!booking)
                 throw new Error('Booking not found');
-            (0, authguard_1.isOwnerOrAdmin)(context, booking.userId); // Only owner can pay
-            const existingPayment = await database_1.default.payment.findUnique({
-                where: { bookingId: input.bookingId }
-            });
-            if (existingPayment)
-                throw new Error('Payment already exists');
-            const payment = await database_1.default.payment.create({
-                data: {
-                    ...input,
-                    status: input.status || 'PENDING',
-                },
-                include: { booking: true }
-            });
-            if (payment.status === 'COMPLETED') {
-                await database_1.default.booking.update({
-                    where: { id: input.bookingId },
-                    data: { status: 'CONFIRMED' }
-                });
-            }
-            return payment;
+            (0, authguard_1.isOwnerOrAdmin)(context, booking.userId);
+            return await paymentService_1.paymentService.createStripeSession(bookingId);
+        },
+        mockFinalizePayment: async (_, { bookingId, success }, context) => {
+            (0, authguard_1.isAuthenticated)(context);
+            const booking = await paymentService_1.paymentService.getBookingForAuth(bookingId);
+            if (!booking)
+                throw new Error('Booking not found');
+            (0, authguard_1.isOwnerOrAdmin)(context, booking.userId);
+            return await paymentService_1.paymentService.finalizeMockPayment(bookingId, success);
+        },
+        createPayment: async (_, { input }, context) => {
+            (0, authguard_1.isAuthenticated)(context);
+            const booking = await paymentService_1.paymentService.getBookingForAuth(input.bookingId);
+            if (!booking)
+                throw new Error('Booking not found');
+            (0, authguard_1.isOwnerOrAdmin)(context, booking.userId);
+            return await paymentService_1.paymentService.processManualPayment(input);
         },
         updatePaymentStatus: async (_, { input }, context) => {
             (0, authguard_1.isAdmin)(context);
-            const { id, status, transactionId } = input;
-            return await database_1.default.payment.update({
-                where: { id },
-                data: { status, transactionId },
-                include: { booking: true }
-            });
+            const { id, status } = input;
+            return await paymentService_1.paymentService.updatePaymentStatus(id, status);
+        },
+        refundPayment: async (_, { paymentId }, context) => {
+            (0, authguard_1.isAdmin)(context);
+            return await paymentService_1.paymentService.refundPayment(paymentId);
         }
     }
 };

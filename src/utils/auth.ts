@@ -1,5 +1,13 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { Role } from '@prisma/client';
+
+interface JWTPayload {
+  userId: string;
+  role: Role;
+  iat?: number;
+  exp?: number;
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_change_in_env';
 
@@ -9,9 +17,10 @@ export const generateToken = (userId: string, role: string = 'USER'): string => 
 };
 
 // 2. Verify JWT Token
-export const verifyToken = (token: string): any => {
+export const verifyToken = (token: string): JWTPayload => {
   try {
-    return jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, JWT_SECRET) as JWTPayload;
+    return decoded;
   } catch (error) {
     throw new Error('Invalid or Expired Token');
   }

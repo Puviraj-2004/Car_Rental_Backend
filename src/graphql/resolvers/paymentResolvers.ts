@@ -1,72 +1,67 @@
-import prisma from '../../utils/database';
 import { isAdmin, isOwnerOrAdmin, isAuthenticated } from '../../utils/authguard';
+import { paymentService } from '../../services/paymentService';
 
 export const paymentResolvers = {
   Query: {
     payments: async (_: any, __: any, context: any) => {
       isAdmin(context);
-      return await prisma.payment.findMany({ include: { booking: true } });
+      return await paymentService.getAllPayments();
     },
-    
+
     bookingPayment: async (_: any, { bookingId }: { bookingId: string }, context: any) => {
-      const payment = await prisma.payment.findUnique({
-        where: { bookingId },
-        include: { booking: true }
-      });
-      
+      const payment = await paymentService.getPaymentByBookingId(bookingId);
+
       if (payment) {
         isOwnerOrAdmin(context, payment.booking.userId);
       } else {
-        isAdmin(context); // If no payment found, only admin usually checks this directly
+        isAdmin(context);
       }
-      
+
       return payment;
     }
   },
 
   Mutation: {
+    createStripeCheckoutSession: async (_: any, { bookingId }: { bookingId: string }, context: any) => {
+      isAuthenticated(context);
+
+      // Fetch booking to check ownership before calling service
+      const booking = await paymentService.getBookingForAuth(bookingId);
+      if (!booking) throw new Error('Booking not found');
+      isOwnerOrAdmin(context, booking.userId);
+
+      return await paymentService.createStripeSession(bookingId);
+    },
+
+    mockFinalizePayment: async (_: any, { bookingId, success }: { bookingId: string; success: boolean }, context: any) => {
+      isAuthenticated(context);
+
+      const booking = await paymentService.getBookingForAuth(bookingId);
+      if (!booking) throw new Error('Booking not found');
+      isOwnerOrAdmin(context, booking.userId);
+
+      return await paymentService.finalizeMockPayment(bookingId, success);
+    },
+
     createPayment: async (_: any, { input }: { input: any }, context: any) => {
       isAuthenticated(context);
 
-      const booking = await prisma.booking.findUnique({ 
-        where: { id: input.bookingId } 
-      });
-      
+      const booking = await paymentService.getBookingForAuth(input.bookingId);
       if (!booking) throw new Error('Booking not found');
-      isOwnerOrAdmin(context, booking.userId); // Only owner can pay
-      
-      const existingPayment = await prisma.payment.findUnique({
-        where: { bookingId: input.bookingId }
-      });
-      if (existingPayment) throw new Error('Payment already exists');
+      isOwnerOrAdmin(context, booking.userId);
 
-      const payment = await prisma.payment.create({
-        data: {
-          ...input,
-          status: input.status || 'PENDING',
-        },
-        include: { booking: true }
-      });
-
-      if (payment.status === 'COMPLETED') {
-        await prisma.booking.update({
-          where: { id: input.bookingId },
-          data: { status: 'CONFIRMED' }
-        });
-      }
-
-      return payment;
+      return await paymentService.processManualPayment(input);
     },
 
     updatePaymentStatus: async (_: any, { input }: { input: any }, context: any) => {
       isAdmin(context);
-
-      const { id, status, transactionId } = input;
-      return await prisma.payment.update({
-        where: { id },
-        data: { status, transactionId },
-        include: { booking: true }
-      });
+      const { id, status } = input;
+      return await paymentService.updatePaymentStatus(id, status);
+    }
+    ,
+    refundPayment: async (_: any, { paymentId }: { paymentId: string }, context: any) => {
+      isAdmin(context);
+      return await paymentService.refundPayment(paymentId);
     }
   }
 };

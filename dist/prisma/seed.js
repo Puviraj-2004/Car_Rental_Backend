@@ -14,55 +14,35 @@ async function main() {
     const admin = await prisma.user.upsert({
         where: { email: adminEmail },
         update: {
-            username: 'admin_user',
             password: hashedPassword,
+            fullName: 'Super Admin',
             role: client_1.Role.ADMIN,
-            isEmailVerified: true,
         },
         create: {
             email: adminEmail,
-            username: 'admin_user',
+            fullName: 'Super Admin',
             password: hashedPassword,
             phoneNumber: '+33612345678',
             role: client_1.Role.ADMIN,
-            isEmailVerified: true,
         },
     });
-    console.log(`✅ Admin user ready: ${admin.username}`);
+    console.log(`✅ Admin user ready: ${admin.email}`);
     // 2. PLATFORM SETTINGS SEEDING
     const settings = await prisma.platformSettings.findFirst();
     if (!settings) {
         await prisma.platformSettings.create({
             data: {
-                companyName: 'RentCar Premium',
-                description: 'Premium car rental service with AI-powered instant verification.',
+                companyName: 'RentCar Premium France',
                 supportEmail: 'support@rentcar.com',
                 supportPhone: '+33 1 23 45 67 89',
-                address: '123 Avenue des Champs-Élysées, Paris, France',
-                currency: 'EUR',
+                address: '123 Avenue des Champs-Élysées, Paris',
                 taxPercentage: 20.0,
+                currency: 'EUR',
                 youngDriverMinAge: 25,
                 youngDriverFee: 30.0,
-                noviceLicenseYears: 2,
-                facebookUrl: 'https://facebook.com/rentcar',
-                instagramUrl: 'https://instagram.com/rentcar',
-                twitterUrl: 'https://twitter.com/rentcar',
-                linkedinUrl: 'https://linkedin.com/company/rentcar',
             },
         });
-        console.log('✅ Platform Settings seeded successfully!');
-    }
-    else {
-        // 🔄 ஒருவேளை ஏற்கனவே செட்டிங்ஸ் இருந்தால், புதிய பில்ட்களை மட்டும் அப்டேட் செய்ய
-        await prisma.platformSettings.update({
-            where: { id: settings.id },
-            data: {
-                youngDriverMinAge: 25,
-                youngDriverFee: 30.0,
-                noviceLicenseYears: 2,
-            }
-        });
-        console.log('✅ Platform Settings updated with Young Driver rules!');
+        console.log('✅ Platform Settings seeded!');
     }
     console.log('🎉 Seeding completed!');
 }

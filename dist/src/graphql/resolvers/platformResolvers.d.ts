@@ -4,41 +4,15 @@ export declare const platformResolvers: {
             id: string;
             updatedAt: Date;
             address: string | null;
-            logoUrl: string | null;
-            logoPublicId: string | null;
-            currency: string;
             companyName: string;
-            description: string | null;
             supportEmail: string | null;
             supportPhone: string | null;
-            facebookUrl: string | null;
-            twitterUrl: string | null;
-            instagramUrl: string | null;
-            linkedinUrl: string | null;
-            youngDriverMinAge: number | null;
-            youngDriverFee: number | null;
-            noviceLicenseYears: number | null;
-            termsAndConditions: string | null;
-            privacyPolicy: string | null;
             taxPercentage: number;
+            currency: string;
+            youngDriverMinAge: number;
+            youngDriverFee: number;
         }>;
-        auditLogs: (_: any, { limit, offset }: {
-            limit?: number;
-            offset?: number;
-        }, context: any) => Promise<({
-            user: {
-                role: import(".prisma/client").$Enums.Role;
-                id: string;
-                email: string;
-                username: string;
-            };
-        } & {
-            userId: string;
-            id: string;
-            createdAt: Date;
-            action: string;
-            details: import("@prisma/client/runtime/library").JsonValue | null;
-        })[]>;
+        auditLogs: (_: any, __: any, context: any) => Promise<never[]>;
     };
     Mutation: {
         updatePlatformSettings: (_: any, { input }: {
@@ -47,23 +21,40 @@ export declare const platformResolvers: {
             id: string;
             updatedAt: Date;
             address: string | null;
-            logoUrl: string | null;
-            logoPublicId: string | null;
-            currency: string;
             companyName: string;
-            description: string | null;
             supportEmail: string | null;
             supportPhone: string | null;
-            facebookUrl: string | null;
-            twitterUrl: string | null;
-            instagramUrl: string | null;
-            linkedinUrl: string | null;
-            youngDriverMinAge: number | null;
-            youngDriverFee: number | null;
-            noviceLicenseYears: number | null;
-            termsAndConditions: string | null;
-            privacyPolicy: string | null;
             taxPercentage: number;
+            currency: string;
+            youngDriverMinAge: number;
+            youngDriverFee: number;
+        }>;
+        cleanupExpiredVerifications: (_: any, __: any, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            deletedCount: number;
+        }>;
+        cleanupOldCompletedBookings: (_: any, { daysOld }: {
+            daysOld?: number;
+        }, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            deletedCount: number;
+        }>;
+        getCleanupStats: (_: any, __: any, context: any) => Promise<{
+            oldCompletedBookings: number;
+            totalPendingCleanup: number;
+        }>;
+        triggerExpirationCheck: (_: any, __: any, context: any) => Promise<{
+            success: boolean;
+            message: string;
+            details: boolean;
+        }>;
+        getExpirationStats: (_: any, __: any, context: any) => Promise<{
+            expiredAwaitingVerification: number;
+            expiredAwaitingPayment: number;
+            totalExpired: number;
+            nextCheckIn: string;
         }>;
     };
 };
