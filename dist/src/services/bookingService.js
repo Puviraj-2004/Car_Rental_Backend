@@ -30,6 +30,17 @@ class BookingService {
         if (input.bookingType === 'REPLACEMENT' && role !== 'ADMIN') {
             throw new AppError_1.AppError('Only admins can create courtesy car bookings', AppError_1.ErrorCode.FORBIDDEN);
         }
+        const isAdminActor = role === 'ADMIN';
+        const isWalkIn = !!input.isWalkIn && isAdminActor;
+        // For walk-in/admin onsite bookings, capture guest contact; require minimal name/phone
+        if (isWalkIn) {
+            if (!input.guestName?.trim()) {
+                throw new AppError_1.AppError('Guest name is required for walk-in bookings', AppError_1.ErrorCode.BAD_USER_INPUT);
+            }
+            if (!input.guestPhone?.trim()) {
+                throw new AppError_1.AppError('Guest phone is required for walk-in bookings', AppError_1.ErrorCode.BAD_USER_INPUT);
+            }
+        }
         const start = new Date(input.startDate);
         const end = new Date(input.endDate);
         const now = new Date();
@@ -58,7 +69,7 @@ class BookingService {
         const totalPrice = (0, calculation_1.calculateTotalPrice)(basePrice, taxAmount);
         // Transform GraphQL input to Prisma input
         const bookingData = {
-            user: { connect: { id: userId } },
+            ...(isWalkIn ? {} : { user: { connect: { id: userId } } }),
             car: { connect: { id: input.carId } },
             startDate: start,
             endDate: end,
@@ -66,6 +77,11 @@ class BookingService {
             pickupTime: input.pickupTime,
             returnTime: input.returnTime,
             status: client_1.BookingStatus.DRAFT,
+            createdByAdmin: isAdminActor,
+            isWalkIn,
+            guestName: input.guestName,
+            guestPhone: input.guestPhone,
+            guestEmail: input.guestEmail,
             endOdometer: 0,
             damageFee: input.damageFee || 0,
             extraKmFee: input.extraKmFee || 0,
@@ -89,7 +105,7 @@ class BookingService {
             verification: { create: { token, expiresAt } }
         });
     }
-    async startTrip(bookingId) {
+    async startTrip(bookingId, startOdometer, pickupNotes) {
         const booking = await bookingRepository_1.bookingRepository.findUnique(bookingId, bookingRepository_1.BOOKING_INCLUDES.detailed);
         if (!booking)
             throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
@@ -97,9 +113,20 @@ class BookingService {
         if (booking.status !== client_1.BookingStatus.CONFIRMED && booking.status !== client_1.BookingStatus.VERIFIED) {
             throw new AppError_1.AppError('Payment Required. Please complete payment before starting trip.', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
-        // Security Check 2: Document Verification
-        if (booking.user?.verification?.status !== client_1.VerificationStatus.APPROVED) {
+        // Security Check 2: Document Verification (skip for walk-ins)
+        if (booking.user && booking.user?.verification?.status !== client_1.VerificationStatus.APPROVED) {
             throw new AppError_1.AppError('Driver documents are not verified yet. Please verify original documents on Admin Panel before handing over the key.', AppError_1.ErrorCode.BAD_USER_INPUT);
+        }
+        // Validate odometer reading
+        if (startOdometer !== undefined && startOdometer < 0) {
+            throw new AppError_1.AppError('Invalid odometer reading', AppError_1.ErrorCode.BAD_USER_INPUT);
+        }
+        // Update booking with odometer and notes before starting trip
+        if (startOdometer !== undefined || pickupNotes) {
+            await bookingRepository_1.bookingRepository.update(bookingId, {
+                startOdometer,
+                pickupNotes
+            });
         }
         return await bookingRepository_1.bookingRepository.startTripTransaction(bookingId, booking.carId);
     }
@@ -175,25 +202,25 @@ class BookingService {
         if (booking.status === client_1.BookingStatus.COMPLETED || booking.status === client_1.BookingStatus.CANCELLED) {
             throw new AppError_1.AppError('Cannot cancel a completed or already cancelled booking', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
-        // Business rule: users may cancel up until 24 hours before pickup. Admins can always cancel.
         if (role !== 'ADMIN') {
-            // Compute pickup datetime: prefer booking.pickupTime when present
-            let pickupDt = booking.startDate;
-            try {
-                if (booking.pickupTime) {
-                    // Combine date portion of startDate with pickupTime (format: HH:MM)
-                    const datePart = booking.startDate.toISOString().split('T')[0];
-                    // Construct as ISO without timezone; server treats Date as UTC when parsing
-                    pickupDt = new Date(`${datePart}T${booking.pickupTime}:00`);
+            if (booking.status === client_1.BookingStatus.ONGOING) {
+                throw new AppError_1.AppError('Only admins can cancel an ongoing booking', AppError_1.ErrorCode.FORBIDDEN);
+            }
+            if (booking.status === client_1.BookingStatus.CONFIRMED) {
+                let pickupDt = booking.startDate;
+                try {
+                    if (booking.pickupTime) {
+                        const datePart = booking.startDate.toISOString().split('T')[0];
+                        pickupDt = new Date(`${datePart}T${booking.pickupTime}:00`);
+                    }
                 }
-            }
-            catch (e) {
-                // If parsing fails, fall back to startDate
-                pickupDt = booking.startDate;
-            }
-            const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
-            if (Date.now() > cutoff.getTime()) {
-                throw new AppError_1.AppError('Cancellation window has passed. Contact admin to cancel within 24 hours of pickup.', AppError_1.ErrorCode.FORBIDDEN);
+                catch (e) {
+                    pickupDt = booking.startDate;
+                }
+                const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
+                if (Date.now() > cutoff.getTime()) {
+                    throw new AppError_1.AppError('Cancellation window has passed. Contact admin to cancel within 24 hours of pickup.', AppError_1.ErrorCode.FORBIDDEN);
+                }
             }
         }
         return await bookingRepository_1.bookingRepository.update(id, { status: client_1.BookingStatus.CANCELLED });

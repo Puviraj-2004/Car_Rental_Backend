@@ -153,6 +153,10 @@ export interface CreateBookingInput {
     bookingType?: string;
     damageFee?: number;
     extraKmFee?: number;
+    isWalkIn?: boolean;
+    guestName?: string;
+    guestPhone?: string;
+    guestEmail?: string;
 }
 export interface UpdateBookingInput {
     carId?: string;
@@ -163,12 +167,14 @@ export interface UpdateBookingInput {
     status?: BookingStatus;
     damageFee?: number;
     extraKmFee?: number;
+    isWalkIn?: boolean;
+    guestName?: string;
+    guestPhone?: string;
+    guestEmail?: string;
 }
 export interface RegisterInput {
     email: string;
     password: string;
-    firstName: string;
-    lastName: string;
     fullName?: string;
     phoneNumber?: string;
     dateOfBirth?: string;

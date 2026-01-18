@@ -122,6 +122,7 @@ model User {
   avatarUrl       String?               
   dateOfBirth     DateTime?             
   fullAddress     String?               
+  emailVerified   Boolean               @default(false)
   role            Role                  @default(USER)
   facebookId      String?               @unique
   appleId         String?               @unique
@@ -237,7 +238,7 @@ model CarImage {
 
 model Booking {
   id              String        @id @default(uuid())
-  userId          String
+  userId          String?
   carId           String
   startDate       DateTime
   endDate         DateTime
@@ -248,14 +249,20 @@ model Booking {
   depositAmount   Float         @default(0) 
   startOdometer   Float?        
   endOdometer     Float?        
+  pickupNotes     String?       // Admin notes during pickup
   damageFee       Float         @default(0)    
   extraKmFee      Float         @default(0)    
   returnNotes     String?                      
   totalPrice      Float         @default(0)    
   bookingType     BookingType   @default(RENTAL)
   repairOrderId   String?
+  createdByAdmin  Boolean       @default(false)
+  isWalkIn        Boolean       @default(false)
+  guestName       String?
+  guestPhone      String?
+  guestEmail      String?
   status          BookingStatus @default(PENDING)
-  user            User          @relation(fields: [userId], references: [id])
+  user            User?         @relation(fields: [userId], references: [id])
   car             Car           @relation(fields: [carId], references: [id])
   payment         Payment?
   verification    BookingVerification?

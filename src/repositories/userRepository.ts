@@ -31,6 +31,7 @@ export class UserRepository {
     fullName: string;
     phoneNumber?: string;
     dateOfBirth?: Date;
+    emailVerified?: boolean;
   }) {
     return await prisma.user.create({
       data,
@@ -45,6 +46,7 @@ export class UserRepository {
     phoneNumber?: string;
     dateOfBirth?: Date;
     fullAddress?: string;
+    emailVerified?: boolean;
   }) {
     return await prisma.user.update({
       where: { id },

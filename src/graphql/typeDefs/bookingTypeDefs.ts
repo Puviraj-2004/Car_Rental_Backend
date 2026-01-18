@@ -20,8 +20,8 @@ export const bookingTypeDefs = gql`
   # --- Types ---
   type Booking {
     id: ID!
-    userId: ID!
-    user: User!
+    userId: ID
+    user: User
     carId: ID!
     car: Car!
     startDate: DateTime!
@@ -33,12 +33,18 @@ export const bookingTypeDefs = gql`
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float
+    pickupNotes: String
     damageFee: Float
     extraKmFee: Float
     returnNotes: String
     totalPrice: Float
     bookingType: BookingType!
     repairOrderId: String
+    createdByAdmin: Boolean!
+    isWalkIn: Boolean!
+    guestName: String
+    guestPhone: String
+    guestEmail: String
     status: BookingStatus!
     createdAt: String!
     updatedAt: String!
@@ -75,6 +81,10 @@ export const bookingTypeDefs = gql`
     totalPrice: Float
     bookingType: BookingType
     repairOrderId: String
+    isWalkIn: Boolean
+    guestName: String
+    guestPhone: String
+    guestEmail: String
   }
 
   input UpdateBookingInput {
@@ -93,6 +103,10 @@ export const bookingTypeDefs = gql`
     totalPrice: Float
     bookingType: BookingType
     repairOrderId: String
+    isWalkIn: Boolean
+    guestName: String
+    guestPhone: String
+    guestEmail: String
     status: BookingStatus
   }
 
@@ -117,7 +131,7 @@ export const bookingTypeDefs = gql`
     deleteBooking(id: ID!): Boolean!
     
     # New Industrial Flow Mutations
-    startTrip(bookingId: String!): Booking!
+    startTrip(bookingId: String!, startOdometer: Float, pickupNotes: String): Booking!
     completeTrip(bookingId: String!): Booking!
     finishCarMaintenance(carId: ID!): Car!
   }

@@ -16,6 +16,7 @@ async function main() {
       password: hashedPassword,
       fullName: 'Super Admin',
       role: Role.ADMIN,
+      emailVerified: true,
     },
     create: {
       email: adminEmail,
@@ -23,6 +24,7 @@ async function main() {
       password: hashedPassword,
       phoneNumber: '+33612345678',
       role: Role.ADMIN,
+      emailVerified: true,
     },
   });
   console.log(`✅ Admin user ready: ${admin.email}`);

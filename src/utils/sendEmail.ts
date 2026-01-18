@@ -30,12 +30,12 @@ export const sendVerificationEmail = async (email: string, otp: string) => {
         </div>
       `,
     });
-    if (process.env.NODE_ENV === 'development') {
-    }
   } catch (error) {
+    // In development mode, log OTP to console as fallback for testing
     if (process.env.NODE_ENV === 'development') {
+      console.log(`📧 DEV: OTP for ${email} = ${otp}`);
+      return; // Don't throw in dev mode
     }
-    // Don't throw error here to prevent crashing the registration flow, 
-    // just log it. The user can request OTP again.
+    // In production, silently fail - user can request OTP again
   }
 };

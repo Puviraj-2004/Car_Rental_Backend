@@ -17,10 +17,11 @@ export declare class BookingService {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -109,7 +110,7 @@ export declare class BookingService {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -117,12 +118,18 @@ export declare class BookingService {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         })[];
     }>;
     createBooking(userId: string, role: string, input: CreateBookingInput): Promise<{
@@ -138,10 +145,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -230,7 +238,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -238,12 +246,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     confirmReservation(id: string, userId: string): Promise<{
         user: {
@@ -258,10 +272,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -350,7 +365,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -358,14 +373,20 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
-    startTrip(bookingId: string): Promise<[{
+    startTrip(bookingId: string, startOdometer?: number, pickupNotes?: string): Promise<[{
         user: {
             id: string;
             email: string;
@@ -378,10 +399,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -470,7 +492,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -478,12 +500,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }, {
         id: string;
         brandId: string;
@@ -517,10 +545,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -609,7 +638,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -617,12 +646,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }, {
         id: string;
         brandId: string;
@@ -655,7 +690,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -663,12 +698,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }) | null>;
     getAllBookings(): Promise<({
         [x: string]: never;
@@ -682,7 +723,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -690,12 +731,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     getBookingsByUserId(userId: string): Promise<({
         [x: string]: never;
@@ -709,7 +756,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -717,12 +764,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     getBookingById(id: string): Promise<({
         [x: string]: never;
@@ -736,7 +789,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -744,12 +797,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }) | null>;
     getBookingsByUserIdBasic(userId: string): Promise<({
         [x: string]: never;
@@ -763,7 +822,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -771,12 +830,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     getBookingsByCarId(carId: string): Promise<({
         [x: string]: never;
@@ -790,7 +855,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -798,15 +863,21 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     getBookingForAuth(id: string): Promise<{
-        userId: string;
+        userId: string | null;
     } | null>;
     updateBookingStatus(id: string, status: BookingStatus, userId?: string, role?: string): Promise<{
         user: {
@@ -821,10 +892,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -913,7 +985,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -921,12 +993,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     cancelBooking(id: string, userId: string, role: string): Promise<{
         user: {
@@ -941,10 +1019,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -1033,7 +1112,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -1041,12 +1120,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     deleteBooking(id: string): Promise<{
         id: string;
@@ -1056,7 +1141,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -1064,12 +1149,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     updateBooking(id: string, input: UpdateBookingInput, userId?: string, userRole?: string): Promise<{
         user: {
@@ -1084,10 +1175,11 @@ export declare class BookingService {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -1176,7 +1268,7 @@ export declare class BookingService {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -1184,12 +1276,18 @@ export declare class BookingService {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     finishCarMaintenance(carId: string): Promise<{
         model: {

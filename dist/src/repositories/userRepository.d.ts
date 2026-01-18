@@ -10,7 +10,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -18,12 +18,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
     } & {
         id: string;
@@ -37,6 +43,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -50,7 +57,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -58,12 +65,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
     } & {
         id: string;
@@ -77,6 +90,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -90,7 +104,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -98,12 +112,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
     } & {
         id: string;
@@ -117,6 +137,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -127,6 +148,7 @@ export declare class UserRepository {
         fullName: string;
         phoneNumber?: string;
         dateOfBirth?: Date;
+        emailVerified?: boolean;
     }): Promise<{
         bookings: {
             id: string;
@@ -136,7 +158,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -144,12 +166,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
     } & {
         id: string;
@@ -163,6 +191,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -174,6 +203,7 @@ export declare class UserRepository {
         phoneNumber?: string;
         dateOfBirth?: Date;
         fullAddress?: string;
+        emailVerified?: boolean;
     }): Promise<{
         bookings: {
             id: string;
@@ -183,7 +213,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -191,12 +221,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
     } & {
         id: string;
@@ -210,6 +246,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -226,6 +263,7 @@ export declare class UserRepository {
         avatarUrl: string | null;
         dateOfBirth: Date | null;
         fullAddress: string | null;
+        emailVerified: boolean;
         role: import(".prisma/client").$Enums.Role;
         createdAt: Date;
         updatedAt: Date;
@@ -282,10 +320,11 @@ export declare class UserRepository {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
         } & {
             id: string;
             startDate: Date;
@@ -294,7 +333,7 @@ export declare class UserRepository {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -302,12 +341,18 @@ export declare class UserRepository {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         };
     } & {
         id: string;

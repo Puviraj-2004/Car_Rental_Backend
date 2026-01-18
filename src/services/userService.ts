@@ -1,5 +1,5 @@
 import { userRepository } from '../repositories/userRepository';
-import { generateToken, hashPassword, comparePasswords } from '../utils/auth';
+import { generateToken, hashPassword, comparePasswords, generateOTP, storeOTP, verifyOTPCode, storePendingRegistration, getPendingRegistration, clearPendingRegistration } from '../utils/auth';
 import { AppError, ErrorCode } from '../errors/AppError';
 import { OAuth2Client } from 'google-auth-library';
 import { OCRService } from './ocrService';
@@ -9,6 +9,7 @@ import { validatePassword } from '../utils/validation';
 import { VerificationStatus } from '@prisma/client';
 import { uploadToCloudinary } from '../utils/cloudinary';
 import { bookingRepository } from '../repositories/bookingRepository';
+import { sendVerificationEmail } from '../utils/sendEmail';
 import prisma from '../utils/database';
 
 // Document verification status type (alias for Prisma enum)
@@ -36,7 +37,7 @@ export class UserService {
     }
   }
   async register(input: RegisterInput) {
-    const { email, password, phoneNumber, firstName, lastName } = input;
+    const { email, password, fullName, phoneNumber } = input;
 
     // Validate email format
     if (!email || !email.includes('@') || email.length < 5) {
@@ -50,8 +51,8 @@ export class UserService {
     }
 
     // Validate names
-    if (!firstName?.trim() || !lastName?.trim()) {
-      throw new AppError('First name and last name are required', ErrorCode.BAD_USER_INPUT);
+    if (!fullName?.trim()) {
+      throw new AppError('Full name is required', ErrorCode.BAD_USER_INPUT);
     }
 
     // Validate phone number format (international support)
@@ -82,24 +83,21 @@ export class UserService {
     const existingUser = await userRepository.findByEmail(email);
     if (existingUser) throw new AppError('User already exists', ErrorCode.ALREADY_EXISTS);
 
+    // Hash password for storage
     const hashedPassword = await hashPassword(password);
-    // Combine firstName and lastName into fullName to match schema
-    const fullName = `${firstName} ${lastName}`.trim();
 
-    const user = await userRepository.createUser({
-      email,
-      password: hashedPassword,
-      fullName,
-      phoneNumber
-    });
+    // Store registration data temporarily (valid until OTP expires - 10 minutes)
+    storePendingRegistration(email, fullName || '', hashedPassword, phoneNumber);
 
-    // Log successful registration
-    logSecurityEvent.registrationSuccess({
-      userId: user.id,
-      email: user.email
-    });
+    // Generate and send OTP
+    const otp = generateOTP();
+    storeOTP(email, otp);
+    await sendVerificationEmail(email, otp);
 
-    return { token: generateToken(user.id, user.role), user, message: "Registration successful." };
+    return { 
+      message: "Registration successful. Please verify your email with the OTP sent.",
+      email
+    } as any;
   }
 
   async login(input: LoginInput) {
@@ -112,6 +110,12 @@ export class UserService {
         attemptCount: 1
       });
       throw new AppError('Invalid credentials', ErrorCode.UNAUTHENTICATED);
+    }
+
+    // Enforce email verification for password-based login
+    // Cast to any to avoid compile errors before prisma generate
+    if (!(user as any).emailVerified) {
+      throw new AppError('Please verify your email before logging in.', ErrorCode.UNAUTHENTICATED);
     }
 
     const isValid = await comparePasswords(password, user.password);
@@ -149,7 +153,8 @@ export class UserService {
         user = await userRepository.createUser({
           email,
           fullName: name || email, // Use Google name as fullName, fallback to email
-          password: '' // Google OAuth users don't need passwords
+          password: '', // Google OAuth users don't need passwords
+          emailVerified: true // Trust Google verified email
         });
       }
 
@@ -252,7 +257,8 @@ export class UserService {
         select: { userId: true }
       });
       
-      if (booking) {
+      // Only update bookings status if there's an associated user (not walk-in)
+      if (booking && booking.userId) {
         // Update only PENDING bookings to VERIFIED
         await userRepository.updateManyBookingsStatus(booking.userId, BookingStatus.PENDING, BookingStatus.VERIFIED);
         // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
@@ -294,6 +300,15 @@ export class UserService {
 
   async getUserVerification(bookingId: string) {
     return await userRepository.findVerificationByBookingId(bookingId);
+  }
+
+  async isEmailAvailable(email: string): Promise<boolean> {
+    // Basic format validation to avoid useless DB hits
+    if (!email || !email.includes('@') || email.length < 5) {
+      return false;
+    }
+    const existing = await userRepository.findByEmail(email);
+    return !existing;
   }
 
   async updateCurrentUser(userId: string, input: UpdateUserInput) {
@@ -372,6 +387,83 @@ export class UserService {
     }
 
     return await userRepository.deleteUser(id);
+  }
+
+  async verifyOTP(email: string, otp: string) {
+    const result = verifyOTPCode(email, otp);
+    
+    if (!result.valid) {
+      throw new AppError(result.message, ErrorCode.UNAUTHENTICATED);
+    }
+
+    // Check if this is a new registration or existing user
+    let user = await userRepository.findByEmail(email);
+    
+    if (!user) {
+      // New registration - create user now that OTP is verified
+      const pending = getPendingRegistration(email);
+      if (!pending) {
+        throw new AppError('Registration data expired. Please register again.', ErrorCode.BAD_USER_INPUT);
+      }
+
+      user = await userRepository.createUser({
+        email,
+        password: pending.password,
+        fullName: pending.fullName,
+        phoneNumber: pending.phoneNumber,
+        emailVerified: true
+      });
+
+      clearPendingRegistration(email);
+
+      logSecurityEvent.registrationSuccess({
+        userId: user.id,
+        email: user.email
+      });
+    } else {
+      // Existing user - mark email as verified
+      await userRepository.updateUser(user.id, { emailVerified: true });
+    }
+
+    return { success: true, message: 'Email verified successfully.' };
+  }
+
+  async resendOTP(email: string) {
+    // Validate email format
+    if (!email || !email.includes('@') || email.length < 5) {
+      throw new AppError('Invalid email format', ErrorCode.BAD_USER_INPUT);
+    }
+
+    // Check if user exists (for registration flow)
+    const user = await userRepository.findByEmail(email);
+    if (!user) {
+      // For security: don't reveal if email exists
+      // Generate and store OTP anyway (for new registrations)
+      const otp = generateOTP();
+      const { expiresAt } = storeOTP(email, otp);
+      
+      // Send email
+      await sendVerificationEmail(email, otp);
+      
+      return {
+        success: true,
+        message: 'OTP sent to your email. Please check your inbox.',
+        expiresAt
+      };
+    }
+
+    // User exists - send OTP
+    const otp = generateOTP();
+    const { expiresAt } = storeOTP(email, otp);
+    
+    // Send email
+    await sendVerificationEmail(email, otp);
+    
+    return {
+      success: true,
+      message: 'OTP sent to your email. Please check your inbox.',
+      expiresAt
+    };
   }
 }
 

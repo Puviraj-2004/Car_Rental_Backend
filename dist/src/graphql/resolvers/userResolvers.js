@@ -25,6 +25,9 @@ exports.userResolvers = {
         },
         checkCarAvailability: async (_, { carId, startDate, endDate, excludeBookingId }) => {
             return await bookingService_1.bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
+        },
+        isEmailAvailable: async (_, { email }) => {
+            return await userService_1.userService.isEmailAvailable(email);
         }
     },
     Mutation: {
@@ -42,6 +45,15 @@ exports.userResolvers = {
         },
         googleLogin: async (_, { idToken }) => {
             return await userService_1.userService.googleLogin(idToken);
+        },
+        verifyOTP: async (_, { email, otp }) => {
+            return await userService_1.userService.verifyOTP(email, otp);
+        },
+        resendOTP: async (_, { email }) => {
+            // Apply rate limiting for OTP resend (max 5 per minute)
+            const rateLimitKey = (0, graphqlRateLimiter_1.generateRateLimitKey)('resendOTP', undefined, email);
+            graphqlRateLimiter_1.authOperationLimiter.checkLimit(rateLimitKey);
+            return await userService_1.userService.resendOTP(email);
         },
         createOrUpdateVerification: async (_, { input }, context) => {
             (0, authguard_1.isAuthenticated)(context);

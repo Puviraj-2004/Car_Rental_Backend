@@ -64,7 +64,6 @@ class PaymentService {
                         },
                     },
                 }],
-            // Pass bookingId/userId into the created PaymentIntent so refunds can be correlated
             payment_intent_data: {
                 metadata: { bookingId: booking.id, userId: booking.userId }
             },

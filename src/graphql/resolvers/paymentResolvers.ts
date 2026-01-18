@@ -12,7 +12,12 @@ export const paymentResolvers = {
       const payment = await paymentService.getPaymentByBookingId(bookingId);
 
       if (payment) {
-        isOwnerOrAdmin(context, payment.booking.userId);
+        // For walk-in bookings, only admins can access payment
+        if (payment.booking.userId === null) {
+          isAdmin(context);
+        } else {
+          isOwnerOrAdmin(context, payment.booking.userId);
+        }
       } else {
         isAdmin(context);
       }
@@ -28,7 +33,12 @@ export const paymentResolvers = {
       // Fetch booking to check ownership before calling service
       const booking = await paymentService.getBookingForAuth(bookingId);
       if (!booking) throw new Error('Booking not found');
-      isOwnerOrAdmin(context, booking.userId);
+      // For walk-in bookings, only admins can create payment sessions
+      if (booking.userId === null) {
+        isAdmin(context);
+      } else {
+        isOwnerOrAdmin(context, booking.userId);
+      }
 
       return await paymentService.createStripeSession(bookingId);
     },
@@ -38,7 +48,12 @@ export const paymentResolvers = {
 
       const booking = await paymentService.getBookingForAuth(bookingId);
       if (!booking) throw new Error('Booking not found');
-      isOwnerOrAdmin(context, booking.userId);
+      // For walk-in bookings, only admins can finalize payment
+      if (booking.userId === null) {
+        isAdmin(context);
+      } else {
+        isOwnerOrAdmin(context, booking.userId);
+      }
 
       return await paymentService.finalizeMockPayment(bookingId, success);
     },
@@ -48,7 +63,12 @@ export const paymentResolvers = {
 
       const booking = await paymentService.getBookingForAuth(input.bookingId);
       if (!booking) throw new Error('Booking not found');
-      isOwnerOrAdmin(context, booking.userId);
+      // For walk-in bookings, only admins can create manual payments
+      if (booking.userId === null) {
+        isAdmin(context);
+      } else {
+        isOwnerOrAdmin(context, booking.userId);
+      }
 
       return await paymentService.processManualPayment(input);
     },

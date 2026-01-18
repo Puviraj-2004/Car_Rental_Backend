@@ -12,7 +12,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -20,12 +20,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         })[]>;
         myBookings: (_: any, __: any, context: any) => Promise<({
             [x: string]: never;
@@ -39,7 +45,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -47,12 +53,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         })[]>;
         checkCarAvailability: (_: any, { carId, startDate, endDate, excludeBookingId }: any) => Promise<{
             available: boolean;
@@ -69,10 +81,11 @@ export declare const bookingResolvers: {
                     avatarUrl: string | null;
                     dateOfBirth: Date | null;
                     fullAddress: string | null;
+                    emailVerified: boolean;
                     role: import(".prisma/client").$Enums.Role;
                     createdAt: Date;
                     updatedAt: Date;
-                };
+                } | null;
                 documentVerification: {
                     id: string;
                     bookingId: string;
@@ -161,7 +174,7 @@ export declare const bookingResolvers: {
                 createdAt: Date;
                 updatedAt: Date;
                 status: import(".prisma/client").$Enums.BookingStatus;
-                userId: string;
+                userId: string | null;
                 pickupTime: string | null;
                 returnTime: string | null;
                 basePrice: number;
@@ -169,12 +182,18 @@ export declare const bookingResolvers: {
                 depositAmount: number;
                 startOdometer: number | null;
                 endOdometer: number | null;
+                pickupNotes: string | null;
                 damageFee: number;
                 extraKmFee: number;
                 returnNotes: string | null;
                 totalPrice: number;
                 bookingType: import(".prisma/client").$Enums.BookingType;
                 repairOrderId: string | null;
+                createdByAdmin: boolean;
+                isWalkIn: boolean;
+                guestName: string | null;
+                guestPhone: string | null;
+                guestEmail: string | null;
             })[];
         }>;
         booking: (_: any, { id }: {
@@ -191,7 +210,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -199,12 +218,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }) | null>;
         bookingByToken: (_: any, { token }: {
             token: string;
@@ -220,7 +245,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -228,12 +253,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }) | null>;
         userBookings: (_: any, { userId }: {
             userId: string;
@@ -249,7 +280,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -257,12 +288,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         })[]>;
         carBookings: (_: any, { carId }: {
             carId: string;
@@ -278,7 +315,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -286,12 +323,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         })[]>;
     };
     Mutation: {
@@ -310,10 +353,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -402,7 +446,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -410,12 +454,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }>;
         confirmReservation: (_: any, { id }: {
             id: string;
@@ -432,10 +482,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -524,7 +575,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -532,15 +583,23 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }>;
-        startTrip: (_: any, { bookingId }: {
+        startTrip: (_: any, { bookingId, startOdometer, pickupNotes }: {
             bookingId: string;
+            startOdometer?: number;
+            pickupNotes?: string;
         }, context: any) => Promise<[{
             user: {
                 id: string;
@@ -554,10 +613,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -646,7 +706,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -654,12 +714,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }, {
             id: string;
             brandId: string;
@@ -695,10 +761,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -787,7 +854,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -795,12 +862,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }, {
             id: string;
             brandId: string;
@@ -868,10 +941,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -960,7 +1034,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -968,12 +1042,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }>;
         cancelBooking: (_: any, { id }: {
             id: string;
@@ -997,10 +1077,11 @@ export declare const bookingResolvers: {
                 avatarUrl: string | null;
                 dateOfBirth: Date | null;
                 fullAddress: string | null;
+                emailVerified: boolean;
                 role: import(".prisma/client").$Enums.Role;
                 createdAt: Date;
                 updatedAt: Date;
-            };
+            } | null;
             documentVerification: {
                 id: string;
                 bookingId: string;
@@ -1089,7 +1170,7 @@ export declare const bookingResolvers: {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -1097,12 +1178,18 @@ export declare const bookingResolvers: {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }>;
     };
 };

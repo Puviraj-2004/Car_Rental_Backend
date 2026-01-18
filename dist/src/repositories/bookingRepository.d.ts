@@ -67,7 +67,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -75,12 +75,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     findUnique(id: string, include?: any): Promise<({
         [x: string]: never;
@@ -94,7 +100,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -102,12 +108,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }) | null>;
     findFirst(where: any, include?: any): Promise<({
         [x: string]: never;
@@ -121,7 +133,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -129,12 +141,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }) | null>;
     findVerificationToken(token: string): Promise<{
         id: string;
@@ -154,7 +172,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -162,12 +180,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     findConflicts(carId: string, startDate: Date, endDate: Date, excludeBookingId?: string): Promise<({
         user: {
@@ -182,10 +206,11 @@ export declare class BookingRepository {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -274,7 +299,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -282,12 +307,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     })[]>;
     create(data: any): Promise<{
         user: {
@@ -302,10 +333,11 @@ export declare class BookingRepository {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -394,7 +426,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -402,12 +434,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     update(id: string, data: any): Promise<{
         user: {
@@ -422,10 +460,11 @@ export declare class BookingRepository {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -514,7 +553,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -522,12 +561,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     delete(id: string): Promise<{
         id: string;
@@ -537,7 +582,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -545,12 +590,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }>;
     startTripTransaction(bookingId: string, carId: string): Promise<[{
         user: {
@@ -565,10 +616,11 @@ export declare class BookingRepository {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -657,7 +709,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -665,12 +717,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }, {
         id: string;
         brandId: string;
@@ -704,10 +762,11 @@ export declare class BookingRepository {
             avatarUrl: string | null;
             dateOfBirth: Date | null;
             fullAddress: string | null;
+            emailVerified: boolean;
             role: import(".prisma/client").$Enums.Role;
             createdAt: Date;
             updatedAt: Date;
-        };
+        } | null;
         documentVerification: {
             id: string;
             bookingId: string;
@@ -796,7 +855,7 @@ export declare class BookingRepository {
         createdAt: Date;
         updatedAt: Date;
         status: import(".prisma/client").$Enums.BookingStatus;
-        userId: string;
+        userId: string | null;
         pickupTime: string | null;
         returnTime: string | null;
         basePrice: number;
@@ -804,12 +863,18 @@ export declare class BookingRepository {
         depositAmount: number;
         startOdometer: number | null;
         endOdometer: number | null;
+        pickupNotes: string | null;
         damageFee: number;
         extraKmFee: number;
         returnNotes: string | null;
         totalPrice: number;
         bookingType: import(".prisma/client").$Enums.BookingType;
         repairOrderId: string | null;
+        createdByAdmin: boolean;
+        isWalkIn: boolean;
+        guestName: string | null;
+        guestPhone: string | null;
+        guestEmail: string | null;
     }, {
         id: string;
         brandId: string;

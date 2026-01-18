@@ -23,6 +23,9 @@ export const userResolvers = {
     },
     checkCarAvailability: async (_: any, { carId, startDate, endDate, excludeBookingId }: any) => {
       return await bookingService.checkAvailability(carId, startDate, endDate, excludeBookingId);
+    },
+    isEmailAvailable: async (_: any, { email }: { email: string }) => {
+      return await userService.isEmailAvailable(email);
     }
   },
 
@@ -45,6 +48,18 @@ export const userResolvers = {
 
     googleLogin: async (_: any, { idToken }: { idToken: string }) => {
       return await userService.googleLogin(idToken);
+    },
+
+    verifyOTP: async (_: any, { email, otp }: { email: string; otp: string }) => {
+      return await userService.verifyOTP(email, otp);
+    },
+
+    resendOTP: async (_: any, { email }: { email: string }) => {
+      // Apply rate limiting for OTP resend (max 5 per minute)
+      const rateLimitKey = generateRateLimitKey('resendOTP', undefined, email);
+      authOperationLimiter.checkLimit(rateLimitKey);
+
+      return await userService.resendOTP(email);
     },
 
     createOrUpdateVerification: async (_: any, { input }: { input: any }, context: any) => {

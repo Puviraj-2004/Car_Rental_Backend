@@ -123,6 +123,11 @@ export const userTypeDefs = gql`
     message: String
   }
 
+  type RegisterPayload {
+    message: String!
+    email: String!
+  }
+
   # --- Inputs ---
   input RegisterInput {
     email: String!
@@ -177,15 +182,29 @@ export const userTypeDefs = gql`
     myVerification: DocumentVerification
     availableCars(startDate: String!, endDate: String!): [Car!]!
     checkCarAvailability(carId: ID!, startDate: String!, endDate: String!, excludeBookingId: ID): CarAvailability!
+    isEmailAvailable(email: String!): Boolean!
     bookingPayment(bookingId: ID!): JSON
+  }
+
+  type ResendOTPPayload {
+    success: Boolean!
+    message: String!
+    expiresAt: String
+  }
+
+  type VerifyOTPPayload {
+    success: Boolean!
+    message: String!
   }
 
   # --- Mutations ---
   type Mutation {
     # Authentication
-    register(input: RegisterInput!): AuthPayload!
+    register(input: RegisterInput!): RegisterPayload!
     login(input: LoginInput!): AuthPayload!
     googleLogin(idToken: String!): AuthPayload!
+    verifyOTP(email: String!, otp: String!): VerifyOTPPayload!
+    resendOTP(email: String!): ResendOTPPayload!
     
     # User Management
     updateUser(input: UpdateUserInput!): User!

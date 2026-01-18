@@ -105,7 +105,7 @@ export declare class CarService {
             createdAt: Date;
             updatedAt: Date;
             status: import(".prisma/client").$Enums.BookingStatus;
-            userId: string;
+            userId: string | null;
             pickupTime: string | null;
             returnTime: string | null;
             basePrice: number;
@@ -113,12 +113,18 @@ export declare class CarService {
             depositAmount: number;
             startOdometer: number | null;
             endOdometer: number | null;
+            pickupNotes: string | null;
             damageFee: number;
             extraKmFee: number;
             returnNotes: string | null;
             totalPrice: number;
             bookingType: import(".prisma/client").$Enums.BookingType;
             repairOrderId: string | null;
+            createdByAdmin: boolean;
+            isWalkIn: boolean;
+            guestName: string | null;
+            guestPhone: string | null;
+            guestEmail: string | null;
         }[];
         images: {
             id: string;

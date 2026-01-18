@@ -21,7 +21,12 @@ export const bookingResolvers = {
       isAuthenticated(context);
       const booking = await bookingService.getBookingById(id);
       if (!booking) return null;
-      isOwnerOrAdmin(context, booking.userId);
+      // For walk-in bookings (userId is null), only admins can access
+      if (booking.userId === null) {
+        isAdmin(context);
+      } else {
+        isOwnerOrAdmin(context, booking.userId);
+      }
       return booking;
     },
 
@@ -51,9 +56,9 @@ export const bookingResolvers = {
       return await bookingService.confirmReservation(id, context.userId);
     },
 
-    startTrip: async (_: any, { bookingId }: { bookingId: string }, context: any) => {
+    startTrip: async (_: any, { bookingId, startOdometer, pickupNotes }: { bookingId: string; startOdometer?: number; pickupNotes?: string }, context: any) => {
       isAuthenticated(context);
-      return await bookingService.startTrip(bookingId);
+      return await bookingService.startTrip(bookingId, startOdometer, pickupNotes);
     },
 
     completeTrip: async (_: any, { bookingId }: { bookingId: string }, context: any) => {

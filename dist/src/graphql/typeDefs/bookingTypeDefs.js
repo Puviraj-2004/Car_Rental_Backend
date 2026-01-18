@@ -22,8 +22,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
   # --- Types ---
   type Booking {
     id: ID!
-    userId: ID!
-    user: User!
+    userId: ID
+    user: User
     carId: ID!
     car: Car!
     startDate: DateTime!
@@ -35,12 +35,18 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     depositAmount: Float
     startOdometer: Float
     endOdometer: Float
+    pickupNotes: String
     damageFee: Float
     extraKmFee: Float
     returnNotes: String
     totalPrice: Float
     bookingType: BookingType!
     repairOrderId: String
+    createdByAdmin: Boolean!
+    isWalkIn: Boolean!
+    guestName: String
+    guestPhone: String
+    guestEmail: String
     status: BookingStatus!
     createdAt: String!
     updatedAt: String!
@@ -77,6 +83,10 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     totalPrice: Float
     bookingType: BookingType
     repairOrderId: String
+    isWalkIn: Boolean
+    guestName: String
+    guestPhone: String
+    guestEmail: String
   }
 
   input UpdateBookingInput {
@@ -95,6 +105,10 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     totalPrice: Float
     bookingType: BookingType
     repairOrderId: String
+    isWalkIn: Boolean
+    guestName: String
+    guestPhone: String
+    guestEmail: String
     status: BookingStatus
   }
 
@@ -119,7 +133,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     deleteBooking(id: ID!): Boolean!
     
     # New Industrial Flow Mutations
-    startTrip(bookingId: String!): Booking!
+    startTrip(bookingId: String!, startOdometer: Float, pickupNotes: String): Booking!
     completeTrip(bookingId: String!): Booking!
     finishCarMaintenance(carId: ID!): Car!
   }

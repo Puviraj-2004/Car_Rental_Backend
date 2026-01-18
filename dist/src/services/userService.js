@@ -15,6 +15,7 @@ const validation_1 = require("../utils/validation");
 const client_1 = require("@prisma/client");
 const cloudinary_1 = require("../utils/cloudinary");
 const bookingRepository_1 = require("../repositories/bookingRepository");
+const sendEmail_1 = require("../utils/sendEmail");
 const database_1 = __importDefault(require("../utils/database"));
 const googleClient = new google_auth_library_1.OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 const ocrService = new ocrService_1.OCRService();
@@ -38,7 +39,7 @@ class UserService {
         }
     }
     async register(input) {
-        const { email, password, phoneNumber, firstName, lastName } = input;
+        const { email, password, fullName, phoneNumber } = input;
         // Validate email format
         if (!email || !email.includes('@') || email.length < 5) {
             throw new AppError_1.AppError('Invalid email format', AppError_1.ErrorCode.BAD_USER_INPUT);
@@ -49,8 +50,8 @@ class UserService {
             throw new AppError_1.AppError(passwordValidation.errors[0], AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Validate names
-        if (!firstName?.trim() || !lastName?.trim()) {
-            throw new AppError_1.AppError('First name and last name are required', AppError_1.ErrorCode.BAD_USER_INPUT);
+        if (!fullName?.trim()) {
+            throw new AppError_1.AppError('Full name is required', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Validate phone number format (international support)
         if (phoneNumber) {
@@ -70,21 +71,18 @@ class UserService {
         const existingUser = await userRepository_1.userRepository.findByEmail(email);
         if (existingUser)
             throw new AppError_1.AppError('User already exists', AppError_1.ErrorCode.ALREADY_EXISTS);
+        // Hash password for storage
         const hashedPassword = await (0, auth_1.hashPassword)(password);
-        // Combine firstName and lastName into fullName to match schema
-        const fullName = `${firstName} ${lastName}`.trim();
-        const user = await userRepository_1.userRepository.createUser({
-            email,
-            password: hashedPassword,
-            fullName,
-            phoneNumber
-        });
-        // Log successful registration
-        securityLogger_1.logSecurityEvent.registrationSuccess({
-            userId: user.id,
-            email: user.email
-        });
-        return { token: (0, auth_1.generateToken)(user.id, user.role), user, message: "Registration successful." };
+        // Store registration data temporarily (valid until OTP expires - 10 minutes)
+        (0, auth_1.storePendingRegistration)(email, fullName || '', hashedPassword, phoneNumber);
+        // Generate and send OTP
+        const otp = (0, auth_1.generateOTP)();
+        (0, auth_1.storeOTP)(email, otp);
+        await (0, sendEmail_1.sendVerificationEmail)(email, otp);
+        return {
+            message: "Registration successful. Please verify your email with the OTP sent.",
+            email
+        };
     }
     async login(input) {
         const { email, password } = input;
@@ -95,6 +93,11 @@ class UserService {
                 attemptCount: 1
             });
             throw new AppError_1.AppError('Invalid credentials', AppError_1.ErrorCode.UNAUTHENTICATED);
+        }
+        // Enforce email verification for password-based login
+        // Cast to any to avoid compile errors before prisma generate
+        if (!user.emailVerified) {
+            throw new AppError_1.AppError('Please verify your email before logging in.', AppError_1.ErrorCode.UNAUTHENTICATED);
         }
         const isValid = await (0, auth_1.comparePasswords)(password, user.password);
         if (!isValid) {
@@ -126,7 +129,8 @@ class UserService {
                 user = await userRepository_1.userRepository.createUser({
                     email,
                     fullName: name || email, // Use Google name as fullName, fallback to email
-                    password: '' // Google OAuth users don't need passwords
+                    password: '', // Google OAuth users don't need passwords
+                    emailVerified: true // Trust Google verified email
                 });
             }
             if (!user)
@@ -218,7 +222,8 @@ class UserService {
                 where: { id: bookingId },
                 select: { userId: true }
             });
-            if (booking) {
+            // Only update bookings status if there's an associated user (not walk-in)
+            if (booking && booking.userId) {
                 // Update only PENDING bookings to VERIFIED
                 await userRepository_1.userRepository.updateManyBookingsStatus(booking.userId, graphql_1.BookingStatus.PENDING, graphql_1.BookingStatus.VERIFIED);
                 // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
@@ -252,6 +257,14 @@ class UserService {
     }
     async getUserVerification(bookingId) {
         return await userRepository_1.userRepository.findVerificationByBookingId(bookingId);
+    }
+    async isEmailAvailable(email) {
+        // Basic format validation to avoid useless DB hits
+        if (!email || !email.includes('@') || email.length < 5) {
+            return false;
+        }
+        const existing = await userRepository_1.userRepository.findByEmail(email);
+        return !existing;
     }
     async updateCurrentUser(userId, input) {
         // Validate email if provided
@@ -310,6 +323,69 @@ class UserService {
             throw new AppError_1.AppError('Cannot delete user with active bookings', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         return await userRepository_1.userRepository.deleteUser(id);
+    }
+    async verifyOTP(email, otp) {
+        const result = (0, auth_1.verifyOTPCode)(email, otp);
+        if (!result.valid) {
+            throw new AppError_1.AppError(result.message, AppError_1.ErrorCode.UNAUTHENTICATED);
+        }
+        // Check if this is a new registration or existing user
+        let user = await userRepository_1.userRepository.findByEmail(email);
+        if (!user) {
+            // New registration - create user now that OTP is verified
+            const pending = (0, auth_1.getPendingRegistration)(email);
+            if (!pending) {
+                throw new AppError_1.AppError('Registration data expired. Please register again.', AppError_1.ErrorCode.BAD_USER_INPUT);
+            }
+            user = await userRepository_1.userRepository.createUser({
+                email,
+                password: pending.password,
+                fullName: pending.fullName,
+                phoneNumber: pending.phoneNumber,
+                emailVerified: true
+            });
+            (0, auth_1.clearPendingRegistration)(email);
+            securityLogger_1.logSecurityEvent.registrationSuccess({
+                userId: user.id,
+                email: user.email
+            });
+        }
+        else {
+            // Existing user - mark email as verified
+            await userRepository_1.userRepository.updateUser(user.id, { emailVerified: true });
+        }
+        return { success: true, message: 'Email verified successfully.' };
+    }
+    async resendOTP(email) {
+        // Validate email format
+        if (!email || !email.includes('@') || email.length < 5) {
+            throw new AppError_1.AppError('Invalid email format', AppError_1.ErrorCode.BAD_USER_INPUT);
+        }
+        // Check if user exists (for registration flow)
+        const user = await userRepository_1.userRepository.findByEmail(email);
+        if (!user) {
+            // For security: don't reveal if email exists
+            // Generate and store OTP anyway (for new registrations)
+            const otp = (0, auth_1.generateOTP)();
+            const { expiresAt } = (0, auth_1.storeOTP)(email, otp);
+            // Send email
+            await (0, sendEmail_1.sendVerificationEmail)(email, otp);
+            return {
+                success: true,
+                message: 'OTP sent to your email. Please check your inbox.',
+                expiresAt
+            };
+        }
+        // User exists - send OTP
+        const otp = (0, auth_1.generateOTP)();
+        const { expiresAt } = (0, auth_1.storeOTP)(email, otp);
+        // Send email
+        await (0, sendEmail_1.sendVerificationEmail)(email, otp);
+        return {
+            success: true,
+            message: 'OTP sent to your email. Please check your inbox.',
+            expiresAt
+        };
     }
 }
 exports.UserService = UserService;
