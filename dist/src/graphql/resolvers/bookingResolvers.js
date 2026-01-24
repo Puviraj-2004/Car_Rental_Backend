@@ -66,9 +66,9 @@ exports.bookingResolvers = {
         updateBookingStatus: async (_, { id, status }, context) => {
             return await bookingService_1.bookingService.updateBookingStatus(id, status, context.userId, context.role);
         },
-        cancelBooking: async (_, { id }, context) => {
+        cancelBooking: async (_, { id, reason }, context) => {
             (0, authguard_1.isAuthenticated)(context);
-            await bookingService_1.bookingService.cancelBooking(id, context.userId, context.role);
+            await bookingService_1.bookingService.cancelBooking(id, context.userId, context.role, reason);
             return true;
         },
         deleteBooking: async (_, { id }, context) => {

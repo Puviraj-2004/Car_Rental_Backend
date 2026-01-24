@@ -1,7 +1,8 @@
 import { bookingRepository, BOOKING_INCLUDES } from '../repositories/bookingRepository';
 import { AppError, ErrorCode } from '../errors/AppError';
 import { carService } from './carService';
-import { Prisma } from '@prisma/client';
+import { paymentService } from './paymentService';
+import { Prisma, PaymentStatus } from '@prisma/client';
 import { CreateBookingInput, UpdateBookingInput } from '../types/graphql';
 import { BookingStatus, VerificationStatus } from '@prisma/client';
 import { validateBookingInput } from '../utils/validation';
@@ -213,9 +214,9 @@ export class BookingService {
     return await bookingRepository.update(id, { status });
   }
 
-  async cancelBooking(id: string, userId: string, role: string) {
-    // Fetch full booking so we can evaluate pickup time and current status
-    const booking = await bookingRepository.findUnique(id, {});
+  async cancelBooking(id: string, userId: string, role: string, _reason?: string) {
+    // Fetch full booking with payment so we can evaluate pickup time and current status
+    const booking = await bookingRepository.findUnique(id, { payment: true });
     if (!booking) {
       throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
     }
@@ -249,6 +250,22 @@ export class BookingService {
         const cutoff = new Date(pickupDt.getTime() - 24 * 60 * 60 * 1000);
         if (Date.now() > cutoff.getTime()) {
           throw new AppError('Cancellation window has passed. Contact admin to cancel within 24 hours of pickup.', ErrorCode.FORBIDDEN);
+        }
+      }
+    }
+
+    // 🔄 REFUND LOGIC: If payment was SUCCEEDED, trigger refund to customer
+    const payment = (booking as any).payment;
+    if (payment && payment.status === PaymentStatus.SUCCEEDED) {
+      try {
+        await paymentService.refundPayment(payment.id);
+        console.log(`💳 Refund initiated for booking ${id}, payment ${payment.id}`);
+      } catch (refundError: any) {
+        // Log error but still proceed with cancellation
+        console.error(`⚠️ Refund failed for booking ${id}: ${refundError.message}`);
+        // For admin, allow cancellation even if refund fails (can be handled manually)
+        if (role !== 'ADMIN') {
+          throw new AppError(`Cannot cancel: Refund failed - ${refundError.message}`, ErrorCode.INTERNAL_SERVER_ERROR);
         }
       }
     }

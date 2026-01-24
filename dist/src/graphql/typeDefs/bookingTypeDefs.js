@@ -129,7 +129,7 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     updateBooking(id: ID!, input: UpdateBookingInput!): Booking!
     updateBookingStatus(id: ID!, status: BookingStatus!): Booking!
     confirmReservation(id: ID!): Booking!
-    cancelBooking(id: ID!): Boolean!
+    cancelBooking(id: ID!, reason: String): Boolean!
     deleteBooking(id: ID!): Boolean!
     
     # New Industrial Flow Mutations

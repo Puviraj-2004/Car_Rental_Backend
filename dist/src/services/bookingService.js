@@ -7,7 +7,9 @@ exports.bookingService = exports.BookingService = void 0;
 const bookingRepository_1 = require("../repositories/bookingRepository");
 const AppError_1 = require("../errors/AppError");
 const carService_1 = require("./carService");
+const paymentService_1 = require("./paymentService");
 const client_1 = require("@prisma/client");
+const client_2 = require("@prisma/client");
 const validation_1 = require("../utils/validation");
 const calculation_1 = require("../utils/calculation");
 const crypto_1 = __importDefault(require("crypto"));
@@ -76,7 +78,7 @@ class BookingService {
             // ✅ FIXED: Added pickupTime and returnTime to Database Save
             pickupTime: input.pickupTime,
             returnTime: input.returnTime,
-            status: client_1.BookingStatus.DRAFT,
+            status: client_2.BookingStatus.DRAFT,
             createdByAdmin: isAdminActor,
             isWalkIn,
             guestName: input.guestName,
@@ -96,12 +98,12 @@ class BookingService {
         const booking = await bookingRepository_1.bookingRepository.findFirst({ id, userId });
         if (!booking)
             throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
-        if (booking.status !== client_1.BookingStatus.DRAFT)
+        if (booking.status !== client_2.BookingStatus.DRAFT)
             throw new AppError_1.AppError('Only draft bookings can be confirmed', AppError_1.ErrorCode.BAD_USER_INPUT);
         const token = crypto_1.default.randomBytes(32).toString('hex');
         const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         return await bookingRepository_1.bookingRepository.update(id, {
-            status: client_1.BookingStatus.PENDING,
+            status: client_2.BookingStatus.PENDING,
             verification: { create: { token, expiresAt } }
         });
     }
@@ -110,11 +112,11 @@ class BookingService {
         if (!booking)
             throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
         // Security Check 1: Payment Required
-        if (booking.status !== client_1.BookingStatus.CONFIRMED && booking.status !== client_1.BookingStatus.VERIFIED) {
+        if (booking.status !== client_2.BookingStatus.CONFIRMED && booking.status !== client_2.BookingStatus.VERIFIED) {
             throw new AppError_1.AppError('Payment Required. Please complete payment before starting trip.', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Security Check 2: Document Verification (skip for walk-ins)
-        if (booking.user && booking.user?.verification?.status !== client_1.VerificationStatus.APPROVED) {
+        if (booking.user && booking.user?.verification?.status !== client_2.VerificationStatus.APPROVED) {
             throw new AppError_1.AppError('Driver documents are not verified yet. Please verify original documents on Admin Panel before handing over the key.', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Validate odometer reading
@@ -171,7 +173,7 @@ class BookingService {
             throw new AppError_1.AppError(`Invalid booking status: ${status}`, AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Authorization check for cancellation
-        if (status === client_1.BookingStatus.CANCELLED) {
+        if (status === client_2.BookingStatus.CANCELLED) {
             const booking = await this.getBookingForAuth(id);
             if (!booking) {
                 throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
@@ -188,9 +190,9 @@ class BookingService {
         }
         return await bookingRepository_1.bookingRepository.update(id, { status });
     }
-    async cancelBooking(id, userId, role) {
-        // Fetch full booking so we can evaluate pickup time and current status
-        const booking = await bookingRepository_1.bookingRepository.findUnique(id, {});
+    async cancelBooking(id, userId, role, _reason) {
+        // Fetch full booking with payment so we can evaluate pickup time and current status
+        const booking = await bookingRepository_1.bookingRepository.findUnique(id, { payment: true });
         if (!booking) {
             throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
         }
@@ -199,14 +201,14 @@ class BookingService {
             throw new AppError_1.AppError('Unauthorized to cancel this booking', AppError_1.ErrorCode.FORBIDDEN);
         }
         // Prevent cancelling completed or already cancelled bookings
-        if (booking.status === client_1.BookingStatus.COMPLETED || booking.status === client_1.BookingStatus.CANCELLED) {
+        if (booking.status === client_2.BookingStatus.COMPLETED || booking.status === client_2.BookingStatus.CANCELLED) {
             throw new AppError_1.AppError('Cannot cancel a completed or already cancelled booking', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         if (role !== 'ADMIN') {
-            if (booking.status === client_1.BookingStatus.ONGOING) {
+            if (booking.status === client_2.BookingStatus.ONGOING) {
                 throw new AppError_1.AppError('Only admins can cancel an ongoing booking', AppError_1.ErrorCode.FORBIDDEN);
             }
-            if (booking.status === client_1.BookingStatus.CONFIRMED) {
+            if (booking.status === client_2.BookingStatus.CONFIRMED) {
                 let pickupDt = booking.startDate;
                 try {
                     if (booking.pickupTime) {
@@ -223,7 +225,23 @@ class BookingService {
                 }
             }
         }
-        return await bookingRepository_1.bookingRepository.update(id, { status: client_1.BookingStatus.CANCELLED });
+        // 🔄 REFUND LOGIC: If payment was SUCCEEDED, trigger refund to customer
+        const payment = booking.payment;
+        if (payment && payment.status === client_1.PaymentStatus.SUCCEEDED) {
+            try {
+                await paymentService_1.paymentService.refundPayment(payment.id);
+                console.log(`💳 Refund initiated for booking ${id}, payment ${payment.id}`);
+            }
+            catch (refundError) {
+                // Log error but still proceed with cancellation
+                console.error(`⚠️ Refund failed for booking ${id}: ${refundError.message}`);
+                // For admin, allow cancellation even if refund fails (can be handled manually)
+                if (role !== 'ADMIN') {
+                    throw new AppError_1.AppError(`Cannot cancel: Refund failed - ${refundError.message}`, AppError_1.ErrorCode.INTERNAL_SERVER_ERROR);
+                }
+            }
+        }
+        return await bookingRepository_1.bookingRepository.update(id, { status: client_2.BookingStatus.CANCELLED });
     }
     async deleteBooking(id) {
         // Check if booking can be deleted (only draft or cancelled bookings)

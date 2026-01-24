@@ -75,9 +75,9 @@ export const bookingResolvers = {
       return await bookingService.updateBookingStatus(id, status, context.userId, context.role);
     },
 
-    cancelBooking: async (_: any, { id }: { id: string }, context: any) => {
+    cancelBooking: async (_: any, { id, reason }: { id: string; reason?: string }, context: any) => {
       isAuthenticated(context);
-      await bookingService.cancelBooking(id, context.userId, context.role);
+      await bookingService.cancelBooking(id, context.userId, context.role, reason);
       return true;
     },
 

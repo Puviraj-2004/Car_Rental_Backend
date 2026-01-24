@@ -1006,7 +1006,7 @@ export declare class BookingService {
         guestPhone: string | null;
         guestEmail: string | null;
     }>;
-    cancelBooking(id: string, userId: string, role: string): Promise<{
+    cancelBooking(id: string, userId: string, role: string, _reason?: string): Promise<{
         user: {
             id: string;
             email: string;

@@ -1055,8 +1055,9 @@ export declare const bookingResolvers: {
             guestPhone: string | null;
             guestEmail: string | null;
         }>;
-        cancelBooking: (_: any, { id }: {
+        cancelBooking: (_: any, { id, reason }: {
             id: string;
+            reason?: string;
         }, context: any) => Promise<boolean>;
         deleteBooking: (_: any, { id }: {
             id: string;
