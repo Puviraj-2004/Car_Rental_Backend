@@ -76,6 +76,58 @@ class ExpirationService {
         });
       }
 
+      // 🔴 EXPIRED: CONFIRMED bookings where return date/time has passed and trip never started
+      const confirmedBookings = await prisma.booking.findMany({
+        where: { 
+          status: BookingStatus.CONFIRMED,
+        },
+        select: { 
+          id: true, 
+          carId: true,
+          startDate: true,
+          endDate: true, 
+          returnTime: true 
+        }
+      });
+
+      const toExpire: { id: string; carId: string }[] = [];
+      for (const b of confirmedBookings) {
+        // Calculate actual return datetime
+        let returnDt = new Date(b.endDate);
+        try {
+          if (b.returnTime) {
+            const datePart = b.endDate.toISOString().split('T')[0];
+            returnDt = new Date(`${datePart}T${b.returnTime}:00`);
+          }
+        } catch (e) {
+          returnDt = new Date(b.endDate);
+        }
+
+        // If current time is past return date/time, mark as expired
+        if (now > returnDt) {
+          toExpire.push({ id: b.id, carId: b.carId });
+        }
+      }
+
+      if (toExpire.length > 0) {
+        securityLogger.warn('Expiring no-show CONFIRMED bookings', { count: toExpire.length, status: 'EXPIRED' });
+        
+        // Update bookings to EXPIRED status
+        await prisma.booking.updateMany({
+          where: { id: { in: toExpire.map(b => b.id) } },
+          data: { status: BookingStatus.EXPIRED, updatedAt: now }
+        });
+
+        // Release cars back to AVAILABLE
+        const carIds = [...new Set(toExpire.map(b => b.carId))];
+        await prisma.car.updateMany({
+          where: { id: { in: carIds } },
+          data: { status: 'AVAILABLE' }
+        });
+
+        securityLogger.info('Cars released from expired bookings', { carIds });
+      }
+
       await prisma.booking.deleteMany({
         where: { 
           status: 'DRAFT', 

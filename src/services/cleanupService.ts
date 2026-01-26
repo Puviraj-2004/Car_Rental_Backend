@@ -4,17 +4,24 @@ import { BookingStatus } from '@prisma/client';
 
 class CleanupService {
   /**
-   * Clean up old completed bookings (optional - for database maintenance)
-   * Removes completed bookings older than specified days
+   * Clean up old completed/cancelled/rejected/expired bookings (optional - for database maintenance)
+   * Removes these bookings older than specified days
    */
   async cleanupOldCompletedBookings(daysOld: number = 90): Promise<{ deletedCount: number }> {
     try {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
+      const cleanableStatuses = [
+        BookingStatus.COMPLETED,
+        BookingStatus.CANCELLED,
+        BookingStatus.REJECTED,
+        BookingStatus.EXPIRED
+      ];
+
       const oldBookings = await prisma.booking.findMany({
         where: {
-          status: BookingStatus.COMPLETED,
+          status: { in: cleanableStatuses },
           updatedAt: {
             lt: cutoffDate
           }
@@ -27,7 +34,7 @@ class CleanupService {
 
       const { count } = await prisma.booking.deleteMany({
         where: {
-          status: BookingStatus.COMPLETED,
+          status: { in: cleanableStatuses },
           updatedAt: {
             lt: cutoffDate
           }
@@ -49,9 +56,16 @@ class CleanupService {
    */
   async getCleanupStats() {
     try {
-      const oldCompletedBookings = await prisma.booking.count({
+      const cleanableStatuses = [
+        BookingStatus.COMPLETED,
+        BookingStatus.CANCELLED,
+        BookingStatus.REJECTED,
+        BookingStatus.EXPIRED
+      ];
+
+      const oldBookingsCount = await prisma.booking.count({
         where: {
-          status: BookingStatus.COMPLETED,
+          status: { in: cleanableStatuses },
           updatedAt: {
             lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
           }
@@ -59,8 +73,8 @@ class CleanupService {
       });
 
       return {
-        oldCompletedBookings,
-        totalPendingCleanup: oldCompletedBookings
+        oldCompletedBookings: oldBookingsCount,
+        totalPendingCleanup: oldBookingsCount
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

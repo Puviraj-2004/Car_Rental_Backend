@@ -1,7 +1,7 @@
 declare class CleanupService {
     /**
-     * Clean up old completed bookings (optional - for database maintenance)
-     * Removes completed bookings older than specified days
+     * Clean up old completed/cancelled/rejected/expired bookings (optional - for database maintenance)
+     * Removes these bookings older than specified days
      */
     cleanupOldCompletedBookings(daysOld?: number): Promise<{
         deletedCount: number;

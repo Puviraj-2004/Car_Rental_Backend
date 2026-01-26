@@ -115,10 +115,9 @@ class PaymentService {
         const payment = await paymentRepository_1.paymentRepository.findById(paymentId);
         if (!payment)
             throw new AppError_1.AppError('Payment not found', AppError_1.ErrorCode.NOT_FOUND);
-        const bookingId = payment.bookingId;
         if (isMockStripe) {
             await paymentRepository_1.paymentRepository.update(paymentId, { status: graphql_1.PaymentStatus.REFUNDED });
-            await bookingRepository_1.bookingRepository.update(bookingId, { status: graphql_1.BookingStatus.CANCELLED });
+            // Note: Booking status is handled by the calling function (cancelBooking)
             return await paymentRepository_1.paymentRepository.findById(paymentId);
         }
         const stripe = this.getStripeClient();
@@ -130,7 +129,7 @@ class PaymentService {
         try {
             await stripe.refunds.create({ payment_intent: payment.stripeId });
             await paymentRepository_1.paymentRepository.update(paymentId, { status: graphql_1.PaymentStatus.REFUNDED });
-            await bookingRepository_1.bookingRepository.update(bookingId, { status: graphql_1.BookingStatus.CANCELLED });
+            // Note: Booking status is handled by the calling function (cancelBooking)
             return await paymentRepository_1.paymentRepository.findById(paymentId);
         }
         catch (err) {

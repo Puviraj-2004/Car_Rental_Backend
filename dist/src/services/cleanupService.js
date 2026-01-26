@@ -9,16 +9,22 @@ const securityLogger_1 = require("../utils/securityLogger");
 const client_1 = require("@prisma/client");
 class CleanupService {
     /**
-     * Clean up old completed bookings (optional - for database maintenance)
-     * Removes completed bookings older than specified days
+     * Clean up old completed/cancelled/rejected/expired bookings (optional - for database maintenance)
+     * Removes these bookings older than specified days
      */
     async cleanupOldCompletedBookings(daysOld = 90) {
         try {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+            const cleanableStatuses = [
+                client_1.BookingStatus.COMPLETED,
+                client_1.BookingStatus.CANCELLED,
+                client_1.BookingStatus.REJECTED,
+                client_1.BookingStatus.EXPIRED
+            ];
             const oldBookings = await database_1.default.booking.findMany({
                 where: {
-                    status: client_1.BookingStatus.COMPLETED,
+                    status: { in: cleanableStatuses },
                     updatedAt: {
                         lt: cutoffDate
                     }
@@ -29,7 +35,7 @@ class CleanupService {
             }
             const { count } = await database_1.default.booking.deleteMany({
                 where: {
-                    status: client_1.BookingStatus.COMPLETED,
+                    status: { in: cleanableStatuses },
                     updatedAt: {
                         lt: cutoffDate
                     }
@@ -49,17 +55,23 @@ class CleanupService {
      */
     async getCleanupStats() {
         try {
-            const oldCompletedBookings = await database_1.default.booking.count({
+            const cleanableStatuses = [
+                client_1.BookingStatus.COMPLETED,
+                client_1.BookingStatus.CANCELLED,
+                client_1.BookingStatus.REJECTED,
+                client_1.BookingStatus.EXPIRED
+            ];
+            const oldBookingsCount = await database_1.default.booking.count({
                 where: {
-                    status: client_1.BookingStatus.COMPLETED,
+                    status: { in: cleanableStatuses },
                     updatedAt: {
                         lt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // 90 days ago
                     }
                 }
             });
             return {
-                oldCompletedBookings,
-                totalPendingCleanup: oldCompletedBookings
+                oldCompletedBookings: oldBookingsCount,
+                totalPendingCleanup: oldBookingsCount
             };
         }
         catch (error) {

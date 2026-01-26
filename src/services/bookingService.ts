@@ -4,7 +4,7 @@ import { carService } from './carService';
 import { paymentService } from './paymentService';
 import { Prisma, PaymentStatus } from '@prisma/client';
 import { CreateBookingInput, UpdateBookingInput } from '../types/graphql';
-import { BookingStatus, VerificationStatus } from '@prisma/client';
+import { BookingStatus } from '@prisma/client';
 import { validateBookingInput } from '../utils/validation';
 import { calculateRentalCost, calculateTax, calculateTotalPrice } from '../utils/calculation';
 import crypto from 'crypto';
@@ -42,6 +42,13 @@ export class BookingService {
       if (!input.guestPhone?.trim()) {
         throw new AppError('Guest phone is required for walk-in bookings', ErrorCode.BAD_USER_INPUT);
       }
+      // Document upload/verification is enforced at trip start, not creation
+    }
+
+    // Courtesy bookings (REPLACEMENT) do NOT require document upload/verification
+    if (input.bookingType === 'REPLACEMENT') {
+      // Audit log: Skipping document verification for courtesy booking
+      console.log(`[AUDIT] Courtesy booking (REPLACEMENT) created. Document verification skipped. Booking input:`, input);
     }
 
     const start = new Date(input.startDate);
@@ -127,8 +134,16 @@ export class BookingService {
       throw new AppError('Payment Required. Please complete payment before starting trip.', ErrorCode.BAD_USER_INPUT);
     }
     
-    // Security Check 2: Document Verification (skip for walk-ins)
-    if (booking.user && (booking.user as any)?.verification?.status !== VerificationStatus.APPROVED) {
+    // Security Check 2: Document Verification
+    if (booking.bookingType === 'REPLACEMENT') {
+      // Audit log: Skipping document verification for courtesy booking
+      console.log(`[AUDIT] Courtesy booking (REPLACEMENT) startTrip: Document verification skipped for bookingId=${bookingId}`);
+    } else if (booking.isWalkIn) {
+      // For walk-in bookings, require documentVerification.status === APPROVED
+      if (!booking.documentVerification || (booking.documentVerification as any)?.status !== 'APPROVED') {
+        throw new AppError('Document verification is required and must be approved for onsite/walk-in bookings.', ErrorCode.BAD_USER_INPUT);
+      }
+    } else if (booking.user && (booking.user as any)?.verification?.status !== 'APPROVED') {
       throw new AppError('Driver documents are not verified yet. Please verify original documents on Admin Panel before handing over the key.', ErrorCode.BAD_USER_INPUT);
     }
 
@@ -190,7 +205,7 @@ export class BookingService {
 
   async updateBookingStatus(id: string, status: BookingStatus, userId?: string, role?: string) {
     // Business logic validation for booking status updates
-    const validStatuses: BookingStatus[] = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED'];
+    const validStatuses: BookingStatus[] = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
     if (!validStatuses.includes(status)) {
       throw new AppError(`Invalid booking status: ${status}`, ErrorCode.BAD_USER_INPUT);
     }
@@ -226,9 +241,12 @@ export class BookingService {
       throw new AppError('Unauthorized to cancel this booking', ErrorCode.FORBIDDEN);
     }
 
-    // Prevent cancelling completed or already cancelled bookings
-    if (booking.status === BookingStatus.COMPLETED || booking.status === BookingStatus.CANCELLED) {
-      throw new AppError('Cannot cancel a completed or already cancelled booking', ErrorCode.BAD_USER_INPUT);
+    // Prevent cancelling completed or already cancelled/rejected/expired bookings
+    if (booking.status === BookingStatus.COMPLETED || 
+        booking.status === BookingStatus.CANCELLED || 
+        booking.status === BookingStatus.REJECTED || 
+        booking.status === BookingStatus.EXPIRED) {
+      throw new AppError('Cannot cancel a completed, cancelled, rejected or expired booking', ErrorCode.BAD_USER_INPUT);
     }
 
     if (role !== 'ADMIN') {
@@ -270,7 +288,9 @@ export class BookingService {
       }
     }
 
-    return await bookingRepository.update(id, { status: BookingStatus.CANCELLED });
+    // User cancel = CANCELLED, Admin cancel = REJECTED
+    const newStatus = role === 'ADMIN' ? BookingStatus.REJECTED : BookingStatus.CANCELLED;
+    return await bookingRepository.update(id, { status: newStatus });
   }
 
   async deleteBooking(id: string) {
@@ -280,9 +300,9 @@ export class BookingService {
       throw new AppError('Booking not found', ErrorCode.NOT_FOUND);
     }
 
-    const deletableStatuses: BookingStatus[] = ['DRAFT', 'CANCELLED'];
+    const deletableStatuses: BookingStatus[] = ['DRAFT', 'CANCELLED', 'REJECTED', 'EXPIRED'];
     if (!deletableStatuses.includes(booking.status)) {
-      throw new AppError('Only draft or cancelled bookings can be deleted', ErrorCode.BAD_USER_INPUT);
+      throw new AppError('Only draft, cancelled, rejected or expired bookings can be deleted', ErrorCode.BAD_USER_INPUT);
     }
 
     return await bookingRepository.delete(id);

@@ -71,6 +71,52 @@ class ExpirationService {
                     data: { status: client_1.BookingStatus.CANCELLED, updatedAt: now }
                 });
             }
+            // 🔴 EXPIRED: CONFIRMED bookings where return date/time has passed and trip never started
+            const confirmedBookings = await database_1.default.booking.findMany({
+                where: {
+                    status: client_1.BookingStatus.CONFIRMED,
+                },
+                select: {
+                    id: true,
+                    carId: true,
+                    startDate: true,
+                    endDate: true,
+                    returnTime: true
+                }
+            });
+            const toExpire = [];
+            for (const b of confirmedBookings) {
+                // Calculate actual return datetime
+                let returnDt = new Date(b.endDate);
+                try {
+                    if (b.returnTime) {
+                        const datePart = b.endDate.toISOString().split('T')[0];
+                        returnDt = new Date(`${datePart}T${b.returnTime}:00`);
+                    }
+                }
+                catch (e) {
+                    returnDt = new Date(b.endDate);
+                }
+                // If current time is past return date/time, mark as expired
+                if (now > returnDt) {
+                    toExpire.push({ id: b.id, carId: b.carId });
+                }
+            }
+            if (toExpire.length > 0) {
+                securityLogger_1.securityLogger.warn('Expiring no-show CONFIRMED bookings', { count: toExpire.length, status: 'EXPIRED' });
+                // Update bookings to EXPIRED status
+                await database_1.default.booking.updateMany({
+                    where: { id: { in: toExpire.map(b => b.id) } },
+                    data: { status: client_1.BookingStatus.EXPIRED, updatedAt: now }
+                });
+                // Release cars back to AVAILABLE
+                const carIds = [...new Set(toExpire.map(b => b.carId))];
+                await database_1.default.car.updateMany({
+                    where: { id: { in: carIds } },
+                    data: { status: 'AVAILABLE' }
+                });
+                securityLogger_1.securityLogger.info('Cars released from expired bookings', { carIds });
+            }
             await database_1.default.booking.deleteMany({
                 where: {
                     status: 'DRAFT',

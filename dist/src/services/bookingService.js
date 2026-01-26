@@ -42,6 +42,12 @@ class BookingService {
             if (!input.guestPhone?.trim()) {
                 throw new AppError_1.AppError('Guest phone is required for walk-in bookings', AppError_1.ErrorCode.BAD_USER_INPUT);
             }
+            // Document upload/verification is enforced at trip start, not creation
+        }
+        // Courtesy bookings (REPLACEMENT) do NOT require document upload/verification
+        if (input.bookingType === 'REPLACEMENT') {
+            // Audit log: Skipping document verification for courtesy booking
+            console.log(`[AUDIT] Courtesy booking (REPLACEMENT) created. Document verification skipped. Booking input:`, input);
         }
         const start = new Date(input.startDate);
         const end = new Date(input.endDate);
@@ -115,8 +121,18 @@ class BookingService {
         if (booking.status !== client_2.BookingStatus.CONFIRMED && booking.status !== client_2.BookingStatus.VERIFIED) {
             throw new AppError_1.AppError('Payment Required. Please complete payment before starting trip.', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
-        // Security Check 2: Document Verification (skip for walk-ins)
-        if (booking.user && booking.user?.verification?.status !== client_2.VerificationStatus.APPROVED) {
+        // Security Check 2: Document Verification
+        if (booking.bookingType === 'REPLACEMENT') {
+            // Audit log: Skipping document verification for courtesy booking
+            console.log(`[AUDIT] Courtesy booking (REPLACEMENT) startTrip: Document verification skipped for bookingId=${bookingId}`);
+        }
+        else if (booking.isWalkIn) {
+            // For walk-in bookings, require documentVerification.status === APPROVED
+            if (!booking.documentVerification || booking.documentVerification?.status !== 'APPROVED') {
+                throw new AppError_1.AppError('Document verification is required and must be approved for onsite/walk-in bookings.', AppError_1.ErrorCode.BAD_USER_INPUT);
+            }
+        }
+        else if (booking.user && booking.user?.verification?.status !== 'APPROVED') {
             throw new AppError_1.AppError('Driver documents are not verified yet. Please verify original documents on Admin Panel before handing over the key.', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         // Validate odometer reading
@@ -168,7 +184,7 @@ class BookingService {
     }
     async updateBookingStatus(id, status, userId, role) {
         // Business logic validation for booking status updates
-        const validStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED'];
+        const validStatuses = ['PENDING', 'VERIFIED', 'CONFIRMED', 'ONGOING', 'COMPLETED', 'CANCELLED', 'REJECTED', 'EXPIRED'];
         if (!validStatuses.includes(status)) {
             throw new AppError_1.AppError(`Invalid booking status: ${status}`, AppError_1.ErrorCode.BAD_USER_INPUT);
         }
@@ -200,9 +216,12 @@ class BookingService {
         if (booking.userId !== userId && role !== 'ADMIN') {
             throw new AppError_1.AppError('Unauthorized to cancel this booking', AppError_1.ErrorCode.FORBIDDEN);
         }
-        // Prevent cancelling completed or already cancelled bookings
-        if (booking.status === client_2.BookingStatus.COMPLETED || booking.status === client_2.BookingStatus.CANCELLED) {
-            throw new AppError_1.AppError('Cannot cancel a completed or already cancelled booking', AppError_1.ErrorCode.BAD_USER_INPUT);
+        // Prevent cancelling completed or already cancelled/rejected/expired bookings
+        if (booking.status === client_2.BookingStatus.COMPLETED ||
+            booking.status === client_2.BookingStatus.CANCELLED ||
+            booking.status === client_2.BookingStatus.REJECTED ||
+            booking.status === client_2.BookingStatus.EXPIRED) {
+            throw new AppError_1.AppError('Cannot cancel a completed, cancelled, rejected or expired booking', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         if (role !== 'ADMIN') {
             if (booking.status === client_2.BookingStatus.ONGOING) {
@@ -241,7 +260,9 @@ class BookingService {
                 }
             }
         }
-        return await bookingRepository_1.bookingRepository.update(id, { status: client_2.BookingStatus.CANCELLED });
+        // User cancel = CANCELLED, Admin cancel = REJECTED
+        const newStatus = role === 'ADMIN' ? client_2.BookingStatus.REJECTED : client_2.BookingStatus.CANCELLED;
+        return await bookingRepository_1.bookingRepository.update(id, { status: newStatus });
     }
     async deleteBooking(id) {
         // Check if booking can be deleted (only draft or cancelled bookings)
@@ -249,9 +270,9 @@ class BookingService {
         if (!booking) {
             throw new AppError_1.AppError('Booking not found', AppError_1.ErrorCode.NOT_FOUND);
         }
-        const deletableStatuses = ['DRAFT', 'CANCELLED'];
+        const deletableStatuses = ['DRAFT', 'CANCELLED', 'REJECTED', 'EXPIRED'];
         if (!deletableStatuses.includes(booking.status)) {
-            throw new AppError_1.AppError('Only draft or cancelled bookings can be deleted', AppError_1.ErrorCode.BAD_USER_INPUT);
+            throw new AppError_1.AppError('Only draft, cancelled, rejected or expired bookings can be deleted', AppError_1.ErrorCode.BAD_USER_INPUT);
         }
         return await bookingRepository_1.bookingRepository.delete(id);
     }

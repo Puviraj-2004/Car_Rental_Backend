@@ -31,6 +31,8 @@ enum BookingStatus {
   ONGOING
   COMPLETED
   CANCELLED
+  REJECTED
+  EXPIRED
 }
 
 enum BookingType {

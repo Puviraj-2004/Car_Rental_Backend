@@ -17,6 +17,8 @@ exports.bookingTypeDefs = (0, graphql_tag_1.gql) `
     ONGOING
     COMPLETED
     CANCELLED
+    REJECTED
+    EXPIRED
   }
 
   # --- Types ---

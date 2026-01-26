@@ -256,12 +256,31 @@ export class UserService {
         where: { id: bookingId },
         select: { userId: true }
       });
-      
       // Only update bookings status if there's an associated user (not walk-in)
       if (booking && booking.userId) {
         // Update only PENDING bookings to VERIFIED
         await userRepository.updateManyBookingsStatus(booking.userId, BookingStatus.PENDING, BookingStatus.VERIFIED);
         // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
+      }
+    } else if (status === VerificationStatus.REJECTED) {
+      // When documents are rejected, also reject the booking
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: { status: BookingStatus.REJECTED }
+      });
+
+      // Refund payment if it exists and was SUCCEEDED
+      const payment = await prisma.payment.findUnique({ where: { bookingId } });
+      if (payment && payment.status === 'SUCCEEDED') {
+        // Import paymentService at the top if not already
+        const { paymentService } = require('./paymentService');
+        try {
+          await paymentService.refundPayment(payment.id);
+          console.log(`💳 Refund initiated for booking ${bookingId}, payment ${payment.id} (document rejection)`);
+        } catch (refundError) {
+          const msg = typeof refundError === 'object' && refundError && 'message' in refundError ? (refundError as any).message : String(refundError);
+          console.error(`⚠️ Refund failed for booking ${bookingId}: ${msg}`);
+        }
       }
     }
     return verification;

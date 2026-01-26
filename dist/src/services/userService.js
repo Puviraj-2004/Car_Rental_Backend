@@ -229,6 +229,27 @@ class UserService {
                 // Don't automatically change VERIFIED to CONFIRMED - that should happen separately
             }
         }
+        else if (status === client_1.VerificationStatus.REJECTED) {
+            // When documents are rejected, also reject the booking
+            await database_1.default.booking.update({
+                where: { id: bookingId },
+                data: { status: graphql_1.BookingStatus.REJECTED }
+            });
+            // Refund payment if it exists and was SUCCEEDED
+            const payment = await database_1.default.payment.findUnique({ where: { bookingId } });
+            if (payment && payment.status === 'SUCCEEDED') {
+                // Import paymentService at the top if not already
+                const { paymentService } = require('./paymentService');
+                try {
+                    await paymentService.refundPayment(payment.id);
+                    console.log(`💳 Refund initiated for booking ${bookingId}, payment ${payment.id} (document rejection)`);
+                }
+                catch (refundError) {
+                    const msg = typeof refundError === 'object' && refundError && 'message' in refundError ? refundError.message : String(refundError);
+                    console.error(`⚠️ Refund failed for booking ${bookingId}: ${msg}`);
+                }
+            }
+        }
         return verification;
     }
     async processOCR(file, documentType, side) {

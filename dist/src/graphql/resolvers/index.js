@@ -10,8 +10,21 @@ const platformResolvers_1 = require("./platformResolvers");
 const scalarResolvers = {
     Upload: graphql_upload_ts_1.GraphQLUpload,
 };
+// Field resolvers for DocumentVerification to convert DateTime to String
+const documentVerificationResolvers = {
+    DocumentVerification: {
+        licenseExpiry: (parent) => parent.licenseExpiry?.toISOString() || null,
+        licenseIssueDate: (parent) => parent.licenseIssueDate?.toISOString() || null,
+        driverDob: (parent) => parent.driverDob?.toISOString() || null,
+        idExpiry: (parent) => parent.idExpiry?.toISOString() || null,
+        verifiedAt: (parent) => parent.verifiedAt?.toISOString() || null,
+        createdAt: (parent) => parent.createdAt?.toISOString() || null,
+        updatedAt: (parent) => parent.updatedAt?.toISOString() || null,
+    }
+};
 const resolvers = (0, merge_1.mergeResolvers)([
     scalarResolvers,
+    documentVerificationResolvers,
     userResolvers_1.userResolvers,
     carResolvers_1.carResolvers,
     bookingResolvers_1.bookingResolvers,

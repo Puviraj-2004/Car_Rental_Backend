@@ -15,6 +15,8 @@ export const bookingTypeDefs = gql`
     ONGOING
     COMPLETED
     CANCELLED
+    REJECTED
+    EXPIRED
   }
 
   # --- Types ---

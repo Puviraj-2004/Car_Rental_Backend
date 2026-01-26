@@ -76,7 +76,9 @@ export enum BookingStatus {
   CONFIRMED = 'CONFIRMED',
   ONGOING = 'ONGOING',
   COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED'
+  CANCELLED = 'CANCELLED',
+  REJECTED = 'REJECTED',
+  EXPIRED = 'EXPIRED'
 }
 
 // GraphQL Context Type
